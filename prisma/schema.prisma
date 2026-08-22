@@ -1,0 +1,151 @@
+// Prisma schema for ai-forge
+// Phase 1: プロンプト管理ツール(認証 + プロンプトCRUD + AI実行履歴・バージョン管理)
+// 詳細は docs/db-design.md を参照
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// --- 認証(NextAuth.js / GitHub OAuth) ---
+// NextAuth Prisma Adapter が要求する標準スキーマに準拠
+// https://authjs.dev/getting-started/adapters/prisma
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+
+  accounts   Account[]
+  sessions   Session[]
+  categories Category[]
+  prompts    Prompt[]
+  executions Execution[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// --- プロンプト管理ドメイン ---
+
+model Category {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+
+  userId  String
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  prompts Prompt[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, name])
+}
+
+model Prompt {
+  id    String @id @default(cuid())
+  title String
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  versions   PromptVersion[]
+  executions Execution[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// プロンプト本文の変更履歴。編集のたびに新しいバージョンを追加し、上書きしない。
+model PromptVersion {
+  id            String  @id @default(cuid())
+  versionNumber Int
+  content       String  @db.Text
+  note          String?
+
+  promptId String
+  prompt   Prompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
+
+  executions Execution[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([promptId, versionNumber])
+}
+
+enum ExecutionStatus {
+  SUCCESS
+  FAILED
+}
+
+// AI API実行の結果と履歴。どのプロンプトバージョンで実行したかを記録する。
+model Execution {
+  id String @id @default(cuid())
+
+  promptId String
+  prompt   Prompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
+
+  promptVersionId String
+  promptVersion   PromptVersion @relation(fields: [promptVersionId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  model        String
+  variables    Json?
+  resultText   String          @db.Text
+  status       ExecutionStatus @default(SUCCESS)
+  errorMessage String?
+
+  promptTokens     Int?
+  completionTokens Int?
+  durationMs       Int?
+
+  createdAt DateTime @default(now())
+}
