@@ -76,7 +76,7 @@ describe("POST /api/review-comments/backfill-embeddings", () => {
   });
 
   it("埋め込みが無い指摘にembeddingを追加する", async () => {
-    await createReviewWithComments(userId, ["指摘A", "指摘B"]);
+    const review = await createReviewWithComments(userId, ["指摘A", "指摘B"]);
     mockEmbedDocuments.mockResolvedValue([fakeEmbedding(1), fakeEmbedding(2)]);
 
     const res = await POST();
@@ -85,7 +85,9 @@ describe("POST /api/review-comments/backfill-embeddings", () => {
     expect(body).toEqual({ processed: 2, remaining: false });
 
     const embedded = await prisma.$queryRaw<{ count: bigint }[]>`
-      SELECT COUNT(*)::int AS count FROM "ReviewCommentEmbedding"
+      SELECT COUNT(*)::int AS count FROM "ReviewCommentEmbedding" rce
+      JOIN "ReviewComment" rc ON rc.id = rce."reviewCommentId"
+      WHERE rc."reviewId" = ${review.id}
     `;
     expect(Number(embedded[0].count)).toBe(2);
   });
