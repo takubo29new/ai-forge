@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth, signOut } from "@/auth";
 
@@ -16,7 +17,15 @@ export default async function PromptsPage() {
   return (
     <div className="flex flex-1 flex-col">
       <header className="flex items-center justify-between border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
-        <span className="font-semibold">ai-forge</span>
+        <div className="flex items-center gap-4">
+          <span className="font-semibold">ai-forge</span>
+          <Link
+            href="/categories"
+            className="text-sm text-zinc-600 hover:underline dark:text-zinc-400"
+          >
+            カテゴリ管理
+          </Link>
+        </div>
         <div className="flex items-center gap-3">
           {session.user.image && (
             <Image
