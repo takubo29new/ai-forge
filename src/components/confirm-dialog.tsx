@@ -10,6 +10,7 @@ export function ConfirmDialog({
   cancelLabel = "キャンセル",
   danger,
   pending,
+  error,
   onConfirm,
   onCancel,
 }: {
@@ -20,6 +21,7 @@ export function ConfirmDialog({
   cancelLabel?: string;
   danger?: boolean;
   pending?: boolean;
+  error?: string | null;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -28,14 +30,18 @@ export function ConfirmDialog({
       <h2 id="confirm-dialog-title" className="mb-2 font-semibold">
         {title}
       </h2>
-      <p className="mb-6 text-sm text-zinc-600 dark:text-zinc-400">
+      <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
         {message}
       </p>
+      {error && (
+        <p className="mb-4 text-sm text-red-600 dark:text-red-400">{error}</p>
+      )}
       <div className="flex justify-end gap-2">
         <button
           type="button"
           onClick={onCancel}
-          className="rounded border border-zinc-300 px-4 py-1.5 text-sm dark:border-zinc-700"
+          disabled={pending}
+          className="rounded border border-zinc-300 px-4 py-1.5 text-sm disabled:opacity-50 dark:border-zinc-700"
         >
           {cancelLabel}
         </button>
@@ -49,7 +55,7 @@ export function ConfirmDialog({
               : "bg-foreground text-background"
           }`}
         >
-          {confirmLabel}
+          {pending ? "処理中..." : confirmLabel}
         </button>
       </div>
     </Modal>

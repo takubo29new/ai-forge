@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Modal } from "@/components/modal";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { useApiMutation } from "@/lib/use-api-mutation";
 
 type Repository = {
   id: string;
@@ -30,21 +31,23 @@ export function RepositoryManager({
   const [showModal, setShowModal] = useState(false);
   const [available, setAvailable] = useState<AvailableRepo[]>([]);
   const [loadingAvailable, setLoadingAvailable] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
+  const [listError, setListError] = useState<string | null>(null);
   const [disconnectTarget, setDisconnectTarget] = useState<Repository | null>(
     null,
   );
 
+  const connectMutation = useApiMutation();
+  const disconnectMutation = useApiMutation();
+
   async function openConnectModal() {
     setShowModal(true);
-    setError(null);
+    setListError(null);
     setLoadingAvailable(true);
     try {
       const res = await fetch("/api/github/repos");
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "リポジトリの取得に失敗しました");
+        setListError(data.error ?? "リポジトリの取得に失敗しました");
         return;
       }
       setAvailable(data);
@@ -54,48 +57,30 @@ export function RepositoryManager({
   }
 
   async function handleConnect(repo: AvailableRepo) {
-    setError(null);
-    setPending(true);
-    try {
-      const res = await fetch("/api/repositories", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ owner: repo.owner, name: repo.name }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "接続に失敗しました");
-        return;
-      }
-      setRepositories((prev) => [data, ...prev]);
-      setAvailable((prev) =>
-        prev.filter((r) => r.githubRepoId !== repo.githubRepoId),
-      );
-    } finally {
-      setPending(false);
-    }
+    const data = await connectMutation.mutate<Repository>(
+      "/api/repositories",
+      { method: "POST", body: { owner: repo.owner, name: repo.name } },
+      "接続に失敗しました",
+    );
+    if (!data) return;
+    setRepositories((prev) => [data, ...prev]);
+    setAvailable((prev) =>
+      prev.filter((r) => r.githubRepoId !== repo.githubRepoId),
+    );
   }
 
   async function handleDisconnect() {
     if (!disconnectTarget) return;
     const repo = disconnectTarget;
 
-    setError(null);
-    setPending(true);
+    const result = await disconnectMutation.mutate(
+      `/api/repositories/${repo.id}`,
+      { method: "DELETE" },
+      "解除に失敗しました",
+    );
+    if (result === null) return;
+    setRepositories((prev) => prev.filter((r) => r.id !== repo.id));
     setDisconnectTarget(null);
-    try {
-      const res = await fetch(`/api/repositories/${repo.id}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setError(data.error ?? "解除に失敗しました");
-        return;
-      }
-      setRepositories((prev) => prev.filter((r) => r.id !== repo.id));
-    } finally {
-      setPending(false);
-    }
   }
 
   return (
@@ -112,8 +97,10 @@ export function RepositoryManager({
         </button>
       </div>
 
-      {error && !showModal && (
-        <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+      {disconnectMutation.error && (
+        <p className="text-sm text-red-600 dark:text-red-400">
+          {disconnectMutation.error}
+        </p>
       )}
 
       <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
@@ -144,7 +131,7 @@ export function RepositoryManager({
               </Link>
               <button
                 onClick={() => setDisconnectTarget(repo)}
-                disabled={pending}
+                disabled={disconnectMutation.pending}
                 className="rounded border border-zinc-300 px-3 py-1.5 text-xs disabled:opacity-50 dark:border-zinc-700"
               >
                 解除
@@ -171,9 +158,9 @@ export function RepositoryManager({
           </button>
         </div>
 
-        {error && (
+        {(listError || connectMutation.error) && (
           <p className="mb-3 text-sm text-red-600 dark:text-red-400">
-            {error}
+            {listError ?? connectMutation.error}
           </p>
         )}
 
@@ -181,7 +168,7 @@ export function RepositoryManager({
           <p className="text-sm text-zinc-500">読み込み中...</p>
         )}
 
-        {!loadingAvailable && available.length === 0 && !error && (
+        {!loadingAvailable && available.length === 0 && !listError && (
           <p className="text-sm text-zinc-500">
             接続できるリポジトリがありません
           </p>
@@ -203,7 +190,7 @@ export function RepositoryManager({
               </span>
               <button
                 onClick={() => handleConnect(repo)}
-                disabled={pending}
+                disabled={connectMutation.pending}
                 className="rounded bg-foreground px-3 py-1 text-xs font-medium text-background disabled:opacity-50"
               >
                 接続
@@ -225,9 +212,13 @@ export function RepositoryManager({
         }
         confirmLabel="解除"
         danger
-        pending={pending}
+        pending={disconnectMutation.pending}
+        error={disconnectTarget ? disconnectMutation.error : null}
         onConfirm={handleDisconnect}
-        onCancel={() => setDisconnectTarget(null)}
+        onCancel={() => {
+          setDisconnectTarget(null);
+          disconnectMutation.setError(null);
+        }}
       />
     </div>
   );

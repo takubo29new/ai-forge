@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { useApiMutation } from "@/lib/use-api-mutation";
 
 type Category = {
   id: string;
@@ -18,34 +19,23 @@ export function CategoryManager({
   const [categories, setCategories] = useState(initialCategories);
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
-  const [pending, setPending] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
+  const { mutate, pending, error, setError } = useApiMutation();
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
-    setPending(true);
-    try {
-      const res = await fetch("/api/categories", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newName, description: newDescription }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "作成に失敗しました");
-        return;
-      }
-      setCategories((prev) => [...prev, { ...data, promptCount: 0 }]);
-      setNewName("");
-      setNewDescription("");
-    } finally {
-      setPending(false);
-    }
+    const data = await mutate<Category>(
+      "/api/categories",
+      { method: "POST", body: { name: newName, description: newDescription } },
+      "作成に失敗しました",
+    );
+    if (!data) return;
+    setCategories((prev) => [...prev, { ...data, promptCount: 0 }]);
+    setNewName("");
+    setNewDescription("");
   }
 
   function startEdit(category: Category) {
@@ -56,48 +46,28 @@ export function CategoryManager({
   }
 
   async function handleUpdate(id: string) {
-    setError(null);
-    setPending(true);
-    try {
-      const res = await fetch(`/api/categories/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: editName, description: editDescription }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "更新に失敗しました");
-        return;
-      }
-      setCategories((prev) =>
-        prev.map((c) => (c.id === id ? { ...c, ...data } : c)),
-      );
-      setEditingId(null);
-    } finally {
-      setPending(false);
-    }
+    const data = await mutate<Category>(
+      `/api/categories/${id}`,
+      { method: "PATCH", body: { name: editName, description: editDescription } },
+      "更新に失敗しました",
+    );
+    if (!data) return;
+    setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, ...data } : c)));
+    setEditingId(null);
   }
 
   async function handleDelete() {
     if (!deleteTarget) return;
     const category = deleteTarget;
 
-    setError(null);
-    setPending(true);
+    const result = await mutate(
+      `/api/categories/${category.id}`,
+      { method: "DELETE" },
+      "削除に失敗しました",
+    );
+    if (result === null) return;
+    setCategories((prev) => prev.filter((c) => c.id !== category.id));
     setDeleteTarget(null);
-    try {
-      const res = await fetch(`/api/categories/${category.id}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setError(data.error ?? "削除に失敗しました");
-        return;
-      }
-      setCategories((prev) => prev.filter((c) => c.id !== category.id));
-    } finally {
-      setPending(false);
-    }
   }
 
   return (
@@ -226,8 +196,12 @@ export function CategoryManager({
         confirmLabel="削除"
         danger
         pending={pending}
+        error={deleteTarget ? error : null}
         onConfirm={handleDelete}
-        onCancel={() => setDeleteTarget(null)}
+        onCancel={() => {
+          setDeleteTarget(null);
+          setError(null);
+        }}
       />
     </div>
   );

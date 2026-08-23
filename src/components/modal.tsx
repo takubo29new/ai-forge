@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
@@ -19,16 +20,31 @@ export function Modal({
   const dialogRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
 
+  // onCloseは呼び出し側でインライン関数として渡されることが多く、親の
+  // 再レンダリングのたびに参照が変わる。effectの依存配列に直接入れると
+  // モーダル表示中の無関係な状態更新(pendingの切り替え等)のたびに
+  // effectが再実行され、フォーカスがダイアログのコンテナへ引き戻されて
+  // しまう。refで最新値だけ追い、effect自体はopenにのみ依存させる。
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+
   useEffect(() => {
     if (!open) return;
 
     previouslyFocused.current = document.activeElement as HTMLElement | null;
     dialogRef.current?.focus();
 
+    // モーダルの外側にあるページ本体をinertにし、スクリーンリーダーの
+    // 仮想カーソルでも背後のコンテンツを操作できないようにする。
+    const appRoot = document.getElementById("app-root");
+    appRoot?.setAttribute("inert", "");
+
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
         e.stopPropagation();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== "Tab") return;
@@ -52,13 +68,14 @@ export function Modal({
     document.addEventListener("keydown", handleKeyDown);
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
+      appRoot?.removeAttribute("inert");
       previouslyFocused.current?.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-6"
       onClick={onClose}
@@ -74,6 +91,7 @@ export function Modal({
       >
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
