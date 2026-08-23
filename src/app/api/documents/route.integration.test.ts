@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 
 vi.mock("@/auth", () => ({ auth: vi.fn() }));
-vi.mock("@/lib/voyage", () => ({ embedDocuments: vi.fn() }));
+vi.mock("@/lib/voyage", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/voyage")>()),
+  embedDocuments: vi.fn(),
+}));
 
 import { auth } from "@/auth";
 import { embedDocuments } from "@/lib/voyage";
@@ -87,6 +90,20 @@ describe("POST /api/documents", () => {
 
     const documents = await prisma.document.findMany({ where: { userId } });
     expect(documents).toHaveLength(0);
+  });
+
+  it("Voyage AIのレート制限(429)時は具体的な案内メッセージを返す", async () => {
+    const { VoyageApiError } = await import("@/lib/voyage");
+    mockEmbedDocuments.mockRejectedValue(
+      new VoyageApiError(429, "rate limited"),
+    );
+
+    const res = await POST(
+      request({ title: "レート制限テスト", content: "## 本文\nテスト" }),
+    );
+    expect(res.status).toBe(502);
+    const body = await res.json();
+    expect(body.error).toContain("レート制限");
   });
 });
 

@@ -5,6 +5,7 @@ import { embedDocuments } from "@/lib/voyage";
 import { setReviewCommentEmbedding } from "@/lib/embeddings";
 import { checkDocumentRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { LIST_LIMIT } from "@/lib/list-limits";
+import { voyageErrorResponse } from "@/lib/voyage-error-response";
 
 // Phase 2で蓄積された既存のReviewCommentにはReviewCommentEmbeddingが無いため、
 // RAG検索チャットの検索対象にするための一括埋め込み生成(docs/phase3-design.md参照)。
@@ -39,11 +40,11 @@ export async function POST() {
     await Promise.all(
       comments.map((c, i) => setReviewCommentEmbedding(c.id, embeddings[i])),
     );
-  } catch {
-    return NextResponse.json(
-      { error: "埋め込みの生成に失敗しました。もう一度お試しください。" },
-      { status: 502 },
-    );
+  } catch (error) {
+    return voyageErrorResponse(error, {
+      path: "/api/review-comments/backfill-embeddings",
+      userId,
+    });
   }
 
   return NextResponse.json({

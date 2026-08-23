@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 
 vi.mock("@/auth", () => ({ auth: vi.fn() }));
-vi.mock("@/lib/voyage", () => ({ embedDocuments: vi.fn() }));
+vi.mock("@/lib/voyage", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/voyage")>()),
+  embedDocuments: vi.fn(),
+}));
 
 import { auth } from "@/auth";
 import { embedDocuments } from "@/lib/voyage";
