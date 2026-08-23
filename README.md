@@ -1,5 +1,7 @@
 # ai-forge
 
+[![CI](https://github.com/takubo29new/ai-forge/actions/workflows/ci.yml/badge.svg)](https://github.com/takubo29new/ai-forge/actions/workflows/ci.yml)
+
 統合AI開発支援ツール — プロンプト管理・AIコードレビュー・RAGドキュメント検索チャットボットを段階的に統合するポートフォリオ向けプラットフォーム。
 
 プロダクトコンセプトや技術スタック、開発ロードマップの詳細は [`ai-dev-tool-handoff.md`](./ai-dev-tool-handoff.md) を参照。
