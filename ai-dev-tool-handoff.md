@@ -68,7 +68,7 @@ Phase 2完了後、経験豊富なWebエンジニアの視点でmainの実装を
 
 ルートレベルのAPI統合テスト(`npm run test:integration`)もCI導入後に追加した。GitHub Actions上のPostgresサービスコンテナに対し、認可判定・レート制限・AI実行の成否分岐など回帰しやすい箇所を検証している。詳細は[`docs/quality-improvements.md`](./docs/quality-improvements.md)を参照。
 
-Phase 3(RAG検索チャットボット)は画面遷移・DB設計まで完了(未実装)。埋め込みモデルはAnthropicがRAG用途で公式に推奨する[Voyage AI](https://www.voyageai.com/)の`voyage-3`を採用する。設計書(`docs/*.md`)とAIレビューの指摘(`ReviewComment`)をベクトル検索の対象とし、`/chat`で出典付きの回答を返す方針。詳細は[`docs/phase3-design.md`](./docs/phase3-design.md)を参照。
+Phase 3(RAG検索チャットボット)は画面遷移・DB設計に続けて実装に着手した。埋め込みモデルはAnthropicがRAG用途で公式に推奨する[Voyage AI](https://www.voyageai.com/)の`voyage-3`を採用。pgvector拡張(0.8.6)を有効化し`Document`/`DocumentChunk`のスキーマを追加、`/documents`でのドキュメント手動登録(見出し単位のチャンク分割→Voyage AIで埋め込み生成→HNSWインデックス付きのベクトル列に保存)まで実装完了。RAG検索チャット(`/chat`)・リポジトリファイル同期・既存`ReviewComment`への埋め込みバックフィル・統合ダッシュボード(`/dashboard`)は未実装。詳細は[`docs/phase3-design.md`](./docs/phase3-design.md)を参照。
 
 ## 次のステップ候補
-- Phase 3: RAG検索チャットボットの実装([`docs/phase3-design.md`](./docs/phase3-design.md)の設計に沿って、pgvector拡張の有効化から着手)
+- Phase 3: リポジトリファイル同期・RAG検索チャット(`/chat`)・統合ダッシュボード(`/dashboard`)の実装([`docs/phase3-design.md`](./docs/phase3-design.md)の「実装状況」参照)

@@ -7,6 +7,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 const NAV_LINKS = [
   { href: "/categories", label: "カテゴリ管理" },
   { href: "/repositories", label: "リポジトリ" },
+  { href: "/documents", label: "ドキュメント" },
   { href: "/errors", label: "エラーログ" },
   { href: "/help", label: "ヘルプ" },
 ];
