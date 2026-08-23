@@ -9,6 +9,9 @@ import { ReviewOutputSchema } from "@/lib/review-schema";
 import { checkExecutionRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { LIST_LIMIT } from "@/lib/list-limits";
 import { runAiExecution } from "@/lib/run-ai-execution";
+import { embedDocuments } from "@/lib/voyage";
+import { setReviewCommentEmbedding } from "@/lib/embeddings";
+import { logError } from "@/lib/error-log";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 
 export async function GET(
@@ -196,14 +199,45 @@ export async function POST(
         })),
       ];
 
+      let comments: { id: string; body: string }[] = [];
       if (commentData.length > 0) {
         await tx.reviewComment.createMany({ data: commentData });
+        comments = await tx.reviewComment.findMany({
+          where: { reviewId: created.id },
+          select: { id: true, body: true },
+        });
       }
 
-      return created;
+      return { review: created, comments };
     });
 
-    return NextResponse.json({ id: review.id }, { status: 201 });
+    // 指摘の埋め込み生成はRAG検索チャットの検索対象を増やすための副次的な処理であり、
+    // ここで失敗してもレビュー結果自体は既に作成・返却できているため、ベストエフォートで
+    // 行う(失敗しても200/201のレスポンスやReview自体には影響させない)。埋め込みが
+    // 無いままの指摘は/api/review-comments/backfill-embeddingsで後から埋められる。
+    if (review.comments.length > 0) {
+      try {
+        const embeddings = await embedDocuments(
+          review.comments.map((c) => c.body),
+        );
+        await Promise.all(
+          review.comments.map((c, i) =>
+            setReviewCommentEmbedding(c.id, embeddings[i]),
+          ),
+        );
+      } catch (error) {
+        await logError({
+          source: "SERVER",
+          message: `ReviewCommentの埋め込み生成に失敗しました: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+          path: `/api/repositories/${repository.id}/reviews`,
+          userId,
+        });
+      }
+    }
+
+    return NextResponse.json({ id: review.review.id }, { status: 201 });
   }
 
   const review = await prisma.review.create({

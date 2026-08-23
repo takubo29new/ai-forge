@@ -12,6 +12,7 @@ const SECTIONS = [
   { id: "review", label: "AIレビュー" },
   { id: "trends", label: "レビュー履歴・傾向" },
   { id: "documents", label: "ドキュメント" },
+  { id: "chat", label: "RAG検索チャット" },
   { id: "appearance", label: "表示設定・エラーログ" },
   { id: "faq", label: "よくある質問" },
 ];
@@ -146,7 +147,17 @@ export default async function HelpPage() {
             「ドキュメント」ページから、設計書やメモをタイトル・本文で登録できます。本文はMarkdownの見出し(<code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">##</code>や<code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">###</code>)単位で自動的にチャンク分割され、それぞれに検索用の埋め込みベクトルが生成されます。
           </p>
           <p className="text-sm text-zinc-700 dark:text-zinc-300">
-            現時点では登録・削除のみで、登録したドキュメントを検索して質問に答えるRAG検索チャットはまだ実装されていません(Phase 3・実装中)。
+            過去に実行したAIレビューの指摘は自動では検索対象になっていないため、「既存のレビュー指摘を取り込む」ボタンで一括して埋め込みを生成できます(新しく実行したレビューは自動で対象になります)。
+          </p>
+        </section>
+
+        <section id="chat">
+          <h2 className="mb-2 text-lg font-semibold">RAG検索チャット</h2>
+          <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
+            「チャット」ページから、登録したドキュメントや過去のAIレビュー指摘について自然文で質問できます。質問に関連する内容をベクトル検索で探し、Claudeがその内容だけを根拠に回答します(文脈に無いことは推測で答えません)。回答の下に表示される出典から、元のレビュー詳細画面に遷移できます。
+          </p>
+          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+            会話履歴はブラウザ上にのみ保持され、ページを離れると失われます。関連するドキュメント・レビュー指摘が見つからない場合は、その旨がそのまま返されます。
           </p>
         </section>
 

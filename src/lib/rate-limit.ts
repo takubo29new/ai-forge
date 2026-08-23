@@ -5,6 +5,7 @@ const WINDOW_MS = 60 * 60 * 1000;
 const MAX_EXECUTIONS_PER_WINDOW = 20;
 const MAX_CLIENT_ERRORS_PER_WINDOW = 30;
 const MAX_DOCUMENTS_PER_WINDOW = 20;
+const MAX_CHAT_MESSAGES_PER_WINDOW = 30;
 
 // 用途(purpose)ごとに独立したカウンタを持たせる。固定ウィンドウ(1時間単位)で
 // RateLimitBucketのcountをupsertでインクリメントする。このupsertはPostgres側で
@@ -44,6 +45,11 @@ export function checkClientErrorRateLimit(userId: string) {
 // ドキュメント登録(Voyage AIへの埋め込み生成を伴う)用の別カウンタ。
 export function checkDocumentRateLimit(userId: string) {
   return checkRateLimit(userId, "document", MAX_DOCUMENTS_PER_WINDOW);
+}
+
+// RAG検索チャット用の別カウンタ。対話的に使う想定のため他より上限を高めにする。
+export function checkChatRateLimit(userId: string) {
+  return checkRateLimit(userId, "chat", MAX_CHAT_MESSAGES_PER_WINDOW);
 }
 
 export function rateLimitResponse(limit: number, message?: string) {

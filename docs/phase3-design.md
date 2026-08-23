@@ -1,6 +1,6 @@
 # Phase 3 基本設計書(RAG検索チャットボット)
 
-対象: RAG検索チャットボット(Phase 3)。アーキテクチャ・認証は [`phase1-design.md`](./phase1-design.md) を、DB設計の全体像は [`db-design.md`](./db-design.md) を参照。本ドキュメントはPhase 3で新規に追加するDB・画面・APIをまとめる。**DBスキーマ・ドキュメント取り込み(手動登録)まで実装済み。RAG検索チャット・ダッシュボードは未実装。**詳細は「実装状況」を参照。
+対象: RAG検索チャットボット(Phase 3)。アーキテクチャ・認証は [`phase1-design.md`](./phase1-design.md) を、DB設計の全体像は [`db-design.md`](./db-design.md) を参照。本ドキュメントはPhase 3で新規に追加するDB・画面・APIをまとめる。**DBスキーマ・ドキュメント取り込み・レビュー指摘の埋め込みバックフィル・RAG検索チャットまで実装済み。統合ダッシュボードは未実装。**詳細は「実装状況」を参照。
 
 ## 概要
 
@@ -142,13 +142,24 @@ flowchart TD
 
 ## レビュー指摘の埋め込みバックフィル
 
-既存の`ReviewComment`(Phase 2ですでに蓄積済み)には`ReviewCommentEmbedding`が無いため、Phase 3実装時に一括で埋め込みを生成するバックフィル処理が別途必要になる(新規作成分は`POST /api/repositories/:id/reviews`の中で都度埋め込みを作る想定)。
+既存の`ReviewComment`(Phase 2ですでに蓄積済み)には`ReviewCommentEmbedding`が無かったため、`POST /api/review-comments/backfill-embeddings`で一括生成できるようにした。1回の呼び出しで未処理分を`LIST_LIMIT`(100件)まで処理し、`remaining: true`が返る間は複数回呼び出す(`/documents`ページの「既存のレビュー指摘を取り込む」ボタンがこれを行う)。新規作成分は`POST /api/repositories/:id/reviews`の中で都度埋め込みを作る(ベストエフォート。失敗してもレビュー自体は成功として返す)。
+
+## RAG検索チャットの回答生成方針
+
+`POST /api/chat`は次の流れで処理する。
+
+1. 質問文をVoyage AI(`input_type: "query"`)で埋め込む
+2. `DocumentChunk`・`ReviewCommentEmbedding`それぞれに対しコサイン距離のk近傍検索(上位5件ずつ)を行い、距離でマージして上位5件を採用する(`src/lib/chat-context.ts`)
+3. 採用したチャンク・指摘を`[出典N: ...]`形式で文脈として整形し、質問と一緒にClaudeに渡す。「文脈に無いことは憶測で答えない」よう明示的に指示する
+4. 検索結果が0件の場合はClaudeを呼ばず、ドキュメント登録・レビュー実行を促す案内文をそのまま返す(コスト最適化と、根拠の無い回答を防ぐため)
+
+この呼び出しは、ユーザーが管理する`PromptVersion`を使う実行ではなくシステム側が組み立てるプロンプトのため、Phase 1・2の`Execution`(`promptVersionId`必須)の枠組みには乗せていない(`src/app/api/chat/route.ts`で直接Claudeを呼ぶ)。
 
 ## 実装状況
 
 1. ~~`pgvector`拡張の有効化・`Document`/`DocumentChunk`/`ReviewCommentEmbedding`のマイグレーション追加~~ → 完了。`vector`拡張(0.8.6)を有効化し、`embedding`列へHNSWインデックス(コサイン距離)を追加済み
 2. ~~ドキュメント取り込み(`/documents`・手動登録)の実装~~ → 完了。タイトル+本文を送ると`chunkMarkdown()`で見出し単位に分割し、Voyage AI(`voyage-3`)で埋め込みを生成して`DocumentChunk`に保存する。埋め込み生成に失敗した場合はDocument自体を削除し、作り直せる状態に戻す(部分的に検索対象外のDocumentが残らないようにするため)
 3. リポジトリファイル同期の実装 — 未着手
-4. 既存`ReviewComment`への埋め込みバックフィル — 未着手
-5. RAG検索チャット(`/chat`)の実装 — 未着手
+4. ~~既存`ReviewComment`への埋め込みバックフィル~~ → 完了。上記「レビュー指摘の埋め込みバックフィル」参照
+5. ~~RAG検索チャット(`/chat`)の実装~~ → 完了。上記「RAG検索チャットの回答生成方針」参照
 6. 統合ダッシュボード(`/dashboard`)の実装 — 未着手
