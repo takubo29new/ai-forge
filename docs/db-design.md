@@ -1,6 +1,6 @@
 # DB設計
 
-Phase 1(プロンプト管理ツール)・Phase 2(AIコードレビューツール)に必要なテーブル構成。スキーマの実体は [`prisma/schema.prisma`](../prisma/schema.prisma)。ORMはPrisma。Phase 3(RAG検索チャットボット)のテーブル構成は設計のみで未実装。[`phase3-design.md`](./phase3-design.md)を参照。
+Phase 1(プロンプト管理ツール)・Phase 2(AIコードレビューツール)・Phase 3(RAG検索チャットボット、ドキュメント取り込みまで)に必要なテーブル構成。スキーマの実体は [`prisma/schema.prisma`](../prisma/schema.prisma)。ORMはPrisma。詳細は[`phase3-design.md`](./phase3-design.md)を参照。
 
 ## テーブル一覧
 
@@ -32,6 +32,14 @@ GitHub OAuthのアクセストークンは、Phase 1の認証ですでに`Accoun
 - `Review` — PRに対するAIレビューの実行単位。どのリポジトリ・PR・`PromptVersion`(レビュー用プロンプト)・`Execution`(実際のAI呼び出し)に対応するかを記録する
 - `ReviewComment` — AIレビューが指摘した個別の指摘事項(ファイルパス・行・重要度・本文)。`Review`に対して複数持つ
 
+### RAG検索チャットボットドメイン(Phase 3)
+
+pgvector拡張(`vector`、0.8.6)をここで初めて有効化した。詳細は[`phase3-design.md`](./phase3-design.md)を参照。
+
+- `Document` — 取り込んだドキュメント本体(手動貼り付け、またはリポジトリファイル同期)
+- `DocumentChunk` — `Document`を見出し単位で分割した1チャンク。埋め込みベクトル(`vector(1024)`)を持つ
+- `ReviewCommentEmbedding` — `ReviewComment`に対する埋め込みを1:1で追加する別テーブル(未着手。既存指摘へのバックフィルが必要)
+
 ## 設計上の判断
 
 - **本文をPromptではなくPromptVersionに持たせた理由**: 「実行履歴・バージョン管理(過去の実行結果とプロンプトの変更履歴を保存)」という要件上、"どのバージョンで何を実行したか"を後から正確に辿れる必要があるため、Prompt本体には本文を持たせず、常にバージョン行を経由する設計にした。最新版の判定は`versionNumber`の最大値、または`createdAt`降順で取得する。
@@ -40,7 +48,7 @@ GitHub OAuthのアクセストークンは、Phase 1の認証ですでに`Accoun
 - **`Execution.resultText`はnullable**: `status: FAILED`(APIエラー・タイムアウト等で出力が得られない実行)を表現できるようにするため、本文なしでも保存できるようにした。
 - **`PromptVersion.versionNumber`の採番はアプリケーション側でmax+1**: 同一Promptに対する同時編集リクエストが競合した場合、`@@unique([promptId, versionNumber])`の制約により片方が失敗しうる(データ不整合ではなくリクエスト失敗)。単一ユーザーが自分のプロンプトを編集する用途では発生頻度は低いと判断し、Phase 1では許容する。将来的に問題になる場合はリトライ処理を追加する。
 - **Executionの`variables`はJson型**: プロンプト内の変数(テンプレート変数)は機能ごとに形が変わるため、リレーショナルに正規化せずJSONで保持する。
-- **pgvector**: Phase 3のRAG機能で同一PostgreSQL内にベクトル列を追加する想定(設計ドキュメント参照)。Phase 1時点では未使用のため、拡張の有効化やベクトル列の追加はPhase 3着手時に行う。
+- **pgvector**: Phase 3のRAG機能で同一PostgreSQL内にベクトル列を追加する想定(設計ドキュメント参照)だった。Phase 1時点では未使用としていたが、Phase 3のドキュメント取り込み実装時に`CREATE EXTENSION vector`で有効化した。
 - **RateLimitBucketは`Execution`の件数をSELECTするのではなく専用カウンタで実装**: 当初は直近1時間の`Execution`件数を数える方式だったが、「件数を数える→実行を記録する」の間に別リクエストが割り込めるTOCTOUレースがあり、同時リクエストで上限を超えて呼び出せてしまう問題があった。`@@id([userId, windowStart])`の複合主キーに対する`upsert`(`count: { increment: 1 }`)はPostgres側で`INSERT ... ON CONFLICT DO UPDATE`としてアトミックに実行されるため、このレースが起きない。あわせて、成長し続ける`Execution`テーブルを都度COUNTする(インデックスが無ければフルスキャンになる)コストも避けられる。
 
 - **ErrorLogの`userId`はnullable**: サーバー側の`onRequestError`(`instrumentation.ts`)はNext.jsのリクエストコンテキストからセッション情報を直接取得できないため、多くのサーバーエラーは`userId: null`(ユーザー非紐付け)で記録される。クライアント側の報告(`POST /api/client-errors`)は認証必須のため`userId`が入る。閲覧画面(`/errors`)では、他ユーザーの個人情報漏えいを避けるため「自分の`userId`のログ」と「`userId`がnullの(=システム全体の)ログ」のみを表示し、他ユーザーの`userId`付きログは見せない。
@@ -54,11 +62,13 @@ GitHub OAuthのアクセストークンは、Phase 1の認証ですでに`Accoun
 - **`Repository.githubRepoId`は`BigInt`**: GitHubのリポジトリIDはPostgresの`Int`(32bit)の範囲を超える可能性があるため、`BigInt`で保持する。リポジトリ名(`owner`/`name`)は変更され得るため、識別子としては使わずGitHub側のIDを正とする。
 - **ReviewCommentはReview経由のみでPromptVersionを参照しない**: 個別の指摘はレビュー単位に従属する情報であり、どのプロンプトで生成されたかは親のReviewを辿れば分かるため、冗長な外部キーは持たせない(Execution/PromptVersion/Promptの関係と同様の考え方)。
 
-### Phase 3の設計判断(未実装)
+### Phase 3の設計判断
 
-- **埋め込みベクトル列はPrismaの`Unsupported("vector(1024)")`として宣言する**: pgvectorの`vector`型はPrismaが標準サポートしていない。`Unsupported`型のフィールドはPrisma Clientの通常のSELECT/INSERTに含められないという制約があるため、埋め込みの読み書き・コサイン類似検索は`$queryRaw`/`$executeRaw`で行う方針にする
+- **埋め込みベクトル列はPrismaの`Unsupported("vector(1024)")`として宣言する**: pgvectorの`vector`型はPrismaが標準サポートしていない。`Unsupported`型のフィールドはPrisma Clientの通常のSELECT/INSERTに含められないという制約があるため、埋め込みの読み書き・コサイン類似検索は`$queryRaw`/`$executeRaw`で行う(`src/lib/embeddings.ts`の`setDocumentChunkEmbedding()`)。`DocumentChunk`は先にPrisma経由でembeddingなしの行を作り、直後に`$executeRaw`でembedding列をUPDATEする2段階の書き込みになる
 - **`ReviewComment`への埋め込みは別テーブル(`ReviewCommentEmbedding`)に分離する**: `ReviewComment`本体に埋め込み列を追加することもできたが、「AIレビューの指摘」という既存の単一責務・既存クエリへの影響を避けるため、1:1の別テーブルにした
 - **埋め込みモデルはVoyage AI(`voyage-3`)**: AnthropicがRAG用途で公式に推奨しているため。詳細・DB設計の全体像は[`phase3-design.md`](./phase3-design.md)を参照
+- **Voyage AI呼び出し失敗時はDocument自体を削除する**: `POST /api/documents`で埋め込み生成(`embedDocuments()`)が失敗した場合、chunkだけ作ってembeddingが無いDocumentを残すと「検索対象に見えるが実際はヒットしない」という気づきにくい不整合になる。Reviewの`status: FAILED`のように失敗を記録として残す設計とは異なり、ここでは作り直せる状態(そもそも存在しない)に戻すことを優先した(Phase 1のExecution・Phase 2のReviewとは意図的に異なる判断)
+- **pgvectorの類似検索インデックスはHNSW**: `ivfflat`は事前にある程度のデータ件数が無いとクラスタリングの精度が出ない(トレーニングデータ依存)のに対し、HNSWはデータが増えるたびに逐次構築されるため、件数が少ない状態から始まるポートフォリオ運用に向いている
 
 ## DB環境構築
 
