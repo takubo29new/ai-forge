@@ -40,12 +40,13 @@ GitHubリポジトリを接続し、PRの差分をPhase 1のプロンプト資�
 
 設計判断の詳細は [`docs/quality-improvements.md`](./docs/quality-improvements.md) を参照。
 
-### Phase 3: RAG検索チャットボット(実装中)
+### Phase 3: RAG検索チャットボット
 
 設計書やAIレビューの指摘をベクトル検索の対象とし、自然文の質問にClaudeが出典付きで回答するチャットボット。埋め込みは[Voyage AI](https://www.voyageai.com/)の`voyage-3`を使用する。
 
 - pgvector拡張を有効化し、`Document`/`DocumentChunk`/`ReviewCommentEmbedding`のスキーマを追加(HNSWインデックスでのコサイン類似検索)
 - ドキュメント取り込み(`/documents`。タイトル+本文を見出し単位でチャンク分割し、埋め込みを生成)
+- リポジトリファイル同期(`docs/*.md`・`README.md`・`ai-dev-tool-handoff.md`を自動取り込み。再同期で最新内容に作り直す)
 - 既存レビュー指摘の埋め込みバックフィル(新規レビューは自動、既存分は`/documents`の「既存のレビュー指摘を取り込む」ボタンから)
 - RAG検索チャット(`/chat`。ドキュメント・レビュー指摘を横断検索し、Claudeが出典付きで回答)
 

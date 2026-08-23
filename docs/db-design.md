@@ -71,6 +71,8 @@ pgvector拡張(`vector`、0.8.6)をここで初めて有効化した。詳細は
 - **pgvectorの類似検索インデックスはHNSW**: `ivfflat`は事前にある程度のデータ件数が無いとクラスタリングの精度が出ない(トレーニングデータ依存)のに対し、HNSWはデータが増えるたびに逐次構築されるため、件数が少ない状態から始まるポートフォリオ運用に向いている
 - **`ReviewComment`の埋め込み生成は失敗してもReview自体をロールバックしない**: `Document`とは逆に、`POST /api/repositories/:id/reviews`ではReviewCommentの埋め込み生成(Voyage AI呼び出し)が失敗しても、既に作成済みのReview・ReviewCommentは残す。理由は、AIレビューという主目的の処理は既に成功しており、埋め込みはRAG検索チャットの検索対象を増やすための副次的な処理に過ぎないため。失敗はErrorLogに記録し、埋め込みが無い指摘は`POST /api/review-comments/backfill-embeddings`で後から埋められる
 - **RAG検索チャット(`/chat`)のAI呼び出しはExecutionを経由しない**: Phase 1・2のAI呼び出しは`Execution`(`promptVersionId`必須)を通すが、チャットの質問はユーザーが管理する`PromptVersion`ではなくシステム側が組み立てるプロンプトのため、この枠組みには馴染まない。無理に`Execution`へ合わせず、`src/app/api/chat/route.ts`で直接Claudeを呼び出す設計にした
+- **リポジトリファイル同期はユーザー入力のパスを受け付けない**: `POST /api/documents/sync`は`docs/*.md`・`README.md`・`ai-dev-tool-handoff.md`という固定の対象一覧のみを読み込む。任意のファイルパスをリクエストで受け取る設計にするとパストラバーサルの懸念があるため、あえて動的な指定を許可していない
+- **リポジトリファイル同期は差分検出をせず全置き換え**: 再同期のたびに、同じ`sourcePath`の`Document`を削除してから作り直す。差分(変更されたファイルだけを更新)を検出する実装は複雑さの割にメリットが薄いと判断した(単一ユーザーのポートフォリオ用途では、対象ファイルの総チャンク数がVoyage AIの1回のバッチ呼び出しに収まる規模のため)
 
 ## DB環境構築
 

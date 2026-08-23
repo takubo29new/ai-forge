@@ -146,6 +146,9 @@ export default async function HelpPage() {
           <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
             「ドキュメント」ページから、設計書やメモをタイトル・本文で登録できます。本文はMarkdownの見出し(<code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">##</code>や<code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">###</code>)単位で自動的にチャンク分割され、それぞれに検索用の埋め込みベクトルが生成されます。
           </p>
+          <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
+            「リポジトリから同期」を押すと、このリポジトリの設計書(docs/配下のMarkdownファイル・README.md・ai-dev-tool-handoff.md)をまとめて取り込めます。再度押すと最新の内容で作り直されるため、設計書を更新した後は同期し直してください。
+          </p>
           <p className="text-sm text-zinc-700 dark:text-zinc-300">
             過去に実行したAIレビューの指摘は自動では検索対象になっていないため、「既存のレビュー指摘を取り込む」ボタンで一括して埋め込みを生成できます(新しく実行したレビューは自動で対象になります)。
           </p>
