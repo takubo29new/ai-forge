@@ -3,6 +3,12 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/session";
 import { getGitHubClient, listOpenPullRequests } from "@/lib/github";
+import {
+  SEVERITIES,
+  SEVERITY_BG,
+  SEVERITY_TEXT,
+  countBySeverity,
+} from "@/lib/review-severity";
 import { PullRequestList } from "./pull-request-list";
 
 const TABS = [
@@ -12,20 +18,6 @@ const TABS = [
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
-
-const SEVERITY_TEXT: Record<string, string> = {
-  CRITICAL: "text-red-600 dark:text-red-400",
-  WARNING: "text-amber-600 dark:text-amber-400",
-  INFO: "text-zinc-500",
-};
-
-const SEVERITY_BG: Record<string, string> = {
-  CRITICAL: "bg-red-500",
-  WARNING: "bg-amber-500",
-  INFO: "bg-zinc-400 dark:bg-zinc-600",
-};
-
-const SEVERITIES = ["CRITICAL", "WARNING", "INFO"] as const;
 
 export default async function RepositoryDetailPage({
   params,
@@ -131,14 +123,7 @@ export default async function RepositoryDetailPage({
     }));
 
     trendReviews = recentReviews.map((review) => {
-      const counts: Record<string, number> = {
-        CRITICAL: 0,
-        WARNING: 0,
-        INFO: 0,
-      };
-      for (const c of review.comments) {
-        counts[c.severity] = (counts[c.severity] ?? 0) + 1;
-      }
+      const counts = countBySeverity(review.comments);
       return {
         id: review.id,
         pullRequestNumber: review.pullRequestNumber,
