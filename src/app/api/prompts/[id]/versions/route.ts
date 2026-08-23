@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { LIST_LIMIT } from "@/lib/list-limits";
 
 export async function GET(
   _request: Request,
@@ -23,6 +24,7 @@ export async function GET(
   const versions = await prisma.promptVersion.findMany({
     where: { promptId: id },
     orderBy: { versionNumber: "desc" },
+    take: LIST_LIMIT,
   });
 
   return NextResponse.json(versions);

@@ -5,6 +5,7 @@ import { requireUserId } from "@/lib/session";
 import { EditTab } from "./edit-tab";
 import { ExecuteTab } from "./execute-tab";
 import { Markdown } from "@/components/markdown";
+import { LIST_LIMIT } from "@/lib/list-limits";
 
 const TABS = [
   { key: "edit", label: "編集" },
@@ -55,6 +56,7 @@ export default async function PromptDetailPage({
       ? await prisma.promptVersion.findMany({
           where: { promptId: id },
           orderBy: { versionNumber: "desc" },
+          take: LIST_LIMIT,
         })
       : null;
 
@@ -64,6 +66,7 @@ export default async function PromptDetailPage({
           where: { promptVersion: { promptId: id } },
           include: { promptVersion: { select: { versionNumber: true } } },
           orderBy: { createdAt: "desc" },
+          take: LIST_LIMIT,
         })
       : null;
 

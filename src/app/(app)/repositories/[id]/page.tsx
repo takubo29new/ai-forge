@@ -10,6 +10,7 @@ import {
   countBySeverity,
 } from "@/lib/review-severity";
 import { PullRequestList } from "./pull-request-list";
+import { LIST_LIMIT } from "@/lib/list-limits";
 
 const TABS = [
   { key: "pulls", label: "オープンなPR" },
@@ -76,6 +77,7 @@ export default async function RepositoryDetailPage({
           where: { repositoryId: id },
           include: { _count: { select: { comments: true } } },
           orderBy: { createdAt: "desc" },
+          take: LIST_LIMIT,
         })
       : null;
 
