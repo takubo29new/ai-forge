@@ -52,6 +52,12 @@ export default async function PromptsPage({
             カテゴリ管理
           </Link>
           <Link
+            href="/repositories"
+            className="text-sm text-zinc-600 hover:underline dark:text-zinc-400"
+          >
+            リポジトリ
+          </Link>
+          <Link
             href="/help"
             className="text-sm text-zinc-600 hover:underline dark:text-zinc-400"
           >
