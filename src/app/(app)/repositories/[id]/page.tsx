@@ -8,9 +8,24 @@ import { PullRequestList } from "./pull-request-list";
 const TABS = [
   { key: "pulls", label: "オープンなPR" },
   { key: "history", label: "レビュー履歴" },
+  { key: "trends", label: "傾向" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
+
+const SEVERITY_TEXT: Record<string, string> = {
+  CRITICAL: "text-red-600 dark:text-red-400",
+  WARNING: "text-amber-600 dark:text-amber-400",
+  INFO: "text-zinc-500",
+};
+
+const SEVERITY_BG: Record<string, string> = {
+  CRITICAL: "bg-red-500",
+  WARNING: "bg-amber-500",
+  INFO: "bg-zinc-400 dark:bg-zinc-600",
+};
+
+const SEVERITIES = ["CRITICAL", "WARNING", "INFO"] as const;
 
 export default async function RepositoryDetailPage({
   params,
@@ -71,6 +86,69 @@ export default async function RepositoryDetailPage({
           orderBy: { createdAt: "desc" },
         })
       : null;
+
+  let severityTotals: Record<string, number> | null = null;
+  let topFiles: { filePath: string; count: number }[] = [];
+  let trendReviews: {
+    id: string;
+    pullRequestNumber: number;
+    pullRequestTitle: string;
+    createdAt: Date;
+    counts: Record<string, number>;
+    total: number;
+  }[] = [];
+
+  if (tab === "trends") {
+    const [severityGroups, fileGroups, recentReviews] = await Promise.all([
+      prisma.reviewComment.groupBy({
+        by: ["severity"],
+        where: { review: { repositoryId: id } },
+        _count: { severity: true },
+      }),
+      prisma.reviewComment.groupBy({
+        by: ["filePath"],
+        where: { review: { repositoryId: id } },
+        _count: { filePath: true },
+        orderBy: { _count: { filePath: "desc" } },
+        take: 8,
+      }),
+      prisma.review.findMany({
+        where: { repositoryId: id, status: "SUCCESS" },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+        include: { comments: { select: { severity: true } } },
+      }),
+    ]);
+
+    severityTotals = { CRITICAL: 0, WARNING: 0, INFO: 0 };
+    for (const g of severityGroups) {
+      severityTotals[g.severity] = g._count.severity;
+    }
+
+    topFiles = fileGroups.map((g) => ({
+      filePath: g.filePath,
+      count: g._count.filePath,
+    }));
+
+    trendReviews = recentReviews.map((review) => {
+      const counts: Record<string, number> = {
+        CRITICAL: 0,
+        WARNING: 0,
+        INFO: 0,
+      };
+      for (const c of review.comments) {
+        counts[c.severity] = (counts[c.severity] ?? 0) + 1;
+      }
+      return {
+        id: review.id,
+        pullRequestNumber: review.pullRequestNumber,
+        pullRequestTitle: review.pullRequestTitle,
+        createdAt: review.createdAt,
+        counts,
+        total: review.comments.length,
+      };
+    });
+  }
 
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-8">
@@ -146,6 +224,100 @@ export default async function RepositoryDetailPage({
             </li>
           ))}
         </ul>
+      )}
+
+      {tab === "trends" && severityTotals && (
+        <div className="flex flex-col gap-8">
+          {trendReviews.length === 0 ? (
+            <p className="py-16 text-center text-sm text-zinc-500">
+              成功したレビューがまだありません
+            </p>
+          ) : (
+            <>
+              <section>
+                <h2 className="mb-3 text-sm font-medium text-zinc-500">
+                  累計の指摘件数
+                </h2>
+                <div className="flex gap-6">
+                  {SEVERITIES.map((s) => (
+                    <div key={s}>
+                      <p className={`text-2xl font-semibold ${SEVERITY_TEXT[s]}`}>
+                        {severityTotals![s]}
+                      </p>
+                      <p className="text-xs text-zinc-500">{s}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section>
+                <h2 className="mb-3 text-sm font-medium text-zinc-500">
+                  直近{trendReviews.length}件のレビュー(新しい順)
+                </h2>
+                <ul className="flex flex-col gap-2">
+                  {trendReviews.map((review) => (
+                    <li key={review.id}>
+                      <Link
+                        href={`/reviews/${review.id}`}
+                        className="block rounded-lg border border-zinc-200 px-4 py-3 hover:border-zinc-400 dark:border-zinc-800 dark:hover:border-zinc-600"
+                      >
+                        <div className="mb-2 flex items-center justify-between gap-3">
+                          <p className="truncate text-sm font-medium">
+                            #{review.pullRequestNumber} {review.pullRequestTitle}
+                          </p>
+                          <p className="shrink-0 text-xs text-zinc-500">
+                            {review.createdAt.toLocaleDateString("ja-JP")} ·{" "}
+                            {review.total}件
+                          </p>
+                        </div>
+                        {review.total > 0 && (
+                          <div className="flex h-2 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+                            {SEVERITIES.map((s) =>
+                              review.counts[s] > 0 ? (
+                                <div
+                                  key={s}
+                                  className={SEVERITY_BG[s]}
+                                  style={{
+                                    width: `${(review.counts[s] / review.total) * 100}%`,
+                                  }}
+                                />
+                              ) : null,
+                            )}
+                          </div>
+                        )}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+
+              <section>
+                <h2 className="mb-3 text-sm font-medium text-zinc-500">
+                  指摘の多いファイル
+                </h2>
+                {topFiles.length === 0 ? (
+                  <p className="text-sm text-zinc-500">指摘はまだありません</p>
+                ) : (
+                  <ul className="flex flex-col gap-1">
+                    {topFiles.map((f) => (
+                      <li
+                        key={f.filePath}
+                        className="flex items-center justify-between gap-3 border-b border-zinc-100 py-1.5 text-sm last:border-0 dark:border-zinc-800/60"
+                      >
+                        <span className="truncate font-mono text-xs">
+                          {f.filePath}
+                        </span>
+                        <span className="shrink-0 text-xs text-zinc-500">
+                          {f.count}件
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            </>
+          )}
+        </div>
       )}
     </div>
   );
