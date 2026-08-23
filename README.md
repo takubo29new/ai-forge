@@ -40,6 +40,10 @@ GitHubリポジトリを接続し、PRの差分をPhase 1のプロンプト資�
 
 設計判断の詳細は [`docs/quality-improvements.md`](./docs/quality-improvements.md) を参照。
 
+### Phase 3: RAG検索チャットボット(設計のみ・未実装)
+
+設計書やAIレビューの指摘をベクトル検索の対象とし、自然文の質問にClaudeが出典付きで回答するチャットボット。埋め込みは[Voyage AI](https://www.voyageai.com/)の`voyage-3`を使用する予定。画面遷移・DB設計は [`docs/phase3-design.md`](./docs/phase3-design.md) を参照。
+
 ## 技術スタック
 
 | 領域 | 技術 |
