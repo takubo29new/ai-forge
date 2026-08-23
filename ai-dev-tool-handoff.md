@@ -58,6 +58,9 @@ Phase 2(AIコードレビューツール)はDB設計(`Repository` / `Review` / `
 
 GitHub OAuthのスコープに`repo`を追加し、`octokit`(GitHub公式SDK)経由でリポジトリ一覧取得・接続・オープンなPR一覧取得を実装済み。既存ログインユーザーは`Account`のスコープが更新されないAuth.jsの仕様により再ログインが必要になる場合がある(その場合は該当`Account`行を削除して作り直す必要がある。詳細はPR参照)。
 
+AIレビュー機能も実装完了。`{{diff}}`変数にPRのunified diffを展開したプロンプトをClaudeに投げ、`client.messages.parse` + Zodスキーマ(`output_config.format`)で`{ findings: [...] }`形式の構造化出力を強制することで、自由記述テキストのパースを避けて`ReviewComment`へ直接マッピングしている。`/repositories/:id`の「レビューを実行」ボタンからプロンプトを選んで実行でき、`/reviews/:id`で指摘一覧・重要度別件数を確認できる。これでPhase 2の主要機能(GitHub連携・AIレビュー)は実装完了。
+
 ## 次のステップ候補
-- Phase 2: AIレビュー機能の実装(Phase 1のプロンプト資産を使ってコード差分を解析。`/repositories/:id`の「レビューを実行」ボタンを有効化)
+- Phase 2: レビュー結果の蓄積・可視化(リポジトリ横断でのレビュー傾向表示など、現状の重要度別バッジ表示から発展させる場合)
+- 品質・UX改善タスク(自動テスト整備、共通ナビゲーション、実行系APIのレート制限など。ユーザーからの改善提案リスト参照)
 - Phase 2: レビュー結果の蓄積・可視化(`/reviews/:id`画面、重要度別集計)

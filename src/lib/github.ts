@@ -37,3 +37,48 @@ export async function listOpenPullRequests(
     updatedAt: pr.updated_at,
   }));
 }
+
+export async function getPullRequest(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  pullNumber: number,
+) {
+  const { data } = await octokit.rest.pulls.get({
+    owner,
+    repo,
+    pull_number: pullNumber,
+  });
+
+  return {
+    number: data.number,
+    title: data.title,
+    url: data.html_url,
+    headSha: data.head.sha,
+  };
+}
+
+const MAX_DIFF_LENGTH = 50_000;
+
+export async function getPullRequestDiff(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  pullNumber: number,
+) {
+  // mediaType: { format: "diff" } を指定すると data はunified diff形式の
+  // 文字列になる(Octokitの型定義上はPullRequestオブジェクトのままなので
+  // 実行時の型にあわせてキャストする)
+  const { data } = await octokit.rest.pulls.get({
+    owner,
+    repo,
+    pull_number: pullNumber,
+    mediaType: { format: "diff" },
+  });
+  const diff = data as unknown as string;
+
+  if (diff.length > MAX_DIFF_LENGTH) {
+    return `${diff.slice(0, MAX_DIFF_LENGTH)}\n\n...(diff truncated at ${MAX_DIFF_LENGTH} characters)`;
+  }
+  return diff;
+}
