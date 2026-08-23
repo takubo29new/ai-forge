@@ -9,18 +9,29 @@ function getStoredTheme(): "light" | "dark" | null {
 
 function applyTheme(theme: "light" | "dark") {
   document.documentElement.classList.toggle("dark", theme === "dark");
-  document.documentElement.classList.toggle("light", theme === "light");
 }
 
 export function ThemeToggle() {
   const [theme, setTheme] = useState<"light" | "dark" | null>(null);
 
   useEffect(() => {
-    const stored = getStoredTheme();
-    const system = window.matchMedia("(prefers-color-scheme: dark)").matches
-      ? "dark"
-      : "light";
-    setTheme(stored ?? system);
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+
+    function sync() {
+      const resolved = getStoredTheme() ?? (media.matches ? "dark" : "light");
+      setTheme(resolved);
+      applyTheme(resolved);
+    }
+
+    sync();
+
+    function handleSystemChange() {
+      // ユーザーが手動で選択済みの場合はOS側の変更を無視する
+      if (getStoredTheme() === null) sync();
+    }
+
+    media.addEventListener("change", handleSystemChange);
+    return () => media.removeEventListener("change", handleSystemChange);
   }, []);
 
   function toggle() {

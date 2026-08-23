@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { reportClientError } from "@/lib/report-client-error";
 
 export default function GlobalError({
   error,
@@ -10,16 +11,7 @@ export default function GlobalError({
   retry: () => void;
 }) {
   useEffect(() => {
-    fetch("/api/client-errors", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        message: error.message,
-        digest: error.digest,
-        stack: error.stack,
-        path: window.location.pathname,
-      }),
-    }).catch(() => {});
+    reportClientError(error);
   }, [error]);
 
   return (

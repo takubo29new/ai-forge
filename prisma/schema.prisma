@@ -159,18 +159,19 @@ model Execution {
   createdAt DateTime @default(now())
 }
 
-// 実行系API(プロンプト実行・AIレビュー実行)のレート制限用カウンタ。
-// 固定ウィンドウ(1時間単位)ごとにユーザーの呼び出し回数を数える。
-// upsertのcount incrementはPostgres側でアトミックに実行されるため、
-// 「件数をSELECTしてから後でINSERTする」方式のような、判定と記録の間に
-// 別リクエストが割り込むTOCTOUレースが起きない。
+// 実行系API(プロンプト実行・AIレビュー実行・クライアントエラー報告)の
+// レート制限用カウンタ。固定ウィンドウ(1時間単位)ごとにユーザー×用途
+// (purpose)の呼び出し回数を数える。upsertのcount incrementはPostgres側で
+// アトミックに実行されるため、「件数をSELECTしてから後でINSERTする」方式の
+// ような、判定と記録の間に別リクエストが割り込むTOCTOUレースが起きない。
 model RateLimitBucket {
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   windowStart DateTime
+  purpose     String   @default("execution")
   count       Int      @default(0)
 
-  @@id([userId, windowStart])
+  @@id([userId, windowStart, purpose])
 }
 
 // --- 運用ドメイン ---

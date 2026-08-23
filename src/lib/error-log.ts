@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 const MAX_TEXT_LENGTH = 4000;
 
 function truncate(value: string | undefined | null, max = MAX_TEXT_LENGTH) {
-  if (!value) return value ?? null;
+  if (value === undefined || value === null || value.length === 0) return null;
   return value.length > max ? value.slice(0, max) : value;
 }
 
