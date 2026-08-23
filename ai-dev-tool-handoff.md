@@ -54,10 +54,9 @@ pgvectorを使うことで、通常のリレーショナルデータとベクト
 
 Phase 1(プロンプト管理ツール)は実装完了し、`main`にマージ済み。詳細は [`docs/phase1-design.md`](./docs/phase1-design.md)(全体設計・実装状況)、[`docs/db-design.md`](./docs/db-design.md)(DB設計)、[`docs/phase1-ui-design.md`](./docs/phase1-ui-design.md)(画面遷移・UI設計)を参照。セットアップ手順は[README](./README.md)。
 
-Phase 2(AIコードレビューツール)はDB設計(`Repository` / `Review` / `ReviewComment`)まで完了。実際のAI呼び出しはPhase 1の`Execution`に委譲する設計とし、Phase 1・2・3でAI呼び出しの仕組みを一元化する狙いを踏襲した。詳細は [`docs/db-design.md`](./docs/db-design.md) を参照。
+Phase 2(AIコードレビューツール)はDB設計(`Repository` / `Review` / `ReviewComment`)・画面遷移/UI設計まで完了。実際のAI呼び出しはPhase 1の`Execution`に委譲する設計とし、Phase 1・2・3でAI呼び出しの仕組みを一元化する狙いを踏襲した。レビュー結果はClaudeの構造化出力で`{ findings: [...] }`形式のJSONとして取得し、`ReviewComment`に直接マッピングする方針。詳細は [`docs/db-design.md`](./docs/db-design.md)(DB設計)、[`docs/phase2-design.md`](./docs/phase2-design.md)(画面遷移・UI設計・API設計)を参照。
 
 ## 次のステップ候補
-- Phase 2: 画面遷移・UI設計(リポジトリ接続画面、PR/差分表示、レビュー結果表示)
-- Phase 2: GitHub連携の実装(OAuthスコープ拡張、リポジトリ一覧・PR/差分取得API)
+- Phase 2: GitHub連携の実装(`repo`スコープの追加同意、リポジトリ一覧・PR/差分取得API、`/repositories`・`/repositories/:id`画面)
 - Phase 2: AIレビュー機能の実装(Phase 1のプロンプト資産を使ってコード差分を解析)
 - Phase 2: レビュー結果の蓄積・可視化
