@@ -51,6 +51,12 @@ export default async function PromptsPage({
           >
             カテゴリ管理
           </Link>
+          <Link
+            href="/help"
+            className="text-sm text-zinc-600 hover:underline dark:text-zinc-400"
+          >
+            ヘルプ
+          </Link>
         </div>
         <div className="flex items-center gap-3">
           {session.user.image && (
