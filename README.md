@@ -105,10 +105,16 @@ npm run dev
 ## テスト
 
 ```bash
-npm test
+npm test              # ユニットテスト(DB不要)
+npm run test:integration  # ルートレベルの統合テスト(DATABASE_URLへの接続が必要)
 ```
 
-[Vitest](https://vitest.dev)によるユニットテスト。DB・外部APIに依存しない純粋なロジック(`{{変数名}}`の抽出・置換、AIレビューの構造化出力スキーマ)を対象にしている。DBアクセスを伴う処理(CRUD・実行系API)は、実装時に開発用DBに対して手動で動作確認している(自動化されたインテグレーションテストは未整備)。
+[Vitest](https://vitest.dev)によるテスト。
+
+- `npm test`: DB・外部APIに依存しない純粋なロジック(`{{変数名}}`の抽出・置換、AIレビューの構造化出力スキーマ)を対象としたユニットテスト
+- `npm run test:integration`: `POST /api/prompts/:id/execute`・`POST /api/repositories/:id/reviews`などのRoute Handlerを、実際のPostgresに対して直接呼び出す統合テスト(`*.integration.test.ts`)。GitHub/Anthropicへの外部呼び出しはモックし、認可判定・レート制限・レコード作成などDB込みの挙動を検証する
+
+CIでは両方とも実行される。詳細は[`docs/quality-improvements.md`](./docs/quality-improvements.md)を参照。
 
 ## ブランチ運用
 

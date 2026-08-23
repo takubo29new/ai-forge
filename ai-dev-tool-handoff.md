@@ -66,6 +66,7 @@ AIレビュー機能も実装完了。`{{diff}}`変数にPRのunified diffを展
 
 Phase 2完了後、経験豊富なWebエンジニアの視点でmainの実装をあらためてレビューし、CI導入・DBインデックス追加・一覧クエリの上限化・AI呼び出しロジックの共通化などの運用ハードニングも実施した。詳細は [`docs/quality-improvements.md`](./docs/quality-improvements.md) を参照。
 
+ルートレベルのAPI統合テスト(`npm run test:integration`)もCI導入後に追加した。GitHub Actions上のPostgresサービスコンテナに対し、認可判定・レート制限・AI実行の成否分岐など回帰しやすい箇所を検証している。詳細は[`docs/quality-improvements.md`](./docs/quality-improvements.md)を参照。
+
 ## 次のステップ候補
-- ルートレベルのAPI統合テスト(CI導入によりGitHub Actions上でPostgresサービスコンテナを使ったテストの費用対効果が変わったため再検討)
 - Phase 3: RAG検索チャットボット(pgvectorでの設計書・レビュー結果の取り込み、リポジトリ横断のダッシュボード)
