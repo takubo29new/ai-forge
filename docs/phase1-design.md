@@ -1,7 +1,7 @@
 # Phase 1 基本設計書
 
 対象: プロンプト管理ツール(統合AI開発支援プラットフォームの土台)
-更新日: 2026-08-23 / ステータス: DB設計・画面遷移/UI設計完了、ローカルDB環境構築は別PR(#5)でレビュー中、認証実装は次タスク
+更新日: 2026-08-23 / ステータス: 認証・カテゴリ/プロンプト/バージョンCRUD・Claude実行機能・実行履歴の実装が完了し、Phase 1の実装タスクはコンプリート。DB環境構築(#5)・画面遷移/UI設計(#6)は別PRでレビュー中
 
 プロダクト全体のコンセプトとロードマップは [`ai-dev-tool-handoff.md`](../ai-dev-tool-handoff.md)、DB設計の詳細な判断理由は [`docs/db-design.md`](./db-design.md) を参照。本ドキュメントはPhase 1のアーキテクチャ・認証・DB・画面・APIを一つにまとめた全体像。
 
@@ -112,7 +112,7 @@ Promptへの参照は`promptVersionId`経由のみで、`Execution`に`promptId`
 
 ## 画面構成(暫定)
 
-詳細な画面遷移・ワイヤーフレームは [`docs/phase1-ui-design.md`](./phase1-ui-design.md) を参照。現時点で想定している画面は以下。
+詳細な画面遷移・UI設計は次タスクで行う。現時点で想定している画面は以下。
 
 | 画面 | 概要 |
 | --- | --- |
@@ -140,7 +140,12 @@ Next.js の Route Handlers(`app/api/*`)としてREST風に実装する。Server 
 
 ## 今後のステップ
 
-1. ~~画面遷移・UI設計(詳細なワイヤーフレーム・画面遷移図)~~ → 完了。詳細は [`docs/phase1-ui-design.md`](./phase1-ui-design.md)
+1. 画面遷移・UI設計(詳細なワイヤーフレーム・画面遷移図) → 実施済み、PR #6でレビュー中
 2. ローカルDB環境構築(Docker + PostgreSQL + pgvector拡張)、`prisma migrate dev`の実行 → 実施済み、PR #5でレビュー中
-3. NextAuth.js + GitHub OAuthの実装
-4. プロンプトCRUD・実行機能の実装(Phase 1完了)
+3. ~~NextAuth.js + GitHub OAuthの実装~~ → 完了。`src/auth.ts`でPrismaAdapter + GitHub Providerを設定(セッションはdatabase方式)。ログイン(`/login`)・ログイン後の遷移先(`/prompts`仮画面)・サインアウトを実装し、GitHub認可画面へのリダイレクトまで動作確認済み。Prisma 7ではドライバーアダプタが必須のため`@prisma/adapter-pg`を追加
+4. プロンプトCRUD・実行機能の実装(Phase 1完了)。レビューしやすいよう機能ごとにPRを分割して進める
+   - ~~カテゴリCRUD(API + `/categories`画面)~~ → 完了。`GET/POST /api/categories`・`PATCH/DELETE /api/categories/:id`、カテゴリ管理画面(追加・編集・削除。削除時は該当プロンプト件数を確認ダイアログで表示)を実装
+   - ~~プロンプト・バージョンCRUD(API + 一覧/詳細画面)~~ → 完了。`GET/POST /api/prompts`・`GET/PATCH/DELETE /api/prompts/:id`・`GET /api/prompts/:id/versions`、`/prompts`(カテゴリ絞り込み・検索)、`/prompts/new`、`/prompts/:id`(編集・バージョン履歴タブ。実行・実行履歴タブは次タスクでプレースホルダー)を実装。保存は常に新規`PromptVersion`を追加(versionNumberはmax+1)
+   - ~~Claude実行機能・実行履歴(API + 実行/実行履歴タブ)~~ → 完了。`POST /api/prompts/:id/execute`(`@anthropic-ai/sdk`でClaudeを呼び出し、成功時は`resultText`・トークン数・実行時間を、失敗時は`errorMessage`を`Execution`として記録)・`GET /api/prompts/:id/executions`(実行履歴一覧)、`/prompts/:id`の実行・実行履歴タブを実装。プロンプト本文の`{{変数名}}`をUIで自動検出しフォーム化する。モデルはClaude Opus 5/Sonnet 5/Haiku 4.5から選択可(デフォルトOpus 5)
+
+Phase 1のスコープ(プロンプトCRUD・AI実行・履歴/バージョン管理)は実装完了。DB環境構築(#5)・画面遷移/UI設計(#6)のマージ後、Phase 2(AIコードレビューツール)に進む。
