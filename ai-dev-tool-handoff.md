@@ -50,7 +50,10 @@ pgvectorを使うことで、通常のリレーショナルデータとベクト
 
 ---
 
+## 進捗
+
+Phase 1(プロンプト管理ツール)は実装完了し、`main`にマージ済み。詳細は [`docs/phase1-design.md`](./docs/phase1-design.md)(全体設計・実装状況)、[`docs/db-design.md`](./docs/db-design.md)(DB設計)、[`docs/phase1-ui-design.md`](./docs/phase1-ui-design.md)(画面遷移・UI設計)を参照。セットアップ手順は[README](./README.md)。
+
 ## 次のステップ候補
-- Phase 1のデータベース設計(テーブル構成)
-- Phase 1の画面遷移・UI設計
-- Next.jsプロジェクトの雛形セットアップ
+- Phase 2: GitHub連携(OAuthでリポジトリ接続、PR/差分取得)の設計
+- Phase 2: AIレビュー機能の設計(Phase 1のプロンプト資産の再利用方法)
