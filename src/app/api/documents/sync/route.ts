@@ -7,6 +7,7 @@ import { chunkMarkdown } from "@/lib/document-chunks";
 import { embedDocuments } from "@/lib/voyage";
 import { setDocumentChunkEmbedding } from "@/lib/embeddings";
 import { checkDocumentRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { voyageErrorResponse } from "@/lib/voyage-error-response";
 
 // リポジトリ内の設計書を自動取り込みするための固定の対象一覧。ユーザー入力の
 // パスを受け付けるとパストラバーサルの懸念があるため、あえて動的なパス指定は
@@ -70,11 +71,8 @@ export async function POST() {
   let embeddings: number[][];
   try {
     embeddings = await embedDocuments(allChunkTexts);
-  } catch {
-    return NextResponse.json(
-      { error: "埋め込みの生成に失敗しました。もう一度お試しください。" },
-      { status: 502 },
-    );
+  } catch (error) {
+    return voyageErrorResponse(error, { path: "/api/documents/sync", userId });
   }
 
   let embeddingIndex = 0;

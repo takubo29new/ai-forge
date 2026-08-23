@@ -4,7 +4,10 @@ vi.mock("@/auth", () => ({ auth: vi.fn() }));
 vi.mock("@/lib/anthropic", () => ({
   anthropic: { messages: { create: vi.fn() } },
 }));
-vi.mock("@/lib/voyage", () => ({ embedQuery: vi.fn() }));
+vi.mock("@/lib/voyage", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/voyage")>()),
+  embedQuery: vi.fn(),
+}));
 
 import { auth } from "@/auth";
 import { anthropic } from "@/lib/anthropic";

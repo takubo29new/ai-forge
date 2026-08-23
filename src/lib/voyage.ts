@@ -7,6 +7,20 @@ type VoyageEmbeddingsResponse = {
   data: { embedding: number[]; index: number }[];
 };
 
+// Voyage AIのHTTPステータスを呼び出し元で判別できるようにするためのエラー型。
+// 特に429(レート制限)は「もう一度お試しください」では解決しないことが多い
+// (支払い方法未登録のアカウントは3RPM/10K TPMに制限される)ため、
+// 呼び出し元でユーザーに具体的な案内を出し分ける。
+export class VoyageApiError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = "VoyageApiError";
+  }
+}
+
 // ドキュメント側はinput_type: "document"、質問側はinput_type: "query"を指定する。
 // Voyage APIが非対称検索用に用意しているパラメータで、それぞれに最適化した
 // 埋め込みが得られる(docs/phase3-design.md参照)。
@@ -31,7 +45,10 @@ async function embed(
 
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`Voyage AI embeddings request failed (${res.status}): ${body}`);
+    throw new VoyageApiError(
+      res.status,
+      `Voyage AI embeddings request failed (${res.status}): ${body}`,
+    );
   }
 
   const json = (await res.json()) as VoyageEmbeddingsResponse;
