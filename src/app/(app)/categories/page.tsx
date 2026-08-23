@@ -1,17 +1,13 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { requireUserId } from "@/lib/session";
 import { CategoryManager } from "./category-manager";
 
 export default async function CategoriesPage() {
-  const session = await auth();
-  if (!session?.user?.id) {
-    redirect("/login");
-  }
+  const userId = await requireUserId();
 
   const categories = await prisma.category.findMany({
-    where: { userId: session.user.id },
+    where: { userId },
     include: { _count: { select: { prompts: true } } },
     orderBy: { createdAt: "asc" },
   });
