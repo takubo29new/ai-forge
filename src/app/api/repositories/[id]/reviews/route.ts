@@ -7,8 +7,9 @@ import { renderTemplate } from "@/lib/prompt-variables";
 import { DEFAULT_MODEL } from "@/lib/models";
 import { ReviewOutputSchema } from "@/lib/review-schema";
 import { checkExecutionRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { LIST_LIMIT } from "@/lib/list-limits";
+import { runAiExecution } from "@/lib/run-ai-execution";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import Anthropic from "@anthropic-ai/sdk";
 
 export async function GET(
   _request: Request,
@@ -32,6 +33,7 @@ export async function GET(
     where: { repositoryId: id },
     include: { _count: { select: { comments: true } } },
     orderBy: { createdAt: "desc" },
+    take: LIST_LIMIT,
   });
 
   return NextResponse.json(reviews);
@@ -102,7 +104,8 @@ export async function POST(
   }
 
   let pullRequest;
-  let diff;
+  let diff: string;
+  let diffTruncated: boolean;
   try {
     pullRequest = await getPullRequest(
       octokit,
@@ -110,12 +113,12 @@ export async function POST(
       repository.name,
       pullRequestNumber,
     );
-    diff = await getPullRequestDiff(
+    ({ diff, truncated: diffTruncated } = await getPullRequestDiff(
       octokit,
       repository.owner,
       repository.name,
       pullRequestNumber,
-    );
+    ));
   } catch {
     return NextResponse.json(
       { error: "PRの取得に失敗しました" },
@@ -125,43 +128,43 @@ export async function POST(
 
   const variables = { diff };
   const renderedContent = renderTemplate(promptVersion.content, variables);
-  const startedAt = Date.now();
 
-  try {
-    const response = await anthropic.messages.parse({
-      model: DEFAULT_MODEL,
-      max_tokens: 16000,
-      messages: [{ role: "user", content: renderedContent }],
-      output_config: { format: zodOutputFormat(ReviewOutputSchema) },
-    });
-    const durationMs = Date.now() - startedAt;
-
-    if (!response.parsed_output) {
-      throw new Error("構造化出力の解析に失敗しました");
-    }
-    const { findings } = response.parsed_output;
-
-    const review = await prisma.$transaction(async (tx) => {
-      const execution = await tx.execution.create({
-        data: {
-          promptVersionId: promptVersion.id,
-          userId,
-          model: DEFAULT_MODEL,
-          variables,
-          resultText: JSON.stringify(response.parsed_output),
-          status: "SUCCESS",
-          promptTokens: response.usage.input_tokens,
-          completionTokens: response.usage.output_tokens,
-          durationMs,
-        },
+  const outcome = await runAiExecution({
+    promptVersionId: promptVersion.id,
+    userId,
+    model: DEFAULT_MODEL,
+    variables,
+    call: async () => {
+      const response = await anthropic.messages.parse({
+        model: DEFAULT_MODEL,
+        max_tokens: 16000,
+        messages: [{ role: "user", content: renderedContent }],
+        output_config: { format: zodOutputFormat(ReviewOutputSchema) },
       });
 
+      if (!response.parsed_output) {
+        throw new Error("構造化出力の解析に失敗しました");
+      }
+
+      return {
+        resultText: JSON.stringify(response.parsed_output),
+        promptTokens: response.usage.input_tokens,
+        completionTokens: response.usage.output_tokens,
+        result: response.parsed_output,
+      };
+    },
+  });
+
+  if (outcome.status === "SUCCESS") {
+    const { findings } = outcome.result;
+
+    const review = await prisma.$transaction(async (tx) => {
       const created = await tx.review.create({
         data: {
           repositoryId: repository.id,
           userId,
           promptVersionId: promptVersion.id,
-          executionId: execution.id,
+          executionId: outcome.execution.id,
           pullRequestNumber: pullRequest.number,
           pullRequestTitle: pullRequest.title,
           pullRequestUrl: pullRequest.url,
@@ -170,59 +173,52 @@ export async function POST(
         },
       });
 
-      if (findings.length > 0) {
-        await tx.reviewComment.createMany({
-          data: findings.map((f) => ({
-            reviewId: created.id,
-            filePath: f.filePath,
-            line: f.line,
-            severity: f.severity,
-            body: f.body,
-          })),
-        });
+      // diffが上限で切り詰められていた場合、その旨をレビュー本文の一部として
+      // 残しておく(専用カラムを設けず既存のReviewComment構造で表現する)。
+      const commentData = [
+        ...(diffTruncated
+          ? [
+              {
+                reviewId: created.id,
+                filePath: "(PR diff)",
+                line: null,
+                severity: "WARNING" as const,
+                body: "PRの差分が大きいため、途中で切り詰めてレビューしました。切り詰められた範囲は指摘の対象外です。",
+              },
+            ]
+          : []),
+        ...findings.map((f) => ({
+          reviewId: created.id,
+          filePath: f.filePath,
+          line: f.line,
+          severity: f.severity,
+          body: f.body,
+        })),
+      ];
+
+      if (commentData.length > 0) {
+        await tx.reviewComment.createMany({ data: commentData });
       }
 
       return created;
     });
 
     return NextResponse.json({ id: review.id }, { status: 201 });
-  } catch (error) {
-    const durationMs = Date.now() - startedAt;
-    const errorMessage =
-      error instanceof Anthropic.APIError
-        ? `${error.status ?? ""} ${error.message}`.trim()
-        : error instanceof Error
-          ? error.message
-          : "レビュー実行中にエラーが発生しました";
-
-    const review = await prisma.$transaction(async (tx) => {
-      const execution = await tx.execution.create({
-        data: {
-          promptVersionId: promptVersion.id,
-          userId,
-          model: DEFAULT_MODEL,
-          variables,
-          status: "FAILED",
-          errorMessage,
-          durationMs,
-        },
-      });
-
-      return tx.review.create({
-        data: {
-          repositoryId: repository.id,
-          userId,
-          promptVersionId: promptVersion.id,
-          executionId: execution.id,
-          pullRequestNumber: pullRequest.number,
-          pullRequestTitle: pullRequest.title,
-          pullRequestUrl: pullRequest.url,
-          headSha: pullRequest.headSha,
-          status: "FAILED",
-        },
-      });
-    });
-
-    return NextResponse.json({ id: review.id }, { status: 201 });
   }
+
+  const review = await prisma.review.create({
+    data: {
+      repositoryId: repository.id,
+      userId,
+      promptVersionId: promptVersion.id,
+      executionId: outcome.execution.id,
+      pullRequestNumber: pullRequest.number,
+      pullRequestTitle: pullRequest.title,
+      pullRequestUrl: pullRequest.url,
+      headSha: pullRequest.headSha,
+      status: "FAILED",
+    },
+  });
+
+  return NextResponse.json({ id: review.id }, { status: 200 });
 }

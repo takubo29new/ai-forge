@@ -54,6 +54,7 @@ model Account {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+  @@index([userId])
 }
 
 model Session {
@@ -104,6 +105,8 @@ model Prompt {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }
 
 // プロンプト本文の変更履歴。編集のたびに新しいバージョンを追加し、上書きしない。
@@ -157,6 +160,9 @@ model Execution {
   review Review?
 
   createdAt DateTime @default(now())
+
+  @@index([promptVersionId])
+  @@index([userId])
 }
 
 // 実行系API(プロンプト実行・AIレビュー実行・クライアントエラー報告)の
@@ -260,6 +266,9 @@ model Review {
   comments ReviewComment[]
 
   createdAt DateTime @default(now())
+
+  @@index([repositoryId])
+  @@index([userId])
 }
 
 enum ReviewCommentSeverity {
@@ -281,4 +290,6 @@ model ReviewComment {
   body     String                @db.Text
 
   createdAt DateTime @default(now())
+
+  @@index([reviewId])
 }
