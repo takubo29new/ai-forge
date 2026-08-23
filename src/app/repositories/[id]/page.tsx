@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getGitHubClient, listOpenPullRequests } from "@/lib/github";
+import { PullRequestList } from "./pull-request-list";
 
 const TABS = [
   { key: "pulls", label: "オープンなPR" },
@@ -36,6 +37,7 @@ export default async function RepositoryDetailPage({
 
   let pulls: Awaited<ReturnType<typeof listOpenPullRequests>> | null = null;
   let pullsError: string | null = null;
+  let prompts: { id: string; title: string }[] = [];
   if (tab === "pulls") {
     const octokit = await getGitHubClient(session.user.id);
     if (!octokit) {
@@ -52,6 +54,11 @@ export default async function RepositoryDetailPage({
         pullsError = "オープンなPRの取得に失敗しました";
       }
     }
+    prompts = await prisma.prompt.findMany({
+      where: { userId: session.user.id },
+      select: { id: true, title: true },
+      orderBy: { updatedAt: "desc" },
+    });
   }
 
   const reviews =
@@ -104,35 +111,11 @@ export default async function RepositoryDetailPage({
             </p>
           )}
           {pulls && pulls.length > 0 && (
-            <ul className="flex flex-col gap-2">
-              {pulls.map((pr) => (
-                <li
-                  key={pr.number}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 px-4 py-3 dark:border-zinc-800"
-                >
-                  <div>
-                    <a
-                      href={pr.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-sm font-medium hover:underline"
-                    >
-                      #{pr.number} {pr.title}
-                    </a>
-                    <p className="text-xs text-zinc-500">
-                      {pr.author && `${pr.author} · `}
-                      {new Date(pr.updatedAt).toLocaleDateString("ja-JP")}
-                    </p>
-                  </div>
-                  <span
-                    className="rounded border border-zinc-300 px-3 py-1.5 text-xs text-zinc-400 dark:border-zinc-700"
-                    title="AIレビュー機能は次のリリースで実装します"
-                  >
-                    レビューを実行(準備中)
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <PullRequestList
+              repositoryId={id}
+              pulls={pulls}
+              prompts={prompts}
+            />
           )}
         </>
       )}
@@ -145,11 +128,11 @@ export default async function RepositoryDetailPage({
             </li>
           )}
           {reviews.map((review) => (
-            <li
-              key={review.id}
-              className="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 px-4 py-3 dark:border-zinc-800"
-            >
-              <div>
+            <li key={review.id}>
+              <Link
+                href={`/reviews/${review.id}`}
+                className="block rounded-lg border border-zinc-200 px-4 py-3 hover:border-zinc-400 dark:border-zinc-800 dark:hover:border-zinc-600"
+              >
                 <p className="text-sm font-medium">
                   #{review.pullRequestNumber} {review.pullRequestTitle}
                 </p>
@@ -157,7 +140,7 @@ export default async function RepositoryDetailPage({
                   {review.createdAt.toLocaleString("ja-JP")} · {review.status} ·{" "}
                   {review._count.comments}件の指摘
                 </p>
-              </div>
+              </Link>
             </li>
           ))}
         </ul>

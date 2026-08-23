@@ -111,10 +111,10 @@ flowchart TD
 3. Claudeの[構造化出力](https://docs.anthropic.com)(`output_config.format`)で、指摘事項を`{ findings: [{ filePath, line, severity, body }] }`形式のJSONとして返すよう指定する。自由記述のテキストをパースするのではなく、スキーマで型を保証する
 4. `Execution`(AI呼び出しの記録)と`Review`(PRの文脈)を作成し、`findings`をそのまま`ReviewComment`として保存する
 
-この構造化出力の具体的なスキーマ定義は、次のタスク(AIレビュー機能の実装)で確定する。
+構造化出力のスキーマは`src/lib/review-schema.ts`でZodにより定義し、`@anthropic-ai/sdk/helpers/zod`の`zodOutputFormat`経由で`client.messages.parse`に渡している(`parsed_output`が型安全に得られる)。
 
-## 今後のステップ
+## 実装状況
 
-1. GitHub連携の実装(`repo`スコープの追加同意フロー、リポジトリ接続・PR取得API、`/repositories`・`/repositories/:id`画面)
-2. AIレビュー機能の実装(構造化出力でのレビュー実行、`/reviews/:id`画面)
-3. レビュー結果の蓄積・可視化(レビュー履歴の重要度別集計)
+1. ~~GitHub連携の実装~~ → 完了。`repo`スコープの追加、`octokit`によるリポジトリ接続・PR取得API、`/repositories`・`/repositories/:id`画面
+2. ~~AIレビュー機能の実装~~ → 完了。`POST /api/repositories/:id/reviews`でPRのdiffを`{{diff}}`変数に展開し、構造化出力でレビュー結果を取得。`/repositories/:id`の「レビューを実行」・`/reviews/:id`画面
+3. レビュー結果の蓄積・可視化(現状は個別レビューの重要度別バッジ表示のみ。リポジトリ横断の傾向表示は未実装)
