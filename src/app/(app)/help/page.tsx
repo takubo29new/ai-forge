@@ -8,6 +8,10 @@ const SECTIONS = [
   { id: "versions", label: "バージョン履歴" },
   { id: "execute", label: "実行" },
   { id: "history", label: "実行履歴" },
+  { id: "repositories", label: "リポジトリ連携" },
+  { id: "review", label: "AIレビュー" },
+  { id: "trends", label: "レビュー履歴・傾向" },
+  { id: "appearance", label: "表示設定・エラーログ" },
   { id: "faq", label: "よくある質問" },
 ];
 
@@ -24,7 +28,7 @@ export default async function HelpPage() {
       </Link>
       <h1 className="mt-4 mb-2 text-2xl font-semibold">ヘルプ</h1>
       <p className="mb-8 text-zinc-600 dark:text-zinc-400">
-        ai-forgeは、AIに投げるプロンプトを「コードのように」管理・改善するためのツールです。プロンプトをカテゴリ分けして登録し、Claudeに実行して結果を確認しながら、変更履歴を保ったまま改善していけます。
+        ai-forgeは、AIに投げるプロンプトを「コードのように」管理・改善するためのツールです。プロンプトをカテゴリ分けして登録し、Claudeに実行して結果を確認しながら、変更履歴を保ったまま改善していけます。管理したプロンプトは、GitHubリポジトリのPRに対するAIコードレビューにもそのまま使い回せます。
       </p>
 
       <nav className="mb-10 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
@@ -103,6 +107,48 @@ export default async function HelpPage() {
           </p>
         </section>
 
+        <section id="repositories">
+          <h2 className="mb-2 text-lg font-semibold">リポジトリ連携</h2>
+          <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
+            「リポジトリ」ページから、自分のGitHubリポジトリを接続できます。「+ リポジトリを接続」を押すとGitHub上のリポジトリ一覧がモーダルで表示されるので、選んで接続します。プライベートリポジトリも接続できます(初回のみGitHub側で追加の権限承認が必要になる場合があります)。
+          </p>
+          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+            「解除」を押すと接続を解除できます。解除すると、そのリポジトリに紐づくレビュー結果もすべて削除されるため、確認ダイアログに件数が表示されます。
+          </p>
+        </section>
+
+        <section id="review">
+          <h2 className="mb-2 text-lg font-semibold">AIレビュー</h2>
+          <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
+            接続したリポジトリの詳細画面の「オープンなPR」タブから、レビューしたいPRを選び、使用するプロンプトを選んで「レビューを実行」を押すと、PRの差分をClaudeが解析して指摘事項を返します。
+          </p>
+          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+            レビューに使うプロンプトの本文には、必ず
+            <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">{"{{diff}}"}</code>
+            を含めてください。実行時にPRの差分がこの部分に展開されます。含まれていないプロンプトは実行前に警告が表示され、実行できません。
+          </p>
+        </section>
+
+        <section id="trends">
+          <h2 className="mb-2 text-lg font-semibold">レビュー履歴・傾向</h2>
+          <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
+            リポジトリ詳細画面の「レビュー履歴」タブで、過去に実行したレビューを新しい順に確認できます。各行を開くと、ファイルごとの指摘事項と重要度(CRITICAL / WARNING / INFO)を確認できます。
+          </p>
+          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+            「傾向」タブでは、そのリポジトリでの累計指摘件数(重要度別)、直近10件のレビューの重要度の内訳、指摘が多いファイルの上位を確認できます。レビューを重ねるほど、どのファイル・観点に問題が集中しているか把握しやすくなります。
+          </p>
+        </section>
+
+        <section id="appearance">
+          <h2 className="mb-2 text-lg font-semibold">表示設定・エラーログ</h2>
+          <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
+            ヘッダー右側の太陽・月アイコンで、ライトモード/ダークモードを手動で切り替えられます。何も操作しなければお使いの端末の設定(OSのライト/ダークモード)に従います。選択内容はこの端末のブラウザに保存され、次回アクセス時も引き継がれます。
+          </p>
+          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+            「エラーログ」ページでは、アプリ内で発生した想定外のエラーを直近50件まで確認できます。実行結果画面に出るエラー(APIエラーなど)とは別に、画面の表示中に起きた不具合の調査用です。
+          </p>
+        </section>
+
         <section id="faq">
           <h2 className="mb-4 text-lg font-semibold">よくある質問</h2>
           <div className="flex flex-col gap-4">
@@ -125,6 +171,16 @@ export default async function HelpPage() {
               <p className="text-sm text-zinc-700 dark:text-zinc-300">
                 A. 迷ったらデフォルトのClaude Opus 5を選んでください。より速い応答が欲しい場合はSonnet 5やHaiku
                 4.5も選べます。
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-medium">
+                Q. レビューを実行しようとすると警告が出て実行できません。
+              </p>
+              <p className="text-sm text-zinc-700 dark:text-zinc-300">
+                A. 選んだプロンプトの本文に
+                <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">{"{{diff}}"}</code>
+                が含まれていないと実行できません。プロンプトの編集タブで追記してください。
               </p>
             </div>
           </div>

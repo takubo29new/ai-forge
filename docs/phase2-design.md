@@ -1,6 +1,6 @@
 # Phase 2 基本設計書(画面遷移・UI設計)
 
-対象: AIコードレビューツール(Phase 2)。アーキテクチャ・認証は [`phase1-design.md`](./phase1-design.md) を、DB設計は [`db-design.md`](./db-design.md) の「Phase 2の設計判断」を参照。本ドキュメントはPhase 2で新規に追加する画面・APIをまとめる。
+対象: AIコードレビューツール(Phase 2)。アーキテクチャ・認証は [`phase1-design.md`](./phase1-design.md) を、DB設計は [`db-design.md`](./db-design.md) の「Phase 2の設計判断」を参照。本ドキュメントはPhase 2で新規に追加する画面・APIをまとめる。実行系APIのレート制限・確認ダイアログのアクセシビリティ対応など、Phase 2の画面にも適用されている品質・UX改善タスクの設計判断は [`quality-improvements.md`](./quality-improvements.md) を参照。
 
 ## 概要
 
@@ -62,7 +62,7 @@ flowchart TD
 ```
 ┌──────────────────────────────────────────────────────┐
 │ ← リポジトリ一覧へ    owner/repo-a                        │
-│ [オープンなPR] [レビュー履歴]                              │
+│ [オープンなPR] [レビュー履歴] [傾向]                        │
 ├──────────────────────────────────────────────────────┤
 │ #42 Add feature X                     [レビューを実行]    │
 │   使用するプロンプト: [コードレビュー v3 ▾]                 │
@@ -71,7 +71,8 @@ flowchart TD
 ```
 
 - 「オープンなPR」タブ: `GET /api/repositories/:id/pulls`でGitHub APIをその場で呼び出し表示する(DBには保存しない)。使用するプロンプトはユーザーの`Prompt`一覧から選択(バージョンは常に最新を使用)
-- 「レビュー履歴」タブ: `GET /api/repositories/:id/reviews`。過去の`Review`を新しい順に一覧し、各行に指摘の重要度別件数(CRITICAL / WARNING / INFOのバッジ)を表示する。これがPhase 2スコープでの「傾向の可視化」にあたる(横断的なダッシュボードはPhase 3で扱う)
+- 「レビュー履歴」タブ: 過去の`Review`を新しい順に一覧し、各行に指摘件数を表示する
+- 「傾向」タブ: そのリポジトリでの累計指摘件数(重要度別)、直近10件のレビューの重要度内訳(積み上げバー)、指摘の多いファイルTOP8を表示する。すべて`ReviewComment`に対する`groupBy`集計で、`/repositories/:id`のServer Componentが直接Prismaへ問い合わせる(専用APIは設けていない)。これがPhase 2スコープでの「傾向の可視化」にあたる(リポジトリ横断のダッシュボードはPhase 3で扱う)
 
 ### 3. レビュー詳細(`/reviews/:id`)
 
@@ -117,4 +118,4 @@ flowchart TD
 
 1. ~~GitHub連携の実装~~ → 完了。`repo`スコープの追加、`octokit`によるリポジトリ接続・PR取得API、`/repositories`・`/repositories/:id`画面
 2. ~~AIレビュー機能の実装~~ → 完了。`POST /api/repositories/:id/reviews`でPRのdiffを`{{diff}}`変数に展開し、構造化出力でレビュー結果を取得。`/repositories/:id`の「レビューを実行」・`/reviews/:id`画面
-3. レビュー結果の蓄積・可視化(現状は個別レビューの重要度別バッジ表示のみ。リポジトリ横断の傾向表示は未実装)
+3. ~~レビュー結果の蓄積・可視化~~ → 完了(リポジトリ単位)。`/repositories/:id`に「傾向」タブを追加し、累計指摘件数(重要度別)・直近10件のレビューの重要度内訳・指摘の多いファイルTOP8を表示。リポジトリ横断のダッシュボードはPhase 3で扱う

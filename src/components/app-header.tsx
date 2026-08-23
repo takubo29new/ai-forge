@@ -2,10 +2,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { signOut } from "@/auth";
 import { getSession } from "@/lib/session";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const NAV_LINKS = [
   { href: "/categories", label: "カテゴリ管理" },
   { href: "/repositories", label: "リポジトリ" },
+  { href: "/errors", label: "エラーログ" },
   { href: "/help", label: "ヘルプ" },
 ];
 
@@ -35,6 +37,7 @@ export async function AppHeader() {
         ))}
       </nav>
       <div className="flex items-center gap-3">
+        <ThemeToggle />
         {session.user.image && (
           <Image
             src={session.user.image}

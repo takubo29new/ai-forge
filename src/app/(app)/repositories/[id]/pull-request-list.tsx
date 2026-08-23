@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useApiMutation } from "@/lib/use-api-mutation";
 
 type PullRequest = {
   number: number;
@@ -27,30 +28,19 @@ export function PullRequestList({
   const [promptId, setPromptId] = useState(
     prompts.find((p) => p.usesDiff)?.id ?? prompts[0]?.id ?? "",
   );
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { mutate, pending, error } = useApiMutation();
 
   const selectedPrompt = prompts.find((p) => p.id === promptId);
 
   async function handleRun(pr: PullRequest) {
     if (!promptId || !selectedPrompt?.usesDiff) return;
-    setError(null);
-    setPending(true);
-    try {
-      const res = await fetch(`/api/repositories/${repositoryId}/reviews`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pullRequestNumber: pr.number, promptId }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "レビューの実行に失敗しました");
-        return;
-      }
-      router.push(`/reviews/${data.id}`);
-    } finally {
-      setPending(false);
-    }
+    const data = await mutate<{ id: string }>(
+      `/api/repositories/${repositoryId}/reviews`,
+      { method: "POST", body: { pullRequestNumber: pr.number, promptId } },
+      "レビューの実行に失敗しました",
+    );
+    if (!data) return;
+    router.push(`/reviews/${data.id}`);
   }
 
   if (prompts.length === 0) {
