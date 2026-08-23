@@ -95,14 +95,16 @@ model Prompt {
   categoryId String?
   category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
-  versions   PromptVersion[]
-  executions Execution[]
+  versions PromptVersion[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 // プロンプト本文の変更履歴。編集のたびに新しいバージョンを追加し、上書きしない。
+// versionNumberはアプリケーション側でmax+1を採番するため、同一Promptへの
+// 同時編集リクエストは@@uniqueの衝突で片方が失敗しうる(採用時のトレードオフ。
+// 詳細はdocs/db-design.md参照)。
 model PromptVersion {
   id            String  @id @default(cuid())
   versionNumber Int
@@ -125,11 +127,10 @@ enum ExecutionStatus {
 }
 
 // AI API実行の結果と履歴。どのプロンプトバージョンで実行したかを記録する。
+// Promptへの参照はpromptVersion経由のみとし、promptIdを別途持たない
+// (実行対象のバージョンと紐付くPromptが食い違う不整合を構造上防ぐ)。
 model Execution {
   id String @id @default(cuid())
-
-  promptId String
-  prompt   Prompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
 
   promptVersionId String
   promptVersion   PromptVersion @relation(fields: [promptVersionId], references: [id], onDelete: Cascade)
@@ -139,7 +140,7 @@ model Execution {
 
   model        String
   variables    Json?
-  resultText   String          @db.Text
+  resultText   String?         @db.Text
   status       ExecutionStatus @default(SUCCESS)
   errorMessage String?
 
