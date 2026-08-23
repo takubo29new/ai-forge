@@ -9,6 +9,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     GitHub({
       clientId: process.env.GITHUB_CLIENT_ID,
       clientSecret: process.env.GITHUB_CLIENT_SECRET,
+      // Phase 2のリポジトリ連携・PR取得のため repo スコープを追加する
+      authorization: { params: { scope: "read:user user:email repo" } },
     }),
   ],
   secret: process.env.NEXTAUTH_SECRET,
