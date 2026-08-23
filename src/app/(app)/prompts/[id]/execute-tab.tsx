@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AVAILABLE_MODELS, DEFAULT_MODEL } from "@/lib/models";
 import { extractVariableNames } from "@/lib/prompt-variables";
 import { Markdown } from "@/components/markdown";
+import { useApiMutation } from "@/lib/use-api-mutation";
 
 type Version = { id: string; versionNumber: number; content: string };
 
@@ -30,9 +31,8 @@ export function ExecuteTab({
   const [variableValues, setVariableValues] = useState<Record<string, string>>(
     {},
   );
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ExecutionResult | null>(null);
+  const { mutate, pending, error } = useApiMutation();
 
   const selectedVersion = versions.find((v) => v.id === versionId);
   const variableNames = useMemo(
@@ -42,29 +42,18 @@ export function ExecuteTab({
 
   async function handleExecute(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
     setResult(null);
-    setPending(true);
-    try {
-      const res = await fetch(`/api/prompts/${promptId}/execute`, {
+    const data = await mutate<ExecutionResult>(
+      `/api/prompts/${promptId}/execute`,
+      {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          promptVersionId: versionId,
-          model,
-          variables: variableValues,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "実行に失敗しました");
-        return;
-      }
-      setResult(data);
-      router.refresh();
-    } finally {
-      setPending(false);
-    }
+        body: { promptVersionId: versionId, model, variables: variableValues },
+      },
+      "実行に失敗しました",
+    );
+    if (!data) return;
+    setResult(data);
+    router.refresh();
   }
 
   if (versions.length === 0) {

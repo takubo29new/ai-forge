@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { useApiMutation } from "@/lib/use-api-mutation";
 
 type Category = { id: string; name: string };
 
@@ -25,52 +27,30 @@ export function EditTab({
   const [categoryId, setCategoryId] = useState(initialCategoryId ?? "");
   const [content, setContent] = useState(initialContent);
   const [note, setNote] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const { mutate, pending, error, setError } = useApiMutation();
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
-    setPending(true);
-    try {
-      const res = await fetch(`/api/prompts/${promptId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title,
-          categoryId: categoryId || null,
-          content,
-          note,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "保存に失敗しました");
-        return;
-      }
-      setNote("");
-      router.refresh();
-    } finally {
-      setPending(false);
-    }
+    const data = await mutate(
+      `/api/prompts/${promptId}`,
+      { method: "PATCH", body: { title, categoryId: categoryId || null, content, note } },
+      "保存に失敗しました",
+    );
+    if (!data) return;
+    setNote("");
+    router.refresh();
   }
 
   async function handleDelete() {
-    if (!window.confirm(`「${title}」を削除します。よろしいですか?`)) return;
-    setPending(true);
-    try {
-      const res = await fetch(`/api/prompts/${promptId}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setError(data.error ?? "削除に失敗しました");
-        return;
-      }
-      router.push("/prompts");
-    } finally {
-      setPending(false);
-    }
+    const result = await mutate(
+      `/api/prompts/${promptId}`,
+      { method: "DELETE" },
+      "削除に失敗しました",
+    );
+    if (result === null) return;
+    setConfirmDelete(false);
+    router.push("/prompts");
   }
 
   return (
@@ -141,13 +121,28 @@ export function EditTab({
         </button>
         <button
           type="button"
-          onClick={handleDelete}
+          onClick={() => setConfirmDelete(true)}
           disabled={pending}
           className="rounded-full border border-red-300 px-4 py-2 text-sm text-red-600 disabled:opacity-50 dark:border-red-900 dark:text-red-400"
         >
           削除
         </button>
       </div>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title="プロンプトを削除"
+        message={`「${title}」を削除します。バージョン履歴・実行履歴もすべて削除されます。よろしいですか?`}
+        confirmLabel="削除"
+        danger
+        pending={pending}
+        error={confirmDelete ? error : null}
+        onConfirm={handleDelete}
+        onCancel={() => {
+          setConfirmDelete(false);
+          setError(null);
+        }}
+      />
     </form>
   );
 }

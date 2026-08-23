@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useApiMutation } from "@/lib/use-api-mutation";
 
 type Category = { id: string; name: string };
 
@@ -10,28 +11,17 @@ export function NewPromptForm({ categories }: { categories: Category[] }) {
   const [title, setTitle] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [content, setContent] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
+  const { mutate, pending, error } = useApiMutation();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
-    setPending(true);
-    try {
-      const res = await fetch("/api/prompts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, categoryId: categoryId || null, content }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "作成に失敗しました");
-        return;
-      }
-      router.push(`/prompts/${data.id}`);
-    } finally {
-      setPending(false);
-    }
+    const data = await mutate<{ id: string }>(
+      "/api/prompts",
+      { method: "POST", body: { title, categoryId: categoryId || null, content } },
+      "作成に失敗しました",
+    );
+    if (!data) return;
+    router.push(`/prompts/${data.id}`);
   }
 
   return (
