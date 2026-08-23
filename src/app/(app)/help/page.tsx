@@ -8,6 +8,7 @@ const SECTIONS = [
   { id: "versions", label: "バージョン履歴" },
   { id: "execute", label: "実行" },
   { id: "history", label: "実行履歴" },
+  { id: "appearance", label: "表示設定・エラーログ" },
   { id: "faq", label: "よくある質問" },
 ];
 
@@ -100,6 +101,16 @@ export default async function HelpPage() {
           <h2 className="mb-2 text-lg font-semibold">実行履歴</h2>
           <p className="text-sm text-zinc-700 dark:text-zinc-300">
             「実行履歴」タブで、これまでの実行結果を新しい順に確認できます。各行を開くと、結果本文(失敗した場合はエラー内容)、使用したバージョン、トークン数、実行時間が表示されます。
+          </p>
+        </section>
+
+        <section id="appearance">
+          <h2 className="mb-2 text-lg font-semibold">表示設定・エラーログ</h2>
+          <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
+            ヘッダー右側の太陽・月アイコンで、ライトモード/ダークモードを手動で切り替えられます。何も操作しなければお使いの端末の設定(OSのライト/ダークモード)に従います。選択内容はこの端末のブラウザに保存され、次回アクセス時も引き継がれます。
+          </p>
+          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+            「エラーログ」ページでは、アプリ内で発生した想定外のエラーを直近50件まで確認できます。実行結果画面に出るエラー(APIエラーなど)とは別に、画面の表示中に起きた不具合の調査用です。
           </p>
         </section>
 

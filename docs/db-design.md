@@ -20,6 +20,7 @@ NextAuthのPrisma Adapterが要求する標準スキーマ([公式ドキュメ�
 - `PromptVersion` — プロンプト本文の実体。編集のたびに新しい行を追加し、既存行は上書きしない(バージョン履歴)
 - `Execution` — AI API実行結果。どの`PromptVersion`で実行したかを記録し、実行時点のプロンプト内容を後から追跡できるようにする
 - `RateLimitBucket` — プロンプト実行・AIレビュー実行の共通レート制限カウンタ(ユーザー×固定ウィンドウ単位)
+- `ErrorLog` — 想定外エラーの収集ログ(サーバー側は`instrumentation.ts`、クライアント側は`error.tsx`/`global-error.tsx`経由)
 
 ### AIコードレビュードメイン(Phase 2)
 
@@ -39,6 +40,9 @@ GitHub OAuthのアクセストークンは、Phase 1の認証ですでに`Accoun
 - **Executionの`variables`はJson型**: プロンプト内の変数(テンプレート変数)は機能ごとに形が変わるため、リレーショナルに正規化せずJSONで保持する。
 - **pgvector**: Phase 3のRAG機能で同一PostgreSQL内にベクトル列を追加する想定(設計ドキュメント参照)。Phase 1時点では未使用のため、拡張の有効化やベクトル列の追加はPhase 3着手時に行う。
 - **RateLimitBucketは`Execution`の件数をSELECTするのではなく専用カウンタで実装**: 当初は直近1時間の`Execution`件数を数える方式だったが、「件数を数える→実行を記録する」の間に別リクエストが割り込めるTOCTOUレースがあり、同時リクエストで上限を超えて呼び出せてしまう問題があった。`@@id([userId, windowStart])`の複合主キーに対する`upsert`(`count: { increment: 1 }`)はPostgres側で`INSERT ... ON CONFLICT DO UPDATE`としてアトミックに実行されるため、このレースが起きない。あわせて、成長し続ける`Execution`テーブルを都度COUNTする(インデックスが無ければフルスキャンになる)コストも避けられる。
+
+- **ErrorLogの`userId`はnullable**: サーバー側の`onRequestError`(`instrumentation.ts`)はNext.jsのリクエストコンテキストからセッション情報を直接取得できないため、多くのサーバーエラーは`userId: null`(ユーザー非紐付け)で記録される。クライアント側の報告(`POST /api/client-errors`)は認証必須のため`userId`が入る。閲覧画面(`/errors`)では、他ユーザーの個人情報漏えいを避けるため「自分の`userId`のログ」と「`userId`がnullの(=システム全体の)ログ」のみを表示し、他ユーザーの`userId`付きログは見せない。
+- **ログ保存はbest-effort**: `logError()`は内部で例外を握りつぶす(`prisma.errorLog.create`が失敗してもthrowしない)。エラーログの保存に失敗したことが原因で本来のリクエスト処理やエラーハンドリング自体が失敗する事態を避けるため。
 
 ### Phase 2の設計判断
 
