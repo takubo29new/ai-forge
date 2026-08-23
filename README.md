@@ -4,16 +4,28 @@
 
 プロダクトコンセプトや技術スタック、開発ロードマップの詳細は [`ai-dev-tool-handoff.md`](./ai-dev-tool-handoff.md) を参照。
 
-## 現在の状態: Phase 1(プロンプト管理ツール)
+## 現在の状態
+
+### Phase 1: プロンプト管理ツール
 
 AIに投げるプロンプトを「コードのように」管理・改善するためのツール。GitHubアカウントでログインし、プロンプトをカテゴリ分けして登録・編集(バージョン履歴つき)、Claudeに実行して結果と実行履歴を確認できる。
 
 - GitHub OAuthログイン(NextAuth.js)
 - カテゴリCRUD
 - プロンプトCRUD・バージョン履歴(編集のたびに新しいバージョンを追加)
-- Claude実行(モデル選択、`{{変数名}}`のテンプレート変数、実行履歴の記録)
+- Claude実行(モデル選択、`{{変数名}}`のテンプレート変数、実行履歴の記録。結果はMarkdownで表示)
 
 設計の詳細は [`docs/phase1-design.md`](./docs/phase1-design.md)(全体設計)、[`docs/db-design.md`](./docs/db-design.md)(DB設計)、[`docs/phase1-ui-design.md`](./docs/phase1-ui-design.md)(画面遷移・UI設計)を参照。
+
+### Phase 2: AIコードレビューツール
+
+GitHubリポジトリを接続し、PRの差分をPhase 1のプロンプト資産でAIレビューできるツール。
+
+- GitHubリポジトリの接続・オープンなPR一覧の取得(`repo`スコープ)
+- AIレビュー実行(PRのdiffを`{{diff}}`変数に展開し、Claudeの構造化出力で指摘事項を取得)
+- レビュー結果の保存・重要度別(CRITICAL / WARNING / INFO)の一覧表示
+
+設計の詳細は [`docs/phase2-design.md`](./docs/phase2-design.md)(画面遷移・UI設計・API設計)を参照。
 
 ## 技術スタック
 
@@ -76,6 +88,14 @@ npm run dev
 ```
 
 [http://localhost:3000](http://localhost:3000) をブラウザで開く。未ログインの場合は`/login`にリダイレクトされ、GitHubでログインすると`/prompts`(プロンプト一覧)に遷移する。
+
+## テスト
+
+```bash
+npm test
+```
+
+[Vitest](https://vitest.dev)によるユニットテスト。DB・外部APIに依存しない純粋なロジック(`{{変数名}}`の抽出・置換、AIレビューの構造化出力スキーマ)を対象にしている。DBアクセスを伴う処理(CRUD・実行系API)は、実装時に開発用DBに対して手動で動作確認している(自動化されたインテグレーションテストは未整備)。
 
 ## ブランチ運用
 
