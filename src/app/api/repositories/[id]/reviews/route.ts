@@ -6,6 +6,7 @@ import { getGitHubClient, getPullRequest, getPullRequestDiff } from "@/lib/githu
 import { renderTemplate } from "@/lib/prompt-variables";
 import { DEFAULT_MODEL } from "@/lib/models";
 import { ReviewOutputSchema } from "@/lib/review-schema";
+import { checkExecutionRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import Anthropic from "@anthropic-ai/sdk";
 
@@ -85,6 +86,11 @@ export async function POST(
       },
       { status: 400 },
     );
+  }
+
+  const rateLimit = await checkExecutionRateLimit(userId);
+  if (!rateLimit.allowed) {
+    return rateLimitResponse(rateLimit.limit);
   }
 
   const octokit = await getGitHubClient(userId);

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { anthropic } from "@/lib/anthropic";
 import { renderTemplate } from "@/lib/prompt-variables";
 import { DEFAULT_MODEL } from "@/lib/models";
+import { checkExecutionRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 export async function POST(
   request: Request,
@@ -45,6 +46,11 @@ export async function POST(
       { error: "対象のバージョンが見つかりません" },
       { status: 400 },
     );
+  }
+
+  const rateLimit = await checkExecutionRateLimit(session.user.id);
+  if (!rateLimit.allowed) {
+    return rateLimitResponse(rateLimit.limit);
   }
 
   const renderedContent = renderTemplate(promptVersion.content, variables);

@@ -19,6 +19,7 @@ NextAuthのPrisma Adapterが要求する標準スキーマ([公式ドキュメ�
 - `Prompt` — プロンプトの器(タイトル・所属カテゴリ・所有者)。本文は持たない
 - `PromptVersion` — プロンプト本文の実体。編集のたびに新しい行を追加し、既存行は上書きしない(バージョン履歴)
 - `Execution` — AI API実行結果。どの`PromptVersion`で実行したかを記録し、実行時点のプロンプト内容を後から追跡できるようにする
+- `RateLimitBucket` — プロンプト実行・AIレビュー実行の共通レート制限カウンタ(ユーザー×固定ウィンドウ単位)
 
 ### AIコードレビュードメイン(Phase 2)
 
@@ -37,6 +38,7 @@ GitHub OAuthのアクセストークンは、Phase 1の認証ですでに`Accoun
 - **`PromptVersion.versionNumber`の採番はアプリケーション側でmax+1**: 同一Promptに対する同時編集リクエストが競合した場合、`@@unique([promptId, versionNumber])`の制約により片方が失敗しうる(データ不整合ではなくリクエスト失敗)。単一ユーザーが自分のプロンプトを編集する用途では発生頻度は低いと判断し、Phase 1では許容する。将来的に問題になる場合はリトライ処理を追加する。
 - **Executionの`variables`はJson型**: プロンプト内の変数(テンプレート変数)は機能ごとに形が変わるため、リレーショナルに正規化せずJSONで保持する。
 - **pgvector**: Phase 3のRAG機能で同一PostgreSQL内にベクトル列を追加する想定(設計ドキュメント参照)。Phase 1時点では未使用のため、拡張の有効化やベクトル列の追加はPhase 3着手時に行う。
+- **RateLimitBucketは`Execution`の件数をSELECTするのではなく専用カウンタで実装**: 当初は直近1時間の`Execution`件数を数える方式だったが、「件数を数える→実行を記録する」の間に別リクエストが割り込めるTOCTOUレースがあり、同時リクエストで上限を超えて呼び出せてしまう問題があった。`@@id([userId, windowStart])`の複合主キーに対する`upsert`(`count: { increment: 1 }`)はPostgres側で`INSERT ... ON CONFLICT DO UPDATE`としてアトミックに実行されるため、このレースが起きない。あわせて、成長し続ける`Execution`テーブルを都度COUNTする(インデックスが無ければフルスキャンになる)コストも避けられる。
 
 ### Phase 2の設計判断
 
