@@ -22,6 +22,8 @@ NextAuthのPrisma Adapterが要求する標準スキーマ([公式ドキュメ�
 - `RateLimitBucket` — プロンプト実行・AIレビュー実行の共通レート制限カウンタ(ユーザー×固定ウィンドウ単位)
 - `ErrorLog` — 想定外エラーの収集ログ(サーバー側は`instrumentation.ts`、クライアント側は`error.tsx`/`global-error.tsx`経由)
 
+いずれも品質・UX改善タスクで追加したテーブル。実装の詳細は [`quality-improvements.md`](./quality-improvements.md) を参照。
+
 ### AIコードレビュードメイン(Phase 2)
 
 GitHub OAuthのアクセストークンは、Phase 1の認証ですでに`Account.access_token`に保存されているものを再利用する(Phase 2専用のトークン保存は行わない)。

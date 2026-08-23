@@ -60,7 +60,7 @@ GitHub OAuthのスコープに`repo`を追加し、`octokit`(GitHub公式SDK)経
 
 AIレビュー機能も実装完了。`{{diff}}`変数にPRのunified diffを展開したプロンプトをClaudeに投げ、`client.messages.parse` + Zodスキーマ(`output_config.format`)で`{ findings: [...] }`形式の構造化出力を強制することで、自由記述テキストのパースを避けて`ReviewComment`へ直接マッピングしている。`/repositories/:id`の「レビューを実行」ボタンからプロンプトを選んで実行でき、`/reviews/:id`で指摘一覧・重要度別件数を確認できる。
 
-品質・UX改善タスク(自動テスト整備、共通ナビゲーション、実行系APIのレート制限、確認ダイアログのアクセシビリティ対応、ダークモード手動トグル、エラーログ収集)も一通り完了。
+品質・UX改善タスク(自動テスト整備、共通ナビゲーション、実行系APIのレート制限、確認ダイアログのアクセシビリティ対応、ダークモード手動トグル、エラーログ収集)も一通り完了。設計判断の詳細は [`docs/quality-improvements.md`](./docs/quality-improvements.md) を参照。
 
 レビュー結果の蓄積・可視化(リポジトリ単位)も実装完了。`/repositories/:id`の「傾向」タブで、累計指摘件数(重要度別)・直近10件のレビューの重要度内訳・指摘の多いファイルTOP8を確認できる。これでPhase 2の主要機能(GitHub連携・AIレビュー・レビュー結果の蓄積可視化)は実装完了。
 

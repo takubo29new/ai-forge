@@ -1,6 +1,6 @@
 # Phase 2 基本設計書(画面遷移・UI設計)
 
-対象: AIコードレビューツール(Phase 2)。アーキテクチャ・認証は [`phase1-design.md`](./phase1-design.md) を、DB設計は [`db-design.md`](./db-design.md) の「Phase 2の設計判断」を参照。本ドキュメントはPhase 2で新規に追加する画面・APIをまとめる。
+対象: AIコードレビューツール(Phase 2)。アーキテクチャ・認証は [`phase1-design.md`](./phase1-design.md) を、DB設計は [`db-design.md`](./db-design.md) の「Phase 2の設計判断」を参照。本ドキュメントはPhase 2で新規に追加する画面・APIをまとめる。実行系APIのレート制限・確認ダイアログのアクセシビリティ対応など、Phase 2の画面にも適用されている品質・UX改善タスクの設計判断は [`quality-improvements.md`](./quality-improvements.md) を参照。
 
 ## 概要
 
