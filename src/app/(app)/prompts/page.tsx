@@ -1,28 +1,24 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { requireUserId } from "@/lib/session";
 
 export default async function PromptsPage({
   searchParams,
 }: {
   searchParams: Promise<{ categoryId?: string; q?: string }>;
 }) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    redirect("/login");
-  }
+  const userId = await requireUserId();
 
   const { categoryId, q } = await searchParams;
 
   const [categories, prompts] = await Promise.all([
     prisma.category.findMany({
-      where: { userId: session.user.id },
+      where: { userId },
       orderBy: { name: "asc" },
     }),
     prisma.prompt.findMany({
       where: {
-        userId: session.user.id,
+        userId,
         ...(categoryId ? { categoryId } : {}),
         ...(q ? { title: { contains: q, mode: "insensitive" } } : {}),
       },

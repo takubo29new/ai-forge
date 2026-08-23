@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
-import { auth } from "@/auth";
+import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { requireUserId } from "@/lib/session";
 import { EditTab } from "./edit-tab";
 import { ExecuteTab } from "./execute-tab";
 import { Markdown } from "@/components/markdown";
@@ -22,10 +22,7 @@ export default async function PromptDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ tab?: string }>;
 }) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    redirect("/login");
-  }
+  const userId = await requireUserId();
 
   const { id } = await params;
   const { tab: tabParam } = await searchParams;
@@ -42,12 +39,12 @@ export default async function PromptDetailPage({
       },
     }),
     prisma.category.findMany({
-      where: { userId: session.user.id },
+      where: { userId },
       orderBy: { name: "asc" },
     }),
   ]);
 
-  if (!prompt || prompt.userId !== session.user.id) {
+  if (!prompt || prompt.userId !== userId) {
     notFound();
   }
 

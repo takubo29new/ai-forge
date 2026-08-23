@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
-import { auth, signOut } from "@/auth";
+import { signOut } from "@/auth";
+import { getSession } from "@/lib/session";
 
 const NAV_LINKS = [
   { href: "/categories", label: "カテゴリ管理" },
@@ -9,7 +10,7 @@ const NAV_LINKS = [
 ];
 
 export async function AppHeader() {
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user) return null;
 
   async function signOutAction() {

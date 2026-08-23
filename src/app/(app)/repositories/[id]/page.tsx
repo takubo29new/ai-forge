@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
-import { auth } from "@/auth";
+import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { requireUserId } from "@/lib/session";
 import { getGitHubClient, listOpenPullRequests } from "@/lib/github";
 import { PullRequestList } from "./pull-request-list";
 
@@ -19,10 +19,7 @@ export default async function RepositoryDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ tab?: string }>;
 }) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    redirect("/login");
-  }
+  const userId = await requireUserId();
 
   const { id } = await params;
   const { tab: tabParam } = await searchParams;
@@ -31,7 +28,7 @@ export default async function RepositoryDetailPage({
     : "pulls";
 
   const repository = await prisma.repository.findUnique({ where: { id } });
-  if (!repository || repository.userId !== session.user.id) {
+  if (!repository || repository.userId !== userId) {
     notFound();
   }
 
@@ -39,7 +36,7 @@ export default async function RepositoryDetailPage({
   let pullsError: string | null = null;
   let prompts: { id: string; title: string; usesDiff: boolean }[] = [];
   if (tab === "pulls") {
-    const octokit = await getGitHubClient(session.user.id);
+    const octokit = await getGitHubClient(userId);
     if (!octokit) {
       pullsError =
         "GitHub連携情報が見つかりません。ログアウトして再度ログインしてください。";
@@ -55,7 +52,7 @@ export default async function RepositoryDetailPage({
       }
     }
     const promptRows = await prisma.prompt.findMany({
-      where: { userId: session.user.id },
+      where: { userId },
       include: { versions: { orderBy: { versionNumber: "desc" }, take: 1 } },
       orderBy: { updatedAt: "desc" },
     });
