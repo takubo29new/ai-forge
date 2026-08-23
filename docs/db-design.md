@@ -69,6 +69,8 @@ pgvector拡張(`vector`、0.8.6)をここで初めて有効化した。詳細は
 - **埋め込みモデルはVoyage AI(`voyage-3`)**: AnthropicがRAG用途で公式に推奨しているため。詳細・DB設計の全体像は[`phase3-design.md`](./phase3-design.md)を参照
 - **Voyage AI呼び出し失敗時はDocument自体を削除する**: `POST /api/documents`で埋め込み生成(`embedDocuments()`)が失敗した場合、chunkだけ作ってembeddingが無いDocumentを残すと「検索対象に見えるが実際はヒットしない」という気づきにくい不整合になる。Reviewの`status: FAILED`のように失敗を記録として残す設計とは異なり、ここでは作り直せる状態(そもそも存在しない)に戻すことを優先した(Phase 1のExecution・Phase 2のReviewとは意図的に異なる判断)
 - **pgvectorの類似検索インデックスはHNSW**: `ivfflat`は事前にある程度のデータ件数が無いとクラスタリングの精度が出ない(トレーニングデータ依存)のに対し、HNSWはデータが増えるたびに逐次構築されるため、件数が少ない状態から始まるポートフォリオ運用に向いている
+- **`ReviewComment`の埋め込み生成は失敗してもReview自体をロールバックしない**: `Document`とは逆に、`POST /api/repositories/:id/reviews`ではReviewCommentの埋め込み生成(Voyage AI呼び出し)が失敗しても、既に作成済みのReview・ReviewCommentは残す。理由は、AIレビューという主目的の処理は既に成功しており、埋め込みはRAG検索チャットの検索対象を増やすための副次的な処理に過ぎないため。失敗はErrorLogに記録し、埋め込みが無い指摘は`POST /api/review-comments/backfill-embeddings`で後から埋められる
+- **RAG検索チャット(`/chat`)のAI呼び出しはExecutionを経由しない**: Phase 1・2のAI呼び出しは`Execution`(`promptVersionId`必須)を通すが、チャットの質問はユーザーが管理する`PromptVersion`ではなくシステム側が組み立てるプロンプトのため、この枠組みには馴染まない。無理に`Execution`へ合わせず、`src/app/api/chat/route.ts`で直接Claudeを呼び出す設計にした
 
 ## DB環境構築
 

@@ -9,6 +9,7 @@ vi.mock("@/lib/github", () => ({
   getPullRequest: vi.fn(),
   getPullRequestDiff: vi.fn(),
 }));
+vi.mock("@/lib/voyage", () => ({ embedDocuments: vi.fn() }));
 
 import { auth } from "@/auth";
 import { anthropic } from "@/lib/anthropic";
@@ -17,6 +18,7 @@ import {
   getPullRequest,
   getPullRequestDiff,
 } from "@/lib/github";
+import { embedDocuments } from "@/lib/voyage";
 import { prisma } from "@/lib/prisma";
 import { POST } from "./route";
 import {
@@ -36,6 +38,11 @@ const mockParse = vi.mocked(anthropic.messages.parse);
 const mockGetClient = vi.mocked(getGitHubClient);
 const mockGetPR = vi.mocked(getPullRequest);
 const mockGetDiff = vi.mocked(getPullRequestDiff);
+const mockEmbedDocuments = vi.mocked(embedDocuments);
+
+function fakeEmbedding(seed: number) {
+  return Array.from({ length: 1024 }, (_, i) => (i === 0 ? seed : 0));
+}
 
 function request(body: unknown) {
   return new Request("http://localhost/api/repositories/x/reviews", {
@@ -76,6 +83,7 @@ describe("POST /api/repositories/:id/reviews", () => {
       headSha: "abc123",
     });
     mockGetDiff.mockReset();
+    mockEmbedDocuments.mockReset().mockResolvedValue([]);
   });
 
   afterEach(async () => {
@@ -112,6 +120,7 @@ describe("POST /api/repositories/:id/reviews", () => {
       },
       usage: { input_tokens: 100, output_tokens: 50 },
     } as never);
+    mockEmbedDocuments.mockResolvedValue([fakeEmbedding(1)]);
 
     const res = await POST(
       request({ pullRequestNumber: 42, promptId: promptWithDiffId }),
@@ -127,6 +136,13 @@ describe("POST /api/repositories/:id/reviews", () => {
     expect(review?.status).toBe("SUCCESS");
     expect(review?.comments).toHaveLength(1);
     expect(review?.comments[0].filePath).toBe("src/x.ts");
+
+    // 新規に作成された指摘には都度埋め込みが生成される(RAG検索チャットの検索対象)
+    const embedded = await prisma.$queryRaw<{ id: string }[]>`
+      SELECT "reviewCommentId" AS id FROM "ReviewCommentEmbedding"
+      WHERE "reviewCommentId" = ${review!.comments[0].id}
+    `;
+    expect(embedded).toHaveLength(1);
   });
 
   it("diffが切り詰められた場合はReviewCommentに警告を残す", async () => {

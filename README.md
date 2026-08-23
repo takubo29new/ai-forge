@@ -44,10 +44,12 @@ GitHubリポジトリを接続し、PRの差分をPhase 1のプロンプト資�
 
 設計書やAIレビューの指摘をベクトル検索の対象とし、自然文の質問にClaudeが出典付きで回答するチャットボット。埋め込みは[Voyage AI](https://www.voyageai.com/)の`voyage-3`を使用する。
 
-- pgvector拡張を有効化し、`Document`/`DocumentChunk`のスキーマを追加(HNSWインデックスでのコサイン類似検索)
+- pgvector拡張を有効化し、`Document`/`DocumentChunk`/`ReviewCommentEmbedding`のスキーマを追加(HNSWインデックスでのコサイン類似検索)
 - ドキュメント取り込み(`/documents`。タイトル+本文を見出し単位でチャンク分割し、埋め込みを生成)
+- 既存レビュー指摘の埋め込みバックフィル(新規レビューは自動、既存分は`/documents`の「既存のレビュー指摘を取り込む」ボタンから)
+- RAG検索チャット(`/chat`。ドキュメント・レビュー指摘を横断検索し、Claudeが出典付きで回答)
 
-RAG検索チャット(`/chat`)・統合ダッシュボード(`/dashboard`)は未実装。画面遷移・DB設計・実装状況は [`docs/phase3-design.md`](./docs/phase3-design.md) を参照。
+統合ダッシュボード(`/dashboard`)は未実装。画面遷移・DB設計・実装状況は [`docs/phase3-design.md`](./docs/phase3-design.md) を参照。
 
 ## 技術スタック
 
