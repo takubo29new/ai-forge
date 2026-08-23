@@ -11,7 +11,7 @@ type PullRequest = {
   updatedAt: string;
 };
 
-type Prompt = { id: string; title: string };
+type Prompt = { id: string; title: string; usesDiff: boolean };
 
 export function PullRequestList({
   repositoryId,
@@ -24,12 +24,16 @@ export function PullRequestList({
 }) {
   const router = useRouter();
   const [openFor, setOpenFor] = useState<number | null>(null);
-  const [promptId, setPromptId] = useState(prompts[0]?.id ?? "");
+  const [promptId, setPromptId] = useState(
+    prompts.find((p) => p.usesDiff)?.id ?? prompts[0]?.id ?? "",
+  );
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const selectedPrompt = prompts.find((p) => p.id === promptId);
+
   async function handleRun(pr: PullRequest) {
-    if (!promptId) return;
+    if (!promptId || !selectedPrompt?.usesDiff) return;
     setError(null);
     setPending(true);
     try {
@@ -88,25 +92,37 @@ export function PullRequestList({
           </div>
 
           {openFor === pr.number && (
-            <div className="mt-3 flex items-center gap-2 border-t border-zinc-200 pt-3 dark:border-zinc-800">
-              <select
-                value={promptId}
-                onChange={(e) => setPromptId(e.target.value)}
-                className="flex-1 rounded border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-              >
-                {prompts.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.title}
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={() => handleRun(pr)}
-                disabled={pending}
-                className="rounded bg-foreground px-4 py-1.5 text-xs font-medium text-background disabled:opacity-50"
-              >
-                {pending ? "実行中..." : "実行"}
-              </button>
+            <div className="mt-3 border-t border-zinc-200 pt-3 dark:border-zinc-800">
+              <div className="flex items-center gap-2">
+                <select
+                  value={promptId}
+                  onChange={(e) => setPromptId(e.target.value)}
+                  className="flex-1 rounded border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                >
+                  {prompts.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.title}
+                      {!p.usesDiff && "(⚠ {{diff}}未使用)"}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => handleRun(pr)}
+                  disabled={pending || !selectedPrompt?.usesDiff}
+                  className="rounded bg-foreground px-4 py-1.5 text-xs font-medium text-background disabled:opacity-50"
+                >
+                  {pending ? "実行中..." : "実行"}
+                </button>
+              </div>
+              {selectedPrompt && !selectedPrompt.usesDiff && (
+                <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+                  このプロンプトの本文に{" "}
+                  <code className="rounded bg-zinc-100 px-1 py-0.5 dark:bg-zinc-800">
+                    {"{{diff}}"}
+                  </code>{" "}
+                  が含まれていないため、コード差分がClaudeに渡りません。プロンプトを編集して追加してください。
+                </p>
+              )}
             </div>
           )}
 

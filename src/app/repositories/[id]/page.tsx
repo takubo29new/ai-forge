@@ -37,7 +37,7 @@ export default async function RepositoryDetailPage({
 
   let pulls: Awaited<ReturnType<typeof listOpenPullRequests>> | null = null;
   let pullsError: string | null = null;
-  let prompts: { id: string; title: string }[] = [];
+  let prompts: { id: string; title: string; usesDiff: boolean }[] = [];
   if (tab === "pulls") {
     const octokit = await getGitHubClient(session.user.id);
     if (!octokit) {
@@ -54,11 +54,16 @@ export default async function RepositoryDetailPage({
         pullsError = "オープンなPRの取得に失敗しました";
       }
     }
-    prompts = await prisma.prompt.findMany({
+    const promptRows = await prisma.prompt.findMany({
       where: { userId: session.user.id },
-      select: { id: true, title: true },
+      include: { versions: { orderBy: { versionNumber: "desc" }, take: 1 } },
       orderBy: { updatedAt: "desc" },
     });
+    prompts = promptRows.map((p) => ({
+      id: p.id,
+      title: p.title,
+      usesDiff: (p.versions[0]?.content ?? "").includes("{{diff}}"),
+    }));
   }
 
   const reviews =

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AVAILABLE_MODELS, DEFAULT_MODEL } from "@/lib/models";
 import { extractVariableNames } from "@/lib/prompt-variables";
+import { Markdown } from "@/components/markdown";
 
 type Version = { id: string; versionNumber: number; content: string };
 
@@ -146,9 +147,13 @@ export function ExecuteTab({
       {result && (
         <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
           <p className="mb-2 text-xs text-zinc-500">実行結果</p>
-          <pre className="whitespace-pre-wrap font-mono text-sm">
-            {result.status === "SUCCESS" ? result.resultText : result.errorMessage}
-          </pre>
+          {result.status === "SUCCESS" ? (
+            <Markdown>{result.resultText ?? ""}</Markdown>
+          ) : (
+            <p className="text-sm text-red-600 dark:text-red-400">
+              {result.errorMessage}
+            </p>
+          )}
           <p className="mt-3 text-xs text-zinc-500">
             status: {result.status}
             {result.status === "SUCCESS" &&

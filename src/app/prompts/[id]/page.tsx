@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { EditTab } from "./edit-tab";
 import { ExecuteTab } from "./execute-tab";
+import { Markdown } from "@/components/markdown";
 
 const TABS = [
   { key: "edit", label: "編集" },
@@ -174,10 +175,16 @@ export default async function PromptDetailPage({
                   </span>{" "}
                   <span className="text-zinc-500">{e.model}</span>
                 </summary>
-                <div className="whitespace-pre-wrap border-t border-zinc-200 px-4 py-3 font-mono text-xs dark:border-zinc-800">
-                  {e.status === "SUCCESS" ? e.resultText : e.errorMessage}
+                <div className="border-t border-zinc-200 px-4 py-3 dark:border-zinc-800">
+                  {e.status === "SUCCESS" ? (
+                    <Markdown>{e.resultText ?? ""}</Markdown>
+                  ) : (
+                    <p className="text-xs text-red-600 dark:text-red-400">
+                      {e.errorMessage}
+                    </p>
+                  )}
                   {e.status === "SUCCESS" && (
-                    <p className="mt-2 font-sans text-zinc-500">
+                    <p className="mt-2 text-xs text-zinc-500">
                       tokens: {e.promptTokens}+{e.completionTokens} /{" "}
                       {e.durationMs}ms
                     </p>

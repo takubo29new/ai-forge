@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { Markdown } from "@/components/markdown";
 
 const SEVERITY_STYLE: Record<string, string> = {
   CRITICAL: "text-red-600 dark:text-red-400",
@@ -96,9 +97,9 @@ export default async function ReviewDetailPage({
                   [{c.severity}]
                 </span>
               </p>
-              <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
-                {c.body}
-              </p>
+              <div className="mt-1">
+                <Markdown>{c.body}</Markdown>
+              </div>
             </li>
           ))}
         </ul>

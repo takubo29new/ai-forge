@@ -77,6 +77,15 @@ export async function POST(
       { status: 400 },
     );
   }
+  if (!promptVersion.content.includes("{{diff}}")) {
+    return NextResponse.json(
+      {
+        error:
+          "選択したプロンプトの本文に{{diff}}が含まれていないため、コード差分を渡せません。プロンプトを編集して{{diff}}を追加してください。",
+      },
+      { status: 400 },
+    );
+  }
 
   const octokit = await getGitHubClient(userId);
   if (!octokit) {
