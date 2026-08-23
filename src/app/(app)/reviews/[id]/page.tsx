@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
-import { auth } from "@/auth";
+import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { requireUserId } from "@/lib/session";
 import { Markdown } from "@/components/markdown";
 
 const SEVERITY_STYLE: Record<string, string> = {
@@ -15,10 +15,7 @@ export default async function ReviewDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    redirect("/login");
-  }
+  const userId = await requireUserId();
 
   const { id } = await params;
   const review = await prisma.review.findUnique({
@@ -30,7 +27,7 @@ export default async function ReviewDetailPage({
     },
   });
 
-  if (!review || review.userId !== session.user.id) {
+  if (!review || review.userId !== userId) {
     notFound();
   }
 
