@@ -1,17 +1,13 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { requireUserId } from "@/lib/session";
 import { RepositoryManager } from "./repository-manager";
 
 export default async function RepositoriesPage() {
-  const session = await auth();
-  if (!session?.user?.id) {
-    redirect("/login");
-  }
+  const userId = await requireUserId();
 
   const repositories = await prisma.repository.findMany({
-    where: { userId: session.user.id },
+    where: { userId },
     include: { _count: { select: { reviews: true } } },
     orderBy: { connectedAt: "desc" },
   });

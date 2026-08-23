@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { requireUserId } from "@/lib/session";
 
 const SECTIONS = [
   { id: "login", label: "ログイン" },
@@ -10,7 +11,9 @@ const SECTIONS = [
   { id: "faq", label: "よくある質問" },
 ];
 
-export default function HelpPage() {
+export default async function HelpPage() {
+  await requireUserId();
+
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-10">
       <Link
