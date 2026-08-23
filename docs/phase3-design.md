@@ -1,6 +1,6 @@
 # Phase 3 基本設計書(RAG検索チャットボット)
 
-対象: RAG検索チャットボット(Phase 3)。アーキテクチャ・認証は [`phase1-design.md`](./phase1-design.md) を、DB設計の全体像は [`db-design.md`](./db-design.md) を参照。本ドキュメントはPhase 3で新規に追加するDB・画面・APIをまとめる。**DBスキーマ・ドキュメント取り込み・レビュー指摘の埋め込みバックフィル・RAG検索チャットまで実装済み。統合ダッシュボードは未実装。**詳細は「実装状況」を参照。
+対象: RAG検索チャットボット(Phase 3)。アーキテクチャ・認証は [`phase1-design.md`](./phase1-design.md) を、DB設計の全体像は [`db-design.md`](./db-design.md) を参照。本ドキュメントはPhase 3で新規に追加するDB・画面・APIをまとめる。**統合ダッシュボード以外は実装済み。**詳細は「実装状況」を参照。
 
 ## 概要
 
@@ -159,7 +159,7 @@ flowchart TD
 
 1. ~~`pgvector`拡張の有効化・`Document`/`DocumentChunk`/`ReviewCommentEmbedding`のマイグレーション追加~~ → 完了。`vector`拡張(0.8.6)を有効化し、`embedding`列へHNSWインデックス(コサイン距離)を追加済み
 2. ~~ドキュメント取り込み(`/documents`・手動登録)の実装~~ → 完了。タイトル+本文を送ると`chunkMarkdown()`で見出し単位に分割し、Voyage AI(`voyage-3`)で埋め込みを生成して`DocumentChunk`に保存する。埋め込み生成に失敗した場合はDocument自体を削除し、作り直せる状態に戻す(部分的に検索対象外のDocumentが残らないようにするため)
-3. リポジトリファイル同期の実装 — 未着手
+3. ~~リポジトリファイル同期の実装~~ → 完了。`POST /api/documents/sync`が`docs/*.md`・`README.md`・`ai-dev-tool-handoff.md`を読み込み、ファイル横断で1回のVoyage AI呼び出しにまとめて埋め込みを生成する。再同期時は同じ`sourcePath`のDocumentを丸ごと作り直す(差分検出はしない)。埋め込み生成に失敗した場合はDBへの書き込みを一切行わない
 4. ~~既存`ReviewComment`への埋め込みバックフィル~~ → 完了。上記「レビュー指摘の埋め込みバックフィル」参照
 5. ~~RAG検索チャット(`/chat`)の実装~~ → 完了。上記「RAG検索チャットの回答生成方針」参照
 6. 統合ダッシュボード(`/dashboard`)の実装 — 未着手

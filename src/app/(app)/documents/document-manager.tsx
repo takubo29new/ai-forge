@@ -29,6 +29,42 @@ export function DocumentManager({
   const { mutate, pending, error, setError } = useApiMutation();
   const backfill = useApiMutation();
   const [backfillMessage, setBackfillMessage] = useState<string | null>(null);
+  const sync = useApiMutation();
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+
+  async function handleSync() {
+    setSyncMessage(null);
+    const data = await sync.mutate<{ syncedDocuments: number; syncedChunks: number }>(
+      "/api/documents/sync",
+      { method: "POST" },
+      "同期に失敗しました",
+    );
+    if (!data) return;
+    setSyncMessage(
+      `${data.syncedDocuments}件のファイルを同期しました(${data.syncedChunks}チャンク)`,
+    );
+    // 同期はサーバー側で複数のDocumentを一括作り直すため、個々の差分を
+    // クライアント側で組み立てるより一覧を取得し直す方が単純で確実。
+    const res = await fetch("/api/documents");
+    if (res.ok) {
+      const raw: {
+        id: string;
+        title: string;
+        sourceType: Document["sourceType"];
+        createdAt: string;
+        _count: { chunks: number };
+      }[] = await res.json();
+      setDocuments(
+        raw.map((d) => ({
+          id: d.id,
+          title: d.title,
+          sourceType: d.sourceType,
+          chunkCount: d._count.chunks,
+          createdAt: d.createdAt,
+        })),
+      );
+    }
+  }
 
   async function handleBackfill() {
     setBackfillMessage(null);
@@ -88,6 +124,28 @@ export function DocumentManager({
 
   return (
     <div className="flex flex-col gap-6">
+      <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+        <p className="mb-2 text-sm font-medium">リポジトリファイル同期</p>
+        <p className="mb-3 text-xs text-zinc-500">
+          docs/配下のMarkdownファイル・README.md・ai-dev-tool-handoff.mdを取り込みます。再度実行すると、同じファイルのドキュメントは最新の内容で作り直されます。
+        </p>
+        <button
+          onClick={handleSync}
+          disabled={sync.pending}
+          className="rounded border border-zinc-300 px-3 py-1.5 text-xs disabled:opacity-50 dark:border-zinc-700"
+        >
+          {sync.pending ? "同期中..." : "リポジトリから同期"}
+        </button>
+        {syncMessage && (
+          <p className="mt-2 text-xs text-zinc-500">{syncMessage}</p>
+        )}
+        {sync.error && (
+          <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+            {sync.error}
+          </p>
+        )}
+      </div>
+
       <form
         onSubmit={handleCreate}
         className="flex flex-col gap-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800"
