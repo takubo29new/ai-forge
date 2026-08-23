@@ -31,6 +31,7 @@ model User {
   repositories     Repository[]
   reviews          Review[]
   rateLimitBuckets RateLimitBucket[]
+  errorLogs        ErrorLog[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -170,6 +171,33 @@ model RateLimitBucket {
   count       Int      @default(0)
 
   @@id([userId, windowStart])
+}
+
+// --- 運用ドメイン ---
+
+enum ErrorLogSource {
+  SERVER
+  CLIENT
+}
+
+// 想定外エラーの収集ログ。サーバー側はinstrumentation.tsのonRequestErrorから、
+// クライアント側はerror.tsx/global-error.tsxからPOST /api/client-errorsを経由して書き込む。
+// ログ保存自体の失敗が本処理に影響しないよう、書き込みは常にbest-effort(失敗を握りつぶす)。
+model ErrorLog {
+  id      String         @id @default(cuid())
+  source  ErrorLogSource
+  message String         @db.Text
+  digest  String?
+  stack   String?        @db.Text
+  path    String?
+  method  String?
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
 }
 
 // --- AIコードレビュードメイン(Phase 2) ---
