@@ -45,6 +45,7 @@ GitHub OAuthのアクセストークンは、Phase 1の認証ですでに`Accoun
 
 - **ErrorLogの`userId`はnullable**: サーバー側の`onRequestError`(`instrumentation.ts`)はNext.jsのリクエストコンテキストからセッション情報を直接取得できないため、多くのサーバーエラーは`userId: null`(ユーザー非紐付け)で記録される。クライアント側の報告(`POST /api/client-errors`)は認証必須のため`userId`が入る。閲覧画面(`/errors`)では、他ユーザーの個人情報漏えいを避けるため「自分の`userId`のログ」と「`userId`がnullの(=システム全体の)ログ」のみを表示し、他ユーザーの`userId`付きログは見せない。
 - **ログ保存はbest-effort**: `logError()`は内部で例外を握りつぶす(`prisma.errorLog.create`が失敗してもthrowしない)。エラーログの保存に失敗したことが原因で本来のリクエスト処理やエラーハンドリング自体が失敗する事態を避けるため。
+- **主要な外部キーにインデックスを追加**: 当初は`ErrorLog.createdAt`以外に明示的な`@@index`が無く、`Account.userId`(GitHubトークン取得のたびに引かれる)・`Prompt.userId`・`Execution.promptVersionId`/`userId`・`Review.repositoryId`/`userId`・`ReviewComment.reviewId`はいずれもフルスキャンになりうる状態だった。データ量が少ないポートフォリオ運用では体感できる差ではないが、増える前に追加しておくほうが安いと判断し、これらすべてに`@@index`を追加した(`20260823175120_add_hot_path_indexes`)。
 
 ### Phase 2の設計判断
 

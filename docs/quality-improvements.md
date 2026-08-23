@@ -12,6 +12,7 @@ Phase 1・Phase 2の機能実装が一段落した後、プロフェッショナ
 6. モーダルのアクセシビリティ対応
 7. ダークモード手動トグル
 8. エラーログ収集
+9. 運用ハードニング(CI・DBインデックス・一覧上限・AI実行ロジックの共通化)
 
 ## 1. 自動テスト整備
 
@@ -20,7 +21,12 @@ Phase 1・Phase 2の機能実装が一段落した後、プロフェッショナ
 - `{{変数名}}`の抽出・置換ロジック(`src/lib/prompt-variables.ts`)
 - AIレビューの構造化出力スキーマ(`src/lib/review-schema.ts`)
 
-CRUD・実行系APIなどDBアクセスを伴う処理は、実装時に開発用DBへ手動で動作確認する運用とし、自動化されたインテグレーションテストは範囲外にした(単一ユーザーのポートフォリオ用途では費用対効果が見合わないと判断)。
+当初、CRUD・実行系APIなどDBアクセスを伴う処理は、実装時に開発用DBへ手動で動作確認する運用とし、自動化されたインテグレーションテストは範囲外にしていた(単一ユーザーのポートフォリオ用途では費用対効果が見合わないと判断)。CIが無かった頃はこの判断で妥当だったが、後述の「9. 運用ハードニング」でCIを導入したことでこの前提が変わったため、認可判定・レート制限・AI実行の成否分岐など回帰しやすい箇所に限定してルートレベルの統合テスト(`*.integration.test.ts`、`npm run test:integration`)を追加した。
+
+- 実際のPostgresに対してPrisma経由でクエリを発行し、GitHub/Anthropicへの外部呼び出しは`vi.mock`でモックする(DBは本物・外部APIは偽物、という境界で線引きしている)
+- `POST /api/prompts/:id/execute`: 未認証401・他ユーザー404・不正なバージョン400・成功時201/SUCCESS・AI失敗時200/FAILED・レート制限429を検証
+- `POST /api/repositories/:id/reviews`: 他ユーザー404・`{{diff}}`欠如400・成功時のReviewComment作成・diff truncate時の警告コメント追加・AI失敗時200/FAILEDを検証(いずれも「9. 運用ハードニング」で見つけた不具合の回帰テストを兼ねる)
+- 全件のCRUD・全ルートを網羅する方針ではなく、「ownership漏れ・ステータスコード不整合のような、手作業では見落としやすい分岐」に絞って追加している
 
 ## 2. 共通ナビゲーション整備
 
@@ -62,6 +68,19 @@ Tailwind CSS v4のclass-based dark mode(`@custom-variant dark (&:where(.dark, .d
 - **クライアント側**: `error.tsx`・`global-error.tsx`(Reactのエラーバウンダリ)から`POST /api/client-errors`経由で送信する。認証必須・レート制限つき(1時間30回)
 - ログ保存自体の失敗が本処理に影響しないよう、書き込みは常にbest-effort(失敗を握りつぶす)
 - `/errors`ページで直近50件を確認できる。`ErrorLog.userId`はサーバー側エラーでは付与できないことが多い(`onRequestError`はセッション情報を直接取得できない)ため、閲覧画面では「自分の`userId`のログ」と「`userId`が未設定のログ」のみを表示し、他ユーザーのログを見せないようにしている
+
+## 9. 運用ハードニング(CI・DBインデックス・一覧上限・AI実行ロジックの共通化)
+
+Phase 2完了後、経験豊富なWebエンジニアの視点であらためてmainの実装をコードレベルでレビューし、見つかった指摘のうち優先度の高いものに対応した。
+
+- **CI導入**: `.github/workflows/ci.yml`を追加。`main`・`dev`へのpush、PR作成時に`npm ci` → `prisma generate` → `lint` → `test` → `build`を自動実行する。それまでは壊れた`main`を機械的に止める仕組みが無く、ビルド・テストはローカルでの手動確認のみに依存していた
+- **DBインデックス追加**: 詳細は[`db-design.md`](./db-design.md)を参照。ホットな外部キーに`@@index`を追加した
+- **一覧クエリへの上限追加**: 実行履歴・レビュー履歴・バージョン履歴の`findMany`が`take`なしで全件取得しており、使い込むほど線形に重くなる作りだった。`src/lib/list-limits.ts`の`LIST_LIMIT`(100件)を導入し、フルページネーションUIを作るほどの規模ではない現段階でも劣化を防ぐ形にした
+- **PR差分truncateの可視化**: `getPullRequestDiff`が50,000文字を超える差分を無言で切り詰めていた(AIへのプロンプトには"...(diff truncated...)"の注記が入るためAI自身は把握できるが、人間のユーザーには何も表示されなかった)。切り詰めが発生した場合は`ReviewComment`にWARNING severityの警告を1件追加し、レビュー結果画面で人間にも見える形にした
+- **AI呼び出しロジックの共通化**: `POST /api/prompts/:id/execute`と`POST /api/repositories/:id/reviews`の両方で「Claudeを呼び出す→成否を`Execution`として記録する(成功時はresultText・トークン数、失敗時はerrorMessage)」というパターンが個別に実装されていた。`src/lib/run-ai-execution.ts`の`runAiExecution()`に共通化し、呼び出し元はAPI呼び出し本体(`call`)だけを渡す形にした。Phase 3のRAGチャットが3つ目の呼び出し元になる前に整理しておく狙い
+- **HTTPステータスの修正**: 上記の共通化とあわせて、AI実行が失敗(`status: FAILED`)した場合でもHTTP 201(Created)を返していた不整合を200に修正した。UIはレスポンスボディの`status`フィールドを見て正しく分岐していたため実害はなかったが、外部消費者や監視ツールを想定するとREST的に筋が悪かった
+
+対応を見送った指摘: GitHubアクセストークンの平文保存(NextAuth Prisma Adapterの標準仕様。実ユーザーを迎える段階でトークン暗号化を再検討)。ルートレベルの統合テストは、CI導入によりトレードオフの前提が変わったため、その後「1. 自動テスト整備」に追加した。
 
 ## 関連PR
 
