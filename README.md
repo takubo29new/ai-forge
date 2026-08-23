@@ -24,8 +24,19 @@ GitHubリポジトリを接続し、PRの差分をPhase 1のプロンプト資�
 - GitHubリポジトリの接続・オープンなPR一覧の取得(`repo`スコープ)
 - AIレビュー実行(PRのdiffを`{{diff}}`変数に展開し、Claudeの構造化出力で指摘事項を取得)
 - レビュー結果の保存・重要度別(CRITICAL / WARNING / INFO)の一覧表示
+- レビュー結果の蓄積・可視化(リポジトリ単位の累計指摘件数・直近レビューの推移・指摘の多いファイル)
 
 設計の詳細は [`docs/phase2-design.md`](./docs/phase2-design.md)(画面遷移・UI設計・API設計)を参照。
+
+### 品質・運用面の取り組み
+
+- 自動テスト([Vitest](https://vitest.dev)。詳細は[テスト](#テスト)を参照)
+- 実行系API(プロンプト実行・AIレビュー)のレート制限(ユーザー×用途ごとに1時間あたりの上限を設定。アトミックなカウンタで実装しTOCTOUレースを回避)
+- 確認ダイアログのアクセシビリティ対応(フォーカストラップ・Escで閉じる・背景コンテンツの`inert`化)
+- ダークモード手動トグル(OS設定に加え、ユーザーごとの手動切り替えとブラウザへの保存)
+- エラーログ収集(サーバー側は`instrumentation.ts`の`onRequestError`、クライアント側はエラーバウンダリ経由でDBに記録し、`/errors`ページで確認可能)
+
+設計判断の詳細は [`docs/quality-improvements.md`](./docs/quality-improvements.md) を参照。
 
 ## 技術スタック
 

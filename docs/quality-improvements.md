@@ -1,0 +1,68 @@
+# 品質・UX改善タスク
+
+Phase 1・Phase 2の機能実装が一段落した後、プロフェッショナルなWeb開発の観点から実施した品質・UX改善タスクの記録。DBスキーマの設計判断は [`db-design.md`](./db-design.md) を参照。
+
+## 実施項目
+
+1. 自動テスト整備
+2. 共通ナビゲーション整備
+3. 実行系APIのレート制限
+4. 確認ダイアログのモーダル化
+5. `useApiMutation`フックへの共通化
+6. モーダルのアクセシビリティ対応
+7. ダークモード手動トグル
+8. エラーログ収集
+
+## 1. 自動テスト整備
+
+[Vitest](https://vitest.dev)を導入し、DB・外部APIに依存しない純粋なロジックをユニットテストの対象にした。
+
+- `{{変数名}}`の抽出・置換ロジック(`src/lib/prompt-variables.ts`)
+- AIレビューの構造化出力スキーマ(`src/lib/review-schema.ts`)
+
+CRUD・実行系APIなどDBアクセスを伴う処理は、実装時に開発用DBへ手動で動作確認する運用とし、自動化されたインテグレーションテストは範囲外にした(単一ユーザーのポートフォリオ用途では費用対効果が見合わないと判断)。
+
+## 2. 共通ナビゲーション整備
+
+認証必須ページ(`/prompts`・`/categories`・`/repositories`・`/help`・`/reviews/:id`など)を`src/app/(app)/`ルートグループへ移動し、共通レイアウト(`src/app/(app)/layout.tsx`)で認証ガードとヘッダー(`src/components/app-header.tsx`)を一元化した。従来は`/prompts`にしかなかったヘッダー・ナビゲーションが全ページで表示されるようになった。ルートグループはURLパスに影響しない。
+
+## 3. 実行系APIのレート制限
+
+`POST /api/prompts/:id/execute`・`POST /api/repositories/:id/reviews`・`POST /api/client-errors`を、ユーザー×用途(purpose)ごとに1時間あたりの上限で制限する。
+
+`RateLimitBucket`モデル(`userId` + `windowStart` + `purpose`の複合主キー)に対して`upsert`の`count: { increment: 1 }`でカウントする方式にした。このupsertはPostgres側で`INSERT ... ON CONFLICT DO UPDATE`としてアトミックに実行されるため、「件数を数える→記録する」の間に別リクエストが割り込むTOCTOUレースが起きない。実際に25件の完全並行リクエストを発行し、上限どおりに許可/拒否が振り分けられることを確認した。
+
+用途(purpose)を分けている理由は、AI呼び出し(execution)とクライアントエラー報告(client-error)を同じカウンタで管理すると、想定外エラーが連続発生しただけでプロンプト実行やAIレビューの上限まで消費してしまうため。
+
+## 4〜6. 確認ダイアログのモーダル化・共通化・アクセシビリティ対応
+
+`window.confirm`によるブラウザ標準の確認ダイアログと、リポジトリ接続用に自前実装していたモーダルを、共通コンポーネント(`src/components/modal.tsx`・`src/components/confirm-dialog.tsx`)に置き換えた。
+
+- **フォーカストラップ**: モーダル内でTabキーによるフォーカス移動が循環する。`onClose`をrefで保持し、`useEffect`の依存配列を`[open]`のみにすることで、モーダル表示中の無関係な再レンダリング(`pending`の切り替え等)でフォーカスが意図せず戻る問題を回避している。
+- **Escで閉じる**、`aria-modal="true"`
+- **背景の`inert`化**: `Modal`は`document.body`へのポータル描画(`createPortal`)に変更し、表示中は背景コンテンツ(`#app-root`)に`inert`属性を付与する。スクリーンリーダーの仮想カーソルが背景コンテンツに到達しないようにするため。
+- **非同期処理との整合性**: 呼び出し側は成功時のみダイアログを閉じるようにし、処理中は確定ボタンを無効化・「処理中...」表示、失敗時はダイアログを閉じずにエラーメッセージを表示する
+
+各画面(`category-manager.tsx`・`edit-tab.tsx`・`repository-manager.tsx`など)で共通していた「POST/PATCH/DELETE + pending/error状態管理」のパターンは`useApiMutation`フック(`src/lib/use-api-mutation.ts`)に切り出し、6箇所の呼び出し元から利用する形にした。
+
+## 7. ダークモード手動トグル
+
+Tailwind CSS v4のclass-based dark mode(`@custom-variant dark (&:where(.dark, .dark *));`)に切り替え、ヘッダーにトグルボタン(`src/components/theme-toggle.tsx`)を追加した。
+
+- 選択したテーマは`localStorage`に保存し、次回アクセス時も引き継ぐ
+- 未選択時はOSの`prefers-color-scheme`に従う。タブを開いたまま OS側のテーマが変わった場合も`matchMedia`の`change`イベントで追従する
+- 初回描画時のちらつき(FOUC)を避けるため、React のハイドレーション前に実行される最小限のインラインscript(`src/lib/theme-script.ts`)で`<html>`のクラスを確定させる。このscriptはモジュールをimportできない制約上、`theme-toggle.tsx`側のロジックと完全な一本化はできないため、変更時は両方を修正する必要がある
+- JavaScriptが無効な環境では`prefers-color-scheme`によるCSS変数フォールバックを持たせず、常にライトテーマで一貫させる設計にした(半分だけダークになる中途半端な状態を避けるため)
+
+## 8. エラーログ収集
+
+外部の監視サービス(Sentry等)を使わず、既存のPostgreSQL上に`ErrorLog`テーブルを追加してアプリ内で完結させた。
+
+- **サーバー側**: Next.jsの`instrumentation.ts`が公開する`onRequestError`フックで、Route Handler・Server Component・Server Actionの想定外エラーを横断的に捕捉する。Edge Runtimeでは動作しないPrismaを使うため、`process.env.NEXT_RUNTIME !== "nodejs"`のときは早期リターンする
+- **クライアント側**: `error.tsx`・`global-error.tsx`(Reactのエラーバウンダリ)から`POST /api/client-errors`経由で送信する。認証必須・レート制限つき(1時間30回)
+- ログ保存自体の失敗が本処理に影響しないよう、書き込みは常にbest-effort(失敗を握りつぶす)
+- `/errors`ページで直近50件を確認できる。`ErrorLog.userId`はサーバー側エラーでは付与できないことが多い(`onRequestError`はセッション情報を直接取得できない)ため、閲覧画面では「自分の`userId`のログ」と「`userId`が未設定のログ」のみを表示し、他ユーザーのログを見せないようにしている
+
+## 関連PR
+
+コードレビュー(`/code-review`)による指摘とその対応も含め、実装の詳細はGitHub上のPR履歴・[`WORKLOG.md`](../WORKLOG.md)を参照。
