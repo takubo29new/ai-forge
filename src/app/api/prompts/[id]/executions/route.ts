@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { LIST_LIMIT } from "@/lib/list-limits";
 
 export async function GET(
   _request: Request,
@@ -24,6 +25,7 @@ export async function GET(
     where: { promptVersion: { promptId: id } },
     include: { promptVersion: { select: { versionNumber: true } } },
     orderBy: { createdAt: "desc" },
+    take: LIST_LIMIT,
   });
 
   return NextResponse.json(executions);

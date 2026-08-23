@@ -78,7 +78,10 @@ export async function getPullRequestDiff(
   const diff = data as unknown as string;
 
   if (diff.length > MAX_DIFF_LENGTH) {
-    return `${diff.slice(0, MAX_DIFF_LENGTH)}\n\n...(diff truncated at ${MAX_DIFF_LENGTH} characters)`;
+    return {
+      diff: `${diff.slice(0, MAX_DIFF_LENGTH)}\n\n...(diff truncated at ${MAX_DIFF_LENGTH} characters)`,
+      truncated: true,
+    };
   }
-  return diff;
+  return { diff, truncated: false };
 }
