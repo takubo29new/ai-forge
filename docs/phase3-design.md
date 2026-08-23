@@ -1,6 +1,6 @@
 # Phase 3 基本設計書(RAG検索チャットボット)
 
-対象: RAG検索チャットボット(Phase 3)。アーキテクチャ・認証は [`phase1-design.md`](./phase1-design.md) を、DB設計の全体像は [`db-design.md`](./db-design.md) を参照。本ドキュメントはPhase 3で新規に追加するDB・画面・APIをまとめる。**設計のみでまだ実装していない。**
+対象: RAG検索チャットボット(Phase 3)。アーキテクチャ・認証は [`phase1-design.md`](./phase1-design.md) を、DB設計の全体像は [`db-design.md`](./db-design.md) を参照。本ドキュメントはPhase 3で新規に追加するDB・画面・APIをまとめる。**DBスキーマ・ドキュメント取り込み(手動登録)まで実装済み。RAG検索チャット・ダッシュボードは未実装。**詳細は「実装状況」を参照。
 
 ## 概要
 
@@ -146,11 +146,9 @@ flowchart TD
 
 ## 実装状況
 
-未実装。設計のみ。実装時は以下の順で進める想定。
-
-1. `pgvector`拡張の有効化・`Document`/`DocumentChunk`/`ReviewCommentEmbedding`のマイグレーション追加
-2. ドキュメント取り込み(`/documents`・手動登録)の実装
-3. リポジトリファイル同期の実装
-4. 既存`ReviewComment`への埋め込みバックフィル
-5. RAG検索チャット(`/chat`)の実装
-6. 統合ダッシュボード(`/dashboard`)の実装
+1. ~~`pgvector`拡張の有効化・`Document`/`DocumentChunk`/`ReviewCommentEmbedding`のマイグレーション追加~~ → 完了。`vector`拡張(0.8.6)を有効化し、`embedding`列へHNSWインデックス(コサイン距離)を追加済み
+2. ~~ドキュメント取り込み(`/documents`・手動登録)の実装~~ → 完了。タイトル+本文を送ると`chunkMarkdown()`で見出し単位に分割し、Voyage AI(`voyage-3`)で埋め込みを生成して`DocumentChunk`に保存する。埋め込み生成に失敗した場合はDocument自体を削除し、作り直せる状態に戻す(部分的に検索対象外のDocumentが残らないようにするため)
+3. リポジトリファイル同期の実装 — 未着手
+4. 既存`ReviewComment`への埋め込みバックフィル — 未着手
+5. RAG検索チャット(`/chat`)の実装 — 未着手
+6. 統合ダッシュボード(`/dashboard`)の実装 — 未着手

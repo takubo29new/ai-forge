@@ -40,9 +40,14 @@ GitHubリポジトリを接続し、PRの差分をPhase 1のプロンプト資�
 
 設計判断の詳細は [`docs/quality-improvements.md`](./docs/quality-improvements.md) を参照。
 
-### Phase 3: RAG検索チャットボット(設計のみ・未実装)
+### Phase 3: RAG検索チャットボット(実装中)
 
-設計書やAIレビューの指摘をベクトル検索の対象とし、自然文の質問にClaudeが出典付きで回答するチャットボット。埋め込みは[Voyage AI](https://www.voyageai.com/)の`voyage-3`を使用する予定。画面遷移・DB設計は [`docs/phase3-design.md`](./docs/phase3-design.md) を参照。
+設計書やAIレビューの指摘をベクトル検索の対象とし、自然文の質問にClaudeが出典付きで回答するチャットボット。埋め込みは[Voyage AI](https://www.voyageai.com/)の`voyage-3`を使用する。
+
+- pgvector拡張を有効化し、`Document`/`DocumentChunk`のスキーマを追加(HNSWインデックスでのコサイン類似検索)
+- ドキュメント取り込み(`/documents`。タイトル+本文を見出し単位でチャンク分割し、埋め込みを生成)
+
+RAG検索チャット(`/chat`)・統合ダッシュボード(`/dashboard`)は未実装。画面遷移・DB設計・実装状況は [`docs/phase3-design.md`](./docs/phase3-design.md) を参照。
 
 ## 技術スタック
 
@@ -91,6 +96,7 @@ cp .env.example .env
 | `NEXTAUTH_SECRET` | `openssl rand -base64 32` 等で生成したランダムな文字列 |
 | `NEXTAUTH_URL` | ローカルでは `http://localhost:3000` |
 | `ANTHROPIC_API_KEY` | [console.anthropic.com](https://console.anthropic.com) の「API Keys」で発行(要クレジット残高) |
+| `VOYAGE_API_KEY` | [dashboard.voyageai.com](https://dashboard.voyageai.com) で発行(Phase 3のドキュメント埋め込みに使用) |
 
 ### 4. DBマイグレーション
 

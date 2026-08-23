@@ -11,6 +11,7 @@ const SECTIONS = [
   { id: "repositories", label: "リポジトリ連携" },
   { id: "review", label: "AIレビュー" },
   { id: "trends", label: "レビュー履歴・傾向" },
+  { id: "documents", label: "ドキュメント" },
   { id: "appearance", label: "表示設定・エラーログ" },
   { id: "faq", label: "よくある質問" },
 ];
@@ -136,6 +137,16 @@ export default async function HelpPage() {
           </p>
           <p className="text-sm text-zinc-700 dark:text-zinc-300">
             「傾向」タブでは、そのリポジトリでの累計指摘件数(重要度別)、直近10件のレビューの重要度の内訳、指摘が多いファイルの上位を確認できます。レビューを重ねるほど、どのファイル・観点に問題が集中しているか把握しやすくなります。
+          </p>
+        </section>
+
+        <section id="documents">
+          <h2 className="mb-2 text-lg font-semibold">ドキュメント</h2>
+          <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
+            「ドキュメント」ページから、設計書やメモをタイトル・本文で登録できます。本文はMarkdownの見出し(<code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">##</code>や<code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">###</code>)単位で自動的にチャンク分割され、それぞれに検索用の埋め込みベクトルが生成されます。
+          </p>
+          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+            現時点では登録・削除のみで、登録したドキュメントを検索して質問に答えるRAG検索チャットはまだ実装されていません(Phase 3・実装中)。
           </p>
         </section>
 

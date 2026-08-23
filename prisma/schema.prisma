@@ -32,6 +32,7 @@ model User {
   reviews          Review[]
   rateLimitBuckets RateLimitBucket[]
   errorLogs        ErrorLog[]
+  documents        Document[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -289,7 +290,67 @@ model ReviewComment {
   severity ReviewCommentSeverity @default(INFO)
   body     String                @db.Text
 
+  embedding ReviewCommentEmbedding?
+
   createdAt DateTime @default(now())
 
   @@index([reviewId])
+}
+
+// --- RAG検索チャットボットドメイン(Phase 3) ---
+// 埋め込みモデルはVoyage AI(voyage-3、1024次元)。詳細はdocs/phase3-design.mdを参照。
+// pgvectorのvector型はPrismaが標準サポートしないためUnsupportedとして宣言しており、
+// Prisma Clientの通常のSELECT/INSERTには含まれない。埋め込みの読み書き・類似検索は
+// $queryRaw/$executeRawで行う(db-design.md参照)。
+
+enum DocumentSourceType {
+  MANUAL // Web画面から直接貼り付け
+  REPO_FILE // リポジトリ内のファイルを同期
+}
+
+// 取り込んだドキュメント本体(設計書・手動メモ等)。検索対象のチャンクはDocumentChunkに持つ。
+model Document {
+  id         String             @id @default(cuid())
+  title      String
+  sourceType DocumentSourceType
+  sourcePath String? // REPO_FILEの場合のみ設定。再同期時にこのパスのDocumentを上書きする
+  content    String             @db.Text
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  chunks DocumentChunk[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, sourcePath])
+  @@index([userId])
+}
+
+// Documentを見出し単位で分割した1チャンク。類似検索のヒット単位。
+model DocumentChunk {
+  id         String @id @default(cuid())
+  chunkIndex Int
+  content    String @db.Text
+
+  embedding Unsupported("vector(1024)")?
+
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([documentId])
+}
+
+// ReviewCommentへの埋め込みを1:1で追加する別テーブル。ReviewComment本体のスキーマ・
+// 既存クエリへの影響を避けるためあえて分離している(db-design.md参照)。
+model ReviewCommentEmbedding {
+  reviewCommentId String        @id
+  reviewComment   ReviewComment @relation(fields: [reviewCommentId], references: [id], onDelete: Cascade)
+
+  embedding Unsupported("vector(1024)")?
+
+  createdAt DateTime @default(now())
 }
