@@ -6,6 +6,8 @@ import { embedQuery } from "@/lib/voyage";
 import { searchDocumentChunks, searchReviewComments } from "@/lib/embeddings";
 import { buildChatContext, renderContextForPrompt } from "@/lib/chat-context";
 import { checkChatRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { voyageErrorResponse } from "@/lib/voyage-error-response";
+import { logError } from "@/lib/error-log";
 
 const SEARCH_LIMIT_PER_SOURCE = 5;
 const CONTEXT_LIMIT = 5;
@@ -35,11 +37,8 @@ export async function POST(request: Request) {
   let queryEmbedding: number[];
   try {
     queryEmbedding = await embedQuery(question);
-  } catch {
-    return NextResponse.json(
-      { error: "質問の埋め込みに失敗しました。もう一度お試しください。" },
-      { status: 502 },
-    );
+  } catch (error) {
+    return voyageErrorResponse(error, { path: "/api/chat", userId });
   }
 
   const [docHits, reviewHits] = await Promise.all([
@@ -81,7 +80,15 @@ export async function POST(request: Request) {
         answer += block.text;
       }
     }
-  } catch {
+  } catch (error) {
+    await logError({
+      source: "SERVER",
+      message: `Claude呼び出しに失敗しました: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      path: "/api/chat",
+      userId,
+    });
     return NextResponse.json(
       { error: "回答の生成に失敗しました。もう一度お試しください。" },
       { status: 502 },

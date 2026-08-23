@@ -6,6 +6,7 @@ import { embedDocuments } from "@/lib/voyage";
 import { setDocumentChunkEmbedding } from "@/lib/embeddings";
 import { checkDocumentRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { LIST_LIMIT } from "@/lib/list-limits";
+import { voyageErrorResponse } from "@/lib/voyage-error-response";
 
 export async function GET() {
   const session = await auth();
@@ -77,14 +78,11 @@ export async function POST(request: Request) {
         setDocumentChunkEmbedding(chunk.id, embeddings[i]),
       ),
     );
-  } catch {
+  } catch (error) {
     // 埋め込みが無いDocumentを検索対象外のまま残すと気づきにくいため、
     // 埋め込み生成に失敗した場合はDocument自体を作り直せる状態に戻す。
     await prisma.document.delete({ where: { id: document.id } });
-    return NextResponse.json(
-      { error: "埋め込みの生成に失敗しました。もう一度お試しください。" },
-      { status: 502 },
-    );
+    return voyageErrorResponse(error, { path: "/api/documents", userId });
   }
 
   return NextResponse.json(
