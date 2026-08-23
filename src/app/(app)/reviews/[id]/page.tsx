@@ -3,12 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/session";
 import { Markdown } from "@/components/markdown";
-
-const SEVERITY_STYLE: Record<string, string> = {
-  CRITICAL: "text-red-600 dark:text-red-400",
-  WARNING: "text-amber-600 dark:text-amber-400",
-  INFO: "text-zinc-500",
-};
+import { SEVERITY_TEXT, countBySeverity } from "@/lib/review-severity";
 
 export default async function ReviewDetailPage({
   params,
@@ -31,10 +26,7 @@ export default async function ReviewDetailPage({
     notFound();
   }
 
-  const counts = { CRITICAL: 0, WARNING: 0, INFO: 0 } as Record<string, number>;
-  for (const c of review.comments) {
-    counts[c.severity] = (counts[c.severity] ?? 0) + 1;
-  }
+  const counts = countBySeverity(review.comments);
 
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-8">
@@ -59,11 +51,11 @@ export default async function ReviewDetailPage({
         {review.execution && <span>{review.execution.model}</span>}
         {review.status === "SUCCESS" && (
           <span className="flex gap-3">
-            <span className={SEVERITY_STYLE.CRITICAL}>
+            <span className={SEVERITY_TEXT.CRITICAL}>
               CRITICAL {counts.CRITICAL}
             </span>
-            <span className={SEVERITY_STYLE.WARNING}>WARNING {counts.WARNING}</span>
-            <span className={SEVERITY_STYLE.INFO}>INFO {counts.INFO}</span>
+            <span className={SEVERITY_TEXT.WARNING}>WARNING {counts.WARNING}</span>
+            <span className={SEVERITY_TEXT.INFO}>INFO {counts.INFO}</span>
           </span>
         )}
       </div>
@@ -90,7 +82,7 @@ export default async function ReviewDetailPage({
               <p className="text-sm font-medium">
                 {c.filePath}
                 {c.line !== null && `:${c.line}`}{" "}
-                <span className={`text-xs ${SEVERITY_STYLE[c.severity]}`}>
+                <span className={`text-xs ${SEVERITY_TEXT[c.severity]}`}>
                   [{c.severity}]
                 </span>
               </p>
