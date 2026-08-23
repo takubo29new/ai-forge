@@ -8,6 +8,7 @@ const NAV_LINKS = [
   { href: "/categories", label: "カテゴリ管理" },
   { href: "/repositories", label: "リポジトリ" },
   { href: "/documents", label: "ドキュメント" },
+  { href: "/chat", label: "チャット" },
   { href: "/errors", label: "エラーログ" },
   { href: "/help", label: "ヘルプ" },
 ];

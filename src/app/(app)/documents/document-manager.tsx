@@ -27,6 +27,28 @@ export function DocumentManager({
   const [content, setContent] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Document | null>(null);
   const { mutate, pending, error, setError } = useApiMutation();
+  const backfill = useApiMutation();
+  const [backfillMessage, setBackfillMessage] = useState<string | null>(null);
+
+  async function handleBackfill() {
+    setBackfillMessage(null);
+    let totalProcessed = 0;
+    for (;;) {
+      const data = await backfill.mutate<{ processed: number; remaining: boolean }>(
+        "/api/review-comments/backfill-embeddings",
+        { method: "POST" },
+        "埋め込みの更新に失敗しました",
+      );
+      if (!data) return;
+      totalProcessed += data.processed;
+      if (!data.remaining) break;
+    }
+    setBackfillMessage(
+      totalProcessed > 0
+        ? `${totalProcessed}件のレビュー指摘に埋め込みを追加しました`
+        : "未処理のレビュー指摘はありませんでした",
+    );
+  }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -132,6 +154,28 @@ export function DocumentManager({
           </li>
         ))}
       </ul>
+
+      <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+        <p className="mb-2 text-sm font-medium">レビュー指摘の埋め込み</p>
+        <p className="mb-3 text-xs text-zinc-500">
+          過去のAIレビュー指摘をRAG検索チャットの検索対象にするための埋め込みを生成します。新しく実行したレビューは自動で対象になるため、既存分を一度取り込むためのボタンです。
+        </p>
+        <button
+          onClick={handleBackfill}
+          disabled={backfill.pending}
+          className="rounded border border-zinc-300 px-3 py-1.5 text-xs disabled:opacity-50 dark:border-zinc-700"
+        >
+          {backfill.pending ? "処理中..." : "既存のレビュー指摘を取り込む"}
+        </button>
+        {backfillMessage && (
+          <p className="mt-2 text-xs text-zinc-500">{backfillMessage}</p>
+        )}
+        {backfill.error && (
+          <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+            {backfill.error}
+          </p>
+        )}
+      </div>
 
       <ConfirmDialog
         open={deleteTarget !== null}
