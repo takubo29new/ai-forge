@@ -8,6 +8,25 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: ai_forge
+          POSTGRES_PASSWORD: ai_forge
+          POSTGRES_DB: ai_forge
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ai_forge"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: "postgresql://ai_forge:ai_forge@localhost:5432/ai_forge?schema=public"
+
     steps:
       - uses: actions/checkout@v4
 
@@ -21,3 +40,5 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+      - run: npx prisma migrate deploy
+      - run: npm run test:integration
