@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 type Category = { id: string; name: string };
 
@@ -27,6 +28,7 @@ export function EditTab({
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -56,8 +58,8 @@ export function EditTab({
   }
 
   async function handleDelete() {
-    if (!window.confirm(`「${title}」を削除します。よろしいですか?`)) return;
     setPending(true);
+    setConfirmDelete(false);
     try {
       const res = await fetch(`/api/prompts/${promptId}`, {
         method: "DELETE",
@@ -141,13 +143,24 @@ export function EditTab({
         </button>
         <button
           type="button"
-          onClick={handleDelete}
+          onClick={() => setConfirmDelete(true)}
           disabled={pending}
           className="rounded-full border border-red-300 px-4 py-2 text-sm text-red-600 disabled:opacity-50 dark:border-red-900 dark:text-red-400"
         >
           削除
         </button>
       </div>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title="プロンプトを削除"
+        message={`「${title}」を削除します。バージョン履歴・実行履歴もすべて削除されます。よろしいですか?`}
+        confirmLabel="削除"
+        danger
+        pending={pending}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmDelete(false)}
+      />
     </form>
   );
 }

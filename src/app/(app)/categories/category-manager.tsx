@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 type Category = {
   id: string;
@@ -22,6 +23,7 @@ export function CategoryManager({
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [pending, setPending] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -76,15 +78,13 @@ export function CategoryManager({
     }
   }
 
-  async function handleDelete(category: Category) {
-    const message =
-      category.promptCount > 0
-        ? `「${category.name}」を削除します。この操作で${category.promptCount}件のプロンプトが未分類になります。よろしいですか?`
-        : `「${category.name}」を削除します。よろしいですか?`;
-    if (!window.confirm(message)) return;
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    const category = deleteTarget;
 
     setError(null);
     setPending(true);
+    setDeleteTarget(null);
     try {
       const res = await fetch(`/api/categories/${category.id}`, {
         method: "DELETE",
@@ -200,7 +200,7 @@ export function CategoryManager({
                     編集
                   </button>
                   <button
-                    onClick={() => handleDelete(category)}
+                    onClick={() => setDeleteTarget(category)}
                     disabled={pending}
                     className="rounded border border-zinc-300 px-3 py-1.5 text-xs disabled:opacity-50 dark:border-zinc-700"
                   >
@@ -212,6 +212,23 @@ export function CategoryManager({
           </li>
         ))}
       </ul>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="カテゴリを削除"
+        message={
+          deleteTarget
+            ? deleteTarget.promptCount > 0
+              ? `「${deleteTarget.name}」を削除します。この操作で${deleteTarget.promptCount}件のプロンプトが未分類になります。よろしいですか?`
+              : `「${deleteTarget.name}」を削除します。よろしいですか?`
+            : ""
+        }
+        confirmLabel="削除"
+        danger
+        pending={pending}
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

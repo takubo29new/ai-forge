@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { Modal } from "@/components/modal";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 type Repository = {
   id: string;
@@ -30,6 +32,9 @@ export function RepositoryManager({
   const [loadingAvailable, setLoadingAvailable] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [disconnectTarget, setDisconnectTarget] = useState<Repository | null>(
+    null,
+  );
 
   async function openConnectModal() {
     setShowModal(true);
@@ -71,15 +76,13 @@ export function RepositoryManager({
     }
   }
 
-  async function handleDisconnect(repo: Repository) {
-    const message =
-      repo.reviewCount > 0
-        ? `「${repo.owner}/${repo.name}」の接続を解除します。この操作で${repo.reviewCount}件のレビュー結果も削除されます。よろしいですか?`
-        : `「${repo.owner}/${repo.name}」の接続を解除します。よろしいですか?`;
-    if (!window.confirm(message)) return;
+  async function handleDisconnect() {
+    if (!disconnectTarget) return;
+    const repo = disconnectTarget;
 
     setError(null);
     setPending(true);
+    setDisconnectTarget(null);
     try {
       const res = await fetch(`/api/repositories/${repo.id}`, {
         method: "DELETE",
@@ -140,7 +143,7 @@ export function RepositoryManager({
                 開く
               </Link>
               <button
-                onClick={() => handleDisconnect(repo)}
+                onClick={() => setDisconnectTarget(repo)}
                 disabled={pending}
                 className="rounded border border-zinc-300 px-3 py-1.5 text-xs disabled:opacity-50 dark:border-zinc-700"
               >
@@ -151,68 +154,81 @@ export function RepositoryManager({
         ))}
       </ul>
 
-      {showModal && (
-        <div
-          className="fixed inset-0 flex items-center justify-center bg-black/40 px-6"
-          onClick={() => setShowModal(false)}
-        >
-          <div
-            className="max-h-[70vh] w-full max-w-lg overflow-y-auto rounded-lg bg-background p-6 shadow-lg"
-            onClick={(e) => e.stopPropagation()}
+      <Modal
+        open={showModal}
+        onClose={() => setShowModal(false)}
+        labelledBy="connect-repository-title"
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <h2 id="connect-repository-title" className="font-semibold">
+            GitHubリポジトリを接続
+          </h2>
+          <button
+            onClick={() => setShowModal(false)}
+            className="text-sm text-zinc-500 hover:underline"
           >
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="font-semibold">GitHubリポジトリを接続</h2>
-              <button
-                onClick={() => setShowModal(false)}
-                className="text-sm text-zinc-500 hover:underline"
-              >
-                閉じる
-              </button>
-            </div>
-
-            {error && (
-              <p className="mb-3 text-sm text-red-600 dark:text-red-400">
-                {error}
-              </p>
-            )}
-
-            {loadingAvailable && (
-              <p className="text-sm text-zinc-500">読み込み中...</p>
-            )}
-
-            {!loadingAvailable && available.length === 0 && !error && (
-              <p className="text-sm text-zinc-500">
-                接続できるリポジトリがありません
-              </p>
-            )}
-
-            <ul className="flex flex-col gap-2">
-              {available.map((repo) => (
-                <li
-                  key={repo.githubRepoId}
-                  className="flex items-center justify-between gap-3 rounded border border-zinc-200 px-3 py-2 dark:border-zinc-800"
-                >
-                  <span className="text-sm">
-                    {repo.fullName}
-                    {repo.private && (
-                      <span className="ml-2 text-xs text-zinc-500">
-                        (private)
-                      </span>
-                    )}
-                  </span>
-                  <button
-                    onClick={() => handleConnect(repo)}
-                    disabled={pending}
-                    className="rounded bg-foreground px-3 py-1 text-xs font-medium text-background disabled:opacity-50"
-                  >
-                    接続
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
+            閉じる
+          </button>
         </div>
-      )}
+
+        {error && (
+          <p className="mb-3 text-sm text-red-600 dark:text-red-400">
+            {error}
+          </p>
+        )}
+
+        {loadingAvailable && (
+          <p className="text-sm text-zinc-500">読み込み中...</p>
+        )}
+
+        {!loadingAvailable && available.length === 0 && !error && (
+          <p className="text-sm text-zinc-500">
+            接続できるリポジトリがありません
+          </p>
+        )}
+
+        <ul className="flex flex-col gap-2">
+          {available.map((repo) => (
+            <li
+              key={repo.githubRepoId}
+              className="flex items-center justify-between gap-3 rounded border border-zinc-200 px-3 py-2 dark:border-zinc-800"
+            >
+              <span className="text-sm">
+                {repo.fullName}
+                {repo.private && (
+                  <span className="ml-2 text-xs text-zinc-500">
+                    (private)
+                  </span>
+                )}
+              </span>
+              <button
+                onClick={() => handleConnect(repo)}
+                disabled={pending}
+                className="rounded bg-foreground px-3 py-1 text-xs font-medium text-background disabled:opacity-50"
+              >
+                接続
+              </button>
+            </li>
+          ))}
+        </ul>
+      </Modal>
+
+      <ConfirmDialog
+        open={disconnectTarget !== null}
+        title="リポジトリの接続を解除"
+        message={
+          disconnectTarget
+            ? disconnectTarget.reviewCount > 0
+              ? `「${disconnectTarget.owner}/${disconnectTarget.name}」の接続を解除します。この操作で${disconnectTarget.reviewCount}件のレビュー結果も削除されます。よろしいですか?`
+              : `「${disconnectTarget.owner}/${disconnectTarget.name}」の接続を解除します。よろしいですか?`
+            : ""
+        }
+        confirmLabel="解除"
+        danger
+        pending={pending}
+        onConfirm={handleDisconnect}
+        onCancel={() => setDisconnectTarget(null)}
+      />
     </div>
   );
 }
