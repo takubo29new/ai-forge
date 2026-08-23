@@ -1,7 +1,7 @@
 # Phase 1 基本設計書
 
 対象: プロンプト管理ツール(統合AI開発支援プラットフォームの土台)
-更新日: 2026-08-23 / ステータス: DB設計・NextAuth.js(GitHub OAuth)実装・カテゴリCRUD実装完了。DB環境構築(#5)・画面遷移/UI設計(#6)は別PRでレビュー中、プロンプト/バージョンCRUD・実行機能は次タスク
+更新日: 2026-08-23 / ステータス: DB設計・NextAuth.js(GitHub OAuth)実装・カテゴリCRUD・プロンプト/バージョンCRUD実装完了。DB環境構築(#5)・画面遷移/UI設計(#6)は別PRでレビュー中、Claude実行機能・実行履歴は次タスク(Phase 1最終)
 
 プロダクト全体のコンセプトとロードマップは [`ai-dev-tool-handoff.md`](../ai-dev-tool-handoff.md)、DB設計の詳細な判断理由は [`docs/db-design.md`](./db-design.md) を参照。本ドキュメントはPhase 1のアーキテクチャ・認証・DB・画面・APIを一つにまとめた全体像。
 
@@ -145,5 +145,5 @@ Next.js の Route Handlers(`app/api/*`)としてREST風に実装する。Server 
 3. ~~NextAuth.js + GitHub OAuthの実装~~ → 完了。`src/auth.ts`でPrismaAdapter + GitHub Providerを設定(セッションはdatabase方式)。ログイン(`/login`)・ログイン後の遷移先(`/prompts`仮画面)・サインアウトを実装し、GitHub認可画面へのリダイレクトまで動作確認済み。Prisma 7ではドライバーアダプタが必須のため`@prisma/adapter-pg`を追加
 4. プロンプトCRUD・実行機能の実装(Phase 1完了)。レビューしやすいよう機能ごとにPRを分割して進める
    - ~~カテゴリCRUD(API + `/categories`画面)~~ → 完了。`GET/POST /api/categories`・`PATCH/DELETE /api/categories/:id`、カテゴリ管理画面(追加・編集・削除。削除時は該当プロンプト件数を確認ダイアログで表示)を実装
-   - プロンプト・バージョンCRUD(API + 一覧/詳細画面)
+   - ~~プロンプト・バージョンCRUD(API + 一覧/詳細画面)~~ → 完了。`GET/POST /api/prompts`・`GET/PATCH/DELETE /api/prompts/:id`・`GET /api/prompts/:id/versions`、`/prompts`(カテゴリ絞り込み・検索)、`/prompts/new`、`/prompts/:id`(編集・バージョン履歴タブ。実行・実行履歴タブは次タスクでプレースホルダー)を実装。保存は常に新規`PromptVersion`を追加(versionNumberはmax+1)
    - Claude実行機能・実行履歴(API + 実行/実行履歴タブ)
