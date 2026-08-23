@@ -1,6 +1,6 @@
 # DB設計
 
-Phase 1(プロンプト管理ツール)・Phase 2(AIコードレビューツール)に必要なテーブル構成。スキーマの実体は [`prisma/schema.prisma`](../prisma/schema.prisma)。ORMはPrisma。
+Phase 1(プロンプト管理ツール)・Phase 2(AIコードレビューツール)に必要なテーブル構成。スキーマの実体は [`prisma/schema.prisma`](../prisma/schema.prisma)。ORMはPrisma。Phase 3(RAG検索チャットボット)のテーブル構成は設計のみで未実装。[`phase3-design.md`](./phase3-design.md)を参照。
 
 ## テーブル一覧
 
@@ -53,6 +53,12 @@ GitHub OAuthのアクセストークンは、Phase 1の認証ですでに`Accoun
 - **`Review.promptVersionId`は`onDelete: Restrict`(Executionは`Cascade`)**: Executionは「その場の実行ログ」として、参照先のPromptVersionが消えれば一緒に消えてよいと判断した(Phase 1の設計判断)。一方Reviewは「指摘内容をDBに保存し、傾向を可視化する」蓄積データであり、後から参照するプロンプト資産(PromptVersion)を誤って削除してレビュー履歴が失われることを防ぐため、あえて挙動を変えてRestrictにした。レビューで使ったプロンプトのバージョンを消したい場合は、先にそのバージョンを使ったReviewを削除する必要がある。
 - **`Repository.githubRepoId`は`BigInt`**: GitHubのリポジトリIDはPostgresの`Int`(32bit)の範囲を超える可能性があるため、`BigInt`で保持する。リポジトリ名(`owner`/`name`)は変更され得るため、識別子としては使わずGitHub側のIDを正とする。
 - **ReviewCommentはReview経由のみでPromptVersionを参照しない**: 個別の指摘はレビュー単位に従属する情報であり、どのプロンプトで生成されたかは親のReviewを辿れば分かるため、冗長な外部キーは持たせない(Execution/PromptVersion/Promptの関係と同様の考え方)。
+
+### Phase 3の設計判断(未実装)
+
+- **埋め込みベクトル列はPrismaの`Unsupported("vector(1024)")`として宣言する**: pgvectorの`vector`型はPrismaが標準サポートしていない。`Unsupported`型のフィールドはPrisma Clientの通常のSELECT/INSERTに含められないという制約があるため、埋め込みの読み書き・コサイン類似検索は`$queryRaw`/`$executeRaw`で行う方針にする
+- **`ReviewComment`への埋め込みは別テーブル(`ReviewCommentEmbedding`)に分離する**: `ReviewComment`本体に埋め込み列を追加することもできたが、「AIレビューの指摘」という既存の単一責務・既存クエリへの影響を避けるため、1:1の別テーブルにした
+- **埋め込みモデルはVoyage AI(`voyage-3`)**: AnthropicがRAG用途で公式に推奨しているため。詳細・DB設計の全体像は[`phase3-design.md`](./phase3-design.md)を参照
 
 ## DB環境構築
 
