@@ -73,9 +73,8 @@ erDiagram
     USER ||--o{ CATEGORY : owns
     USER ||--o{ PROMPT : owns
     USER ||--o{ EXECUTION : runs
-    CATEGORY ||--o{ PROMPT : classifies
+    CATEGORY o|--o{ PROMPT : classifies
     PROMPT ||--o{ PROMPTVERSION : has
-    PROMPT ||--o{ EXECUTION : has
     PROMPTVERSION ||--o{ EXECUTION : "executed as"
 
     USER {
@@ -104,11 +103,12 @@ erDiagram
         string id PK
         string model
         string status
-        string promptId FK
         string promptVersionId FK
         string userId FK
     }
 ```
+
+Promptへの参照は`promptVersionId`経由のみで、`Execution`に`promptId`は持たせていない(実行対象バージョンと記録上のPromptが食い違う不整合を構造上防ぐため)。詳細な設計判断は [`docs/db-design.md`](./db-design.md) を参照。
 
 ## 画面構成(暫定)
 
