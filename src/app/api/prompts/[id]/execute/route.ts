@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { anthropic } from "@/lib/anthropic";
 import { renderTemplate } from "@/lib/prompt-variables";
 import { DEFAULT_MODEL } from "@/lib/models";
+import { checkExecutionRateLimit } from "@/lib/rate-limit";
 
 export async function POST(
   request: Request,
@@ -44,6 +45,16 @@ export async function POST(
     return NextResponse.json(
       { error: "対象のバージョンが見つかりません" },
       { status: 400 },
+    );
+  }
+
+  const rateLimit = await checkExecutionRateLimit(session.user.id);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      {
+        error: `実行回数の上限(1時間あたり${rateLimit.limit}回)に達しました。しばらくしてから再度お試しください。`,
+      },
+      { status: 429 },
     );
   }
 

@@ -6,6 +6,7 @@ import { getGitHubClient, getPullRequest, getPullRequestDiff } from "@/lib/githu
 import { renderTemplate } from "@/lib/prompt-variables";
 import { DEFAULT_MODEL } from "@/lib/models";
 import { ReviewOutputSchema } from "@/lib/review-schema";
+import { checkExecutionRateLimit } from "@/lib/rate-limit";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import Anthropic from "@anthropic-ai/sdk";
 
@@ -84,6 +85,16 @@ export async function POST(
           "選択したプロンプトの本文に{{diff}}が含まれていないため、コード差分を渡せません。プロンプトを編集して{{diff}}を追加してください。",
       },
       { status: 400 },
+    );
+  }
+
+  const rateLimit = await checkExecutionRateLimit(userId);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      {
+        error: `実行回数の上限(1時間あたり${rateLimit.limit}回)に達しました。しばらくしてから再度お試しください。`,
+      },
+      { status: 429 },
     );
   }
 
