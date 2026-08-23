@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { EditTab } from "./edit-tab";
+import { ExecuteTab } from "./execute-tab";
 
 const TABS = [
   { key: "edit", label: "編集" },
@@ -52,10 +53,19 @@ export default async function PromptDetailPage({
   const latestVersion = prompt.versions[0];
 
   const versions =
-    tab === "versions"
+    tab === "versions" || tab === "execute"
       ? await prisma.promptVersion.findMany({
           where: { promptId: id },
           orderBy: { versionNumber: "desc" },
+        })
+      : null;
+
+  const executions =
+    tab === "history"
+      ? await prisma.execution.findMany({
+          where: { promptVersion: { promptId: id } },
+          include: { promptVersion: { select: { versionNumber: true } } },
+          orderBy: { createdAt: "desc" },
         })
       : null;
 
@@ -122,16 +132,61 @@ export default async function PromptDetailPage({
         </ul>
       )}
 
-      {tab === "execute" && (
-        <p className="py-16 text-center text-sm text-zinc-500">
-          実行機能は次のPRで実装します。
-        </p>
+      {tab === "execute" && versions && (
+        <ExecuteTab
+          promptId={id}
+          versions={versions.map((v) => ({
+            id: v.id,
+            versionNumber: v.versionNumber,
+            content: v.content,
+          }))}
+        />
       )}
 
-      {tab === "history" && (
-        <p className="py-16 text-center text-sm text-zinc-500">
-          実行履歴は次のPRで実装します。
-        </p>
+      {tab === "history" && executions && (
+        <ul className="flex flex-col gap-2">
+          {executions.length === 0 && (
+            <li className="py-16 text-center text-sm text-zinc-500">
+              実行履歴がまだありません
+            </li>
+          )}
+          {executions.map((e) => (
+            <li
+              key={e.id}
+              className="rounded-lg border border-zinc-200 dark:border-zinc-800"
+            >
+              <details>
+                <summary className="cursor-pointer px-4 py-3 text-sm">
+                  <span className="text-zinc-500">
+                    {e.createdAt.toLocaleString("ja-JP")}
+                  </span>{" "}
+                  <span className="font-medium">
+                    v{e.promptVersion.versionNumber}
+                  </span>{" "}
+                  <span
+                    className={
+                      e.status === "SUCCESS"
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : "text-red-600 dark:text-red-400"
+                    }
+                  >
+                    {e.status}
+                  </span>{" "}
+                  <span className="text-zinc-500">{e.model}</span>
+                </summary>
+                <div className="whitespace-pre-wrap border-t border-zinc-200 px-4 py-3 font-mono text-xs dark:border-zinc-800">
+                  {e.status === "SUCCESS" ? e.resultText : e.errorMessage}
+                  {e.status === "SUCCESS" && (
+                    <p className="mt-2 font-sans text-zinc-500">
+                      tokens: {e.promptTokens}+{e.completionTokens} /{" "}
+                      {e.durationMs}ms
+                    </p>
+                  )}
+                </div>
+              </details>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );

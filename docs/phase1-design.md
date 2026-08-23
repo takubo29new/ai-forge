@@ -1,7 +1,7 @@
 # Phase 1 基本設計書
 
 対象: プロンプト管理ツール(統合AI開発支援プラットフォームの土台)
-更新日: 2026-08-23 / ステータス: DB設計・NextAuth.js(GitHub OAuth)実装・カテゴリCRUD・プロンプト/バージョンCRUD実装完了。DB環境構築(#5)・画面遷移/UI設計(#6)は別PRでレビュー中、Claude実行機能・実行履歴は次タスク(Phase 1最終)
+更新日: 2026-08-23 / ステータス: 認証・カテゴリ/プロンプト/バージョンCRUD・Claude実行機能・実行履歴の実装が完了し、Phase 1の実装タスクはコンプリート。DB環境構築(#5)・画面遷移/UI設計(#6)は別PRでレビュー中
 
 プロダクト全体のコンセプトとロードマップは [`ai-dev-tool-handoff.md`](../ai-dev-tool-handoff.md)、DB設計の詳細な判断理由は [`docs/db-design.md`](./db-design.md) を参照。本ドキュメントはPhase 1のアーキテクチャ・認証・DB・画面・APIを一つにまとめた全体像。
 
@@ -146,4 +146,6 @@ Next.js の Route Handlers(`app/api/*`)としてREST風に実装する。Server 
 4. プロンプトCRUD・実行機能の実装(Phase 1完了)。レビューしやすいよう機能ごとにPRを分割して進める
    - ~~カテゴリCRUD(API + `/categories`画面)~~ → 完了。`GET/POST /api/categories`・`PATCH/DELETE /api/categories/:id`、カテゴリ管理画面(追加・編集・削除。削除時は該当プロンプト件数を確認ダイアログで表示)を実装
    - ~~プロンプト・バージョンCRUD(API + 一覧/詳細画面)~~ → 完了。`GET/POST /api/prompts`・`GET/PATCH/DELETE /api/prompts/:id`・`GET /api/prompts/:id/versions`、`/prompts`(カテゴリ絞り込み・検索)、`/prompts/new`、`/prompts/:id`(編集・バージョン履歴タブ。実行・実行履歴タブは次タスクでプレースホルダー)を実装。保存は常に新規`PromptVersion`を追加(versionNumberはmax+1)
-   - Claude実行機能・実行履歴(API + 実行/実行履歴タブ)
+   - ~~Claude実行機能・実行履歴(API + 実行/実行履歴タブ)~~ → 完了。`POST /api/prompts/:id/execute`(`@anthropic-ai/sdk`でClaudeを呼び出し、成功時は`resultText`・トークン数・実行時間を、失敗時は`errorMessage`を`Execution`として記録)・`GET /api/prompts/:id/executions`(実行履歴一覧)、`/prompts/:id`の実行・実行履歴タブを実装。プロンプト本文の`{{変数名}}`をUIで自動検出しフォーム化する。モデルはClaude Opus 5/Sonnet 5/Haiku 4.5から選択可(デフォルトOpus 5)
+
+Phase 1のスコープ(プロンプトCRUD・AI実行・履歴/バージョン管理)は実装完了。DB環境構築(#5)・画面遷移/UI設計(#6)のマージ後、Phase 2(AIコードレビューツール)に進む。
