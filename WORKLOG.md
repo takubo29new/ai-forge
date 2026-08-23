@@ -14,3 +14,4 @@
 | 2026-08-23 | 17:18 | 17:41 | 23m | APIキー課金後にClaude実行が成功することを確認(変数置換→実行→結果/トークン数/実行時間の記録)。PR #5〜#10を依存順にdevへマージ(#7→#8→#9→#10→#5→#6、ドキュメント競合を解消)、devをmainへ統合(PR #11)、マージ済みfeatureブランチを整理。README・ai-dev-tool-handoff.md・docs配下のPhase 1完了に伴うステータス更新 |
 | 2026-08-23 | 17:41 | 17:54 | 13m | ドキュメント更新をPR #12(dev)・PR #13(main)としてマージ。設計書アーティファクトをPhase 1完了・mainマージ済みの状態に更新。アプリ内ヘルプページ(/help)を追加(ログイン・カテゴリ・プロンプト編集・バージョン履歴・実行・実行履歴・FAQ)、/promptsヘッダーにリンクを追加 |
 | 2026-08-23 | 17:54 | 18:03 | 9m | ヘルプページをPR #14(dev)・PR #15(main)としてマージ。Phase 2のDBスキーマ設計・実装(Repository/Review/ReviewCommentを追加。Reviewは実際のAI呼び出しをExecutionに委譲し、PromptVersionへの参照はRestrictでレビュー履歴を保護)、prisma migrate devで適用、実データベースでRestrict/Cascade制約の動作を確認、docs/db-design.md・ai-dev-tool-handoff.mdを更新 |
+| 2026-08-23 | 18:03 | 18:06 | 3m | Phase 2 DBスキーマをPR #16(dev)・PR #17(main)としてマージ。Phase 2の画面遷移・UI設計(docs/phase2-design.md)を作成(リポジトリ一覧・リポジトリ詳細・レビュー詳細のワイヤーフレーム、画面遷移図、API設計、構造化出力でのレビュー結果取得方針)、ai-dev-tool-handoff.mdを更新 |
