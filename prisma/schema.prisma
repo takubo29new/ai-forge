@@ -1,5 +1,6 @@
 // Prisma schema for ai-forge
 // Phase 1: プロンプト管理ツール(認証 + プロンプトCRUD + AI実行履歴・バージョン管理)
+// Phase 2: AIコードレビューツール(GitHubリポジトリ連携 + PRレビュー結果の蓄積)
 // 詳細は docs/db-design.md を参照
 
 generator client {
@@ -22,11 +23,13 @@ model User {
   emailVerified DateTime?
   image         String?
 
-  accounts   Account[]
-  sessions   Session[]
-  categories Category[]
-  prompts    Prompt[]
-  executions Execution[]
+  accounts     Account[]
+  sessions     Session[]
+  categories   Category[]
+  prompts      Prompt[]
+  executions   Execution[]
+  repositories Repository[]
+  reviews      Review[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -115,6 +118,7 @@ model PromptVersion {
   prompt   Prompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
 
   executions Execution[]
+  reviews    Review[]
 
   createdAt DateTime @default(now())
 
@@ -147,6 +151,90 @@ model Execution {
   promptTokens     Int?
   completionTokens Int?
   durationMs       Int?
+
+  review Review?
+
+  createdAt DateTime @default(now())
+}
+
+// --- AIコードレビュードメイン(Phase 2) ---
+// GitHub OAuthのアクセストークンはNextAuthのAccount.access_tokenを再利用する
+// (Phase 2用に別テーブルでトークンを持たない)。
+
+// ユーザーがai-forgeに接続したGitHubリポジトリ。
+model Repository {
+  id            String  @id @default(cuid())
+  githubRepoId  BigInt // GitHubのリポジトリID(名前変更に影響されない安定的な識別子)
+  owner         String
+  name          String
+  defaultBranch String?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  reviews Review[]
+
+  connectedAt DateTime @default(now())
+
+  @@unique([userId, githubRepoId])
+}
+
+enum ReviewStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+// PRに対するAIレビューの実行単位。実際のAI呼び出しはExecutionに委譲し、
+// Reviewはその結果をどのリポジトリ・PRに対するものかという文脈に紐付ける。
+model Review {
+  id String @id @default(cuid())
+
+  repositoryId String
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // どのプロンプト(バージョン)でレビューしたか。レビュー結果を後から追跡できるよう、
+  // Executionと同様にPromptVersionを削除してもレビュー履歴は消えないようRestrictにする
+  // (ExecutionはonDelete: Cascadeだが、Reviewは「傾向を可視化」する蓄積データのため
+  // 実行ログより保持を優先する設計判断)。
+  promptVersionId String
+  promptVersion   PromptVersion @relation(fields: [promptVersionId], references: [id], onDelete: Restrict)
+
+  executionId String?    @unique
+  execution   Execution? @relation(fields: [executionId], references: [id], onDelete: SetNull)
+
+  pullRequestNumber Int
+  pullRequestTitle  String
+  pullRequestUrl    String
+  headSha           String
+
+  status ReviewStatus @default(PENDING)
+
+  comments ReviewComment[]
+
+  createdAt DateTime @default(now())
+}
+
+enum ReviewCommentSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+// AIレビューが指摘した個別のコメント。Review.execution.resultTextから構造化して抽出する。
+model ReviewComment {
+  id String @id @default(cuid())
+
+  reviewId String
+  review   Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  filePath String
+  line     Int?
+  severity ReviewCommentSeverity @default(INFO)
+  body     String                @db.Text
 
   createdAt DateTime @default(now())
 }
