@@ -12,3 +12,4 @@
 | 2026-08-23 | 17:01 | 17:08 | 7m | プロンプト・バージョンCRUD実装(API: GET/POST /api/prompts, GET/PATCH/DELETE /api/prompts/:id, GET /api/prompts/:id/versions、画面: /prompts一覧・/prompts/new・/prompts/:idの編集/バージョン履歴タブ)、実データベースでの動作確認(バージョン採番・カテゴリ削除時のSetNull・プロンプト削除時のバージョンカスケード削除) |
 | 2026-08-23 | 17:08 | 17:18 | 10m | Claude実行機能・実行履歴の実装(@anthropic-ai/sdk追加、API: POST /api/prompts/:id/execute, GET /api/prompts/:id/executions、{{変数}}検出・置換ロジック、/prompts/:idの実行/実行履歴タブ)。ANTHROPIC_API_KEY発行手順を案内。APIキー未設定の状態でFAILED実行の記録が正しく動作することを確認(変数抽出・置換ロジックも検証済み) |
 | 2026-08-23 | 17:18 | 17:41 | 23m | APIキー課金後にClaude実行が成功することを確認(変数置換→実行→結果/トークン数/実行時間の記録)。PR #5〜#10を依存順にdevへマージ(#7→#8→#9→#10→#5→#6、ドキュメント競合を解消)、devをmainへ統合(PR #11)、マージ済みfeatureブランチを整理。README・ai-dev-tool-handoff.md・docs配下のPhase 1完了に伴うステータス更新 |
+| 2026-08-23 | 17:41 | 17:54 | 13m | ドキュメント更新をPR #12(dev)・PR #13(main)としてマージ。設計書アーティファクトをPhase 1完了・mainマージ済みの状態に更新。アプリ内ヘルプページ(/help)を追加(ログイン・カテゴリ・プロンプト編集・バージョン履歴・実行・実行履歴・FAQ)、/promptsヘッダーにリンクを追加 |
