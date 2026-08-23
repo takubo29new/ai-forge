@@ -1,7 +1,7 @@
 # Phase 1 基本設計書
 
 対象: プロンプト管理ツール(統合AI開発支援プラットフォームの土台)
-更新日: 2026-08-23 / ステータス: DB設計完了、UI設計は次タスクで詳細化
+更新日: 2026-08-23 / ステータス: DB設計・NextAuth.js(GitHub OAuth)実装完了。DB環境構築(#5)・画面遷移/UI設計(#6)は別PRでレビュー中、プロンプトCRUD・実行機能は次タスク
 
 プロダクト全体のコンセプトとロードマップは [`ai-dev-tool-handoff.md`](../ai-dev-tool-handoff.md)、DB設計の詳細な判断理由は [`docs/db-design.md`](./db-design.md) を参照。本ドキュメントはPhase 1のアーキテクチャ・認証・DB・画面・APIを一つにまとめた全体像。
 
@@ -140,7 +140,7 @@ Next.js の Route Handlers(`app/api/*`)としてREST風に実装する。Server 
 
 ## 今後のステップ
 
-1. 画面遷移・UI設計(詳細なワイヤーフレーム・画面遷移図)
-2. ローカルDB環境構築(Docker + PostgreSQL + pgvector拡張)、`prisma migrate dev`の実行
-3. NextAuth.js + GitHub OAuthの実装
+1. 画面遷移・UI設計(詳細なワイヤーフレーム・画面遷移図) → 実施済み、PR #6でレビュー中
+2. ローカルDB環境構築(Docker + PostgreSQL + pgvector拡張)、`prisma migrate dev`の実行 → 実施済み、PR #5でレビュー中
+3. ~~NextAuth.js + GitHub OAuthの実装~~ → 完了。`src/auth.ts`でPrismaAdapter + GitHub Providerを設定(セッションはdatabase方式)。ログイン(`/login`)・ログイン後の遷移先(`/prompts`仮画面)・サインアウトを実装し、GitHub認可画面へのリダイレクトまで動作確認済み。Prisma 7ではドライバーアダプタが必須のため`@prisma/adapter-pg`を追加
 4. プロンプトCRUD・実行機能の実装(Phase 1完了)

@@ -5,3 +5,6 @@
 | 日付 | 開始 | 終了 | 作業時間 | 内容 |
 | --- | --- | --- | --- | --- |
 | 2026-08-23 | 07:00 | 08:05 | 1h05m | リポジトリ初期化、ブランチ運用ルール策定(main/dev/feature/bugfix/hotfix)、GitHubリポジトリ作成・gh CLIセットアップ、Next.jsひな形セットアップ(TypeScript + Tailwind + App Router)、PRレビューと指摘対応(.gitignore修正)、devへマージ |
+| 2026-08-23 | 13:00 | 13:44 | 44m | ローカルDB環境構築(docker-compose.ymlでpgvector/pgvector:pg16のPostgresを起動)、.env設定、`prisma migrate dev`で初期スキーマ適用、PR作成(#5) |
+| 2026-08-23 | 13:44 | 13:52 | 8m | 画面遷移・UI設計(docs/phase1-ui-design.md)、phase1-design.mdのステータス更新、PR作成(#6) |
+| 2026-08-23 | 16:00 | 16:40 | 40m | GitHub OAuth App作成手順の案内、NextAuth.js(v5) + GitHub Provider + PrismaAdapter実装、@prisma/adapter-pg追加(Prisma 7のドライバーアダプタ必須化対応)、ログイン/prompts仮画面実装、ビルド・OAuthリダイレクトの動作確認 |
