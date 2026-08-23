@@ -6,7 +6,7 @@ import { getGitHubClient, getPullRequest, getPullRequestDiff } from "@/lib/githu
 import { renderTemplate } from "@/lib/prompt-variables";
 import { DEFAULT_MODEL } from "@/lib/models";
 import { ReviewOutputSchema } from "@/lib/review-schema";
-import { checkExecutionRateLimit } from "@/lib/rate-limit";
+import { checkExecutionRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import Anthropic from "@anthropic-ai/sdk";
 
@@ -90,12 +90,7 @@ export async function POST(
 
   const rateLimit = await checkExecutionRateLimit(userId);
   if (!rateLimit.allowed) {
-    return NextResponse.json(
-      {
-        error: `実行回数の上限(1時間あたり${rateLimit.limit}回)に達しました。しばらくしてから再度お試しください。`,
-      },
-      { status: 429 },
-    );
+    return rateLimitResponse(rateLimit.limit);
   }
 
   const octokit = await getGitHubClient(userId);

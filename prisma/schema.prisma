@@ -23,13 +23,14 @@ model User {
   emailVerified DateTime?
   image         String?
 
-  accounts     Account[]
-  sessions     Session[]
-  categories   Category[]
-  prompts      Prompt[]
-  executions   Execution[]
-  repositories Repository[]
-  reviews      Review[]
+  accounts         Account[]
+  sessions         Session[]
+  categories       Category[]
+  prompts          Prompt[]
+  executions       Execution[]
+  repositories     Repository[]
+  reviews          Review[]
+  rateLimitBuckets RateLimitBucket[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -155,6 +156,20 @@ model Execution {
   review Review?
 
   createdAt DateTime @default(now())
+}
+
+// 実行系API(プロンプト実行・AIレビュー実行)のレート制限用カウンタ。
+// 固定ウィンドウ(1時間単位)ごとにユーザーの呼び出し回数を数える。
+// upsertのcount incrementはPostgres側でアトミックに実行されるため、
+// 「件数をSELECTしてから後でINSERTする」方式のような、判定と記録の間に
+// 別リクエストが割り込むTOCTOUレースが起きない。
+model RateLimitBucket {
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  windowStart DateTime
+  count       Int      @default(0)
+
+  @@id([userId, windowStart])
 }
 
 // --- AIコードレビュードメイン(Phase 2) ---
