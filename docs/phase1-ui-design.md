@@ -1,6 +1,6 @@
 # Phase 1 画面遷移・UI設計
 
-対象: プロンプト管理ツール(Phase 1)。全体像は [`phase1-design.md`](./phase1-design.md) の「画面構成(暫定)」「API設計方針」を詳細化したもの。
+対象: プロンプト管理ツール(Phase 1)。全体像は [`phase1-design.md`](./phase1-design.md) の「画面構成」「API設計方針」を詳細化したもの。
 
 ## ルーティング一覧
 
@@ -203,6 +203,6 @@ flowchart TD
 | `ExecutionResultPanel` | 実行結果・エラー表示 | 実行、実行履歴(詳細モーダル) |
 | `CategorySelect` | カテゴリ選択ドロップダウン(未分類を含む) | 一覧の絞り込み、編集タブ、新規作成 |
 
-## 次のステップ
+## 実装状況
 
-この画面設計をもとに、[`phase1-design.md`](./phase1-design.md) の「今後のステップ」3〜4(NextAuth.js実装、CRUD・実行機能の実装)に進む。
+この画面設計をもとにNextAuth.js実装・CRUD・実行機能を実装済み(`main`にマージ済み)。詳細は [`phase1-design.md`](./phase1-design.md) の「実装状況」を参照。

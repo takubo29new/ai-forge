@@ -30,6 +30,6 @@ NextAuthのPrisma Adapterが要求する標準スキーマ([公式ドキュメ�
 - **Executionの`variables`はJson型**: プロンプト内の変数(テンプレート変数)は機能ごとに形が変わるため、リレーショナルに正規化せずJSONで保持する。
 - **pgvector**: Phase 3のRAG機能で同一PostgreSQL内にベクトル列を追加する想定(設計ドキュメント参照)。Phase 1時点では未使用のため、拡張の有効化やベクトル列の追加はPhase 3着手時に行う。
 
-## 今回のスコープ
+## DB環境構築
 
-このタスクではスキーマ定義(`prisma/schema.prisma`)と`prisma generate`によるクライアント生成までを実施し、実データベースへの接続・マイグレーション実行(`prisma migrate dev`)は行っていない。DB環境構築は別タスクで対応する。
+`docker-compose.yml`でpgvector/pgvector:pg16イメージのPostgresをローカルに起動し、`prisma migrate dev`で初期マイグレーション(`prisma/migrations/20260823044341_init`)を適用済み。セットアップ手順は[README](../README.md)を参照。
