@@ -52,11 +52,19 @@ export function NewPromptForm({ categories }: { categories: Category[] }) {
       </div>
       <div>
         <label className="mb-1 block text-xs text-zinc-500">本文</label>
+        <p className="mb-1.5 text-xs text-zinc-500">
+          本文に{" "}
+          <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono dark:bg-zinc-800">
+            {"{{変数名}}"}
+          </code>{" "}
+          と書くと、実行時にその名前の入力欄が自動で表示されます。
+        </p>
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
           required
           rows={10}
+          placeholder={"{{topic}}について、初心者向けに3行で説明してください。"}
           className="w-full rounded border border-zinc-300 px-3 py-2 font-mono text-sm dark:border-zinc-700 dark:bg-zinc-900"
         />
       </div>
