@@ -14,12 +14,27 @@ export default async function DocumentsPage({
   const { limit: limitParam } = await searchParams;
   const limit = parsePageSize(limitParam);
 
-  const documents = await prisma.document.findMany({
-    where: { userId },
-    include: { _count: { select: { chunks: true } } },
-    orderBy: { createdAt: "desc" },
-    take: limit,
-  });
+  const [documents, lastSyncedDocument, pendingEmbeddingCount] = await Promise.all([
+    prisma.document.findMany({
+      where: { userId },
+      include: { _count: { select: { chunks: true } } },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+    }),
+    // 「設計書を同期」の最終実行日時。再同期のたびにDocumentを作り直す
+    // (updatedAt = createdAt = 実行時刻になる)ため、REPO_FILE Documentの
+    // 最新updatedAtがそのまま最終同期日時になる。
+    prisma.document.findFirst({
+      where: { userId, sourceType: "REPO_FILE" },
+      orderBy: { updatedAt: "desc" },
+      select: { updatedAt: true },
+    }),
+    // 埋め込み未生成のレビュー指摘数。バックフィルボタンを押す必要が
+    // あるかどうかを、実行日時よりも直接的に示す指標として使う。
+    prisma.reviewComment.count({
+      where: { review: { userId }, embedding: null },
+    }),
+  ]);
 
   return (
     <div className="mx-auto w-full max-w-2xl px-6 py-10">
@@ -46,6 +61,8 @@ export default async function DocumentsPage({
           chunkCount: d._count.chunks,
           createdAt: d.createdAt.toISOString(),
         }))}
+        initialLastSyncedAt={lastSyncedDocument?.updatedAt.toISOString() ?? null}
+        initialPendingEmbeddingCount={pendingEmbeddingCount}
       />
     </div>
   );
