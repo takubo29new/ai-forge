@@ -137,6 +137,7 @@ Vercelへのデプロイを想定した構成になっている(実際にv1.0.0�
 
 1. **Postgres(pgvector対応)を用意する**: Vercelの「Storage」タブに専用のPostgresが無い場合は、「Integrations」(Marketplace)タブで「Prisma Postgres」または「Neon」を探して接続する。いずれもpgvector拡張に対応している
    - このプロジェクトは`@prisma/adapter-pg`(直接TCP接続のドライバーアダプタ)を使っているため、`DATABASE_URL`には**直接接続の文字列**(`postgres://...`)が必要。Accelerateやプーリング用の`prisma+postgres://`・`prisma://`形式は使えない
+   - **DBを作成するリージョンを控えておくこと**。Vercel Functionのデフォルト実行リージョンは`iad1`(米国東部)だが、DBを日本(`ap-northeast-1`)などの別リージョンに作成すると、すべてのDBアクセスがWAN越しになり体感速度の低下・トランザクションタイムアウトの原因になる。`vercel.json`の`regions`をDBと同じリージョンに合わせること(例: 東京なら`hnd1`。[リージョン一覧](https://vercel.com/docs/regions)参照)
 2. **本番用GitHub OAuth Appを用意する**: [GitHub OAuth App](https://github.com/settings/applications/new)を新規作成(ローカル開発用とは別に用意する)。Authorization callback URLはVercelのデプロイURL(例: `https://your-app.vercel.app/api/auth/callback/github`)を指定する
 3. **VercelでGitHubリポジトリをインポート**し、以下の環境変数を設定する(`.env.example`参照。値はすべて本番用に新規発行し、ローカルの`.env`とは分ける):
    `DATABASE_URL` / `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` / `NEXTAUTH_SECRET` / `NEXTAUTH_URL`(本番ドメイン) / `ANTHROPIC_API_KEY` / `VOYAGE_API_KEY` / `TOKEN_ENCRYPTION_KEY`
