@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireUserId } from "@/lib/session";
+import { HelpToc } from "./help-toc";
 
 const SECTIONS = [
   { id: "login", label: "ログイン" },
@@ -22,7 +23,7 @@ export default async function HelpPage() {
   await requireUserId();
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-6 py-10">
+    <div className="mx-auto w-full max-w-5xl px-6 py-10">
       <Link
         href="/dashboard"
         className="text-sm text-zinc-500 hover:underline dark:text-zinc-400"
@@ -30,27 +31,14 @@ export default async function HelpPage() {
         ← ダッシュボードへ
       </Link>
       <h1 className="mt-4 mb-2 text-2xl font-semibold">ヘルプ</h1>
-      <p className="mb-8 text-zinc-600 dark:text-zinc-400">
+      <p className="mb-8 max-w-3xl text-zinc-600 dark:text-zinc-400">
         ai-forgeは、AIに投げるプロンプトを「コードのように」管理・改善するためのツールです。プロンプトをカテゴリ分けして登録し、Claudeに実行して結果を確認しながら、変更履歴を保ったまま改善していけます。管理したプロンプトは、GitHubリポジトリのPRに対するAIコードレビューにもそのまま使い回せます。
       </p>
 
-      <nav className="mb-10 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
-        <p className="mb-2 text-xs font-medium text-zinc-500">目次</p>
-        <ul className="flex flex-col gap-1">
-          {SECTIONS.map((s) => (
-            <li key={s.id}>
-              <a
-                href={`#${s.id}`}
-                className="text-sm text-zinc-700 hover:underline dark:text-zinc-300"
-              >
-                {s.label}
-              </a>
-            </li>
-          ))}
-        </ul>
-      </nav>
+      <div className="flex flex-col gap-8 md:grid md:grid-cols-[180px_minmax(0,1fr)] md:items-start md:gap-10">
+        <HelpToc sections={SECTIONS} />
 
-      <div className="flex flex-col gap-10">
+        <div className="flex max-w-3xl flex-col gap-10">
         <section id="login">
           <h2 className="mb-2 text-lg font-semibold">ログイン</h2>
           <p className="text-sm text-zinc-700 dark:text-zinc-300">
@@ -218,6 +206,7 @@ export default async function HelpPage() {
             </div>
           </div>
         </section>
+        </div>
       </div>
     </div>
   );
