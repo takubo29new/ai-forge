@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { buildChatContext, renderContextForPrompt } from "./chat-context";
 import type {
   DocumentChunkSearchHit,
+  ExecutionSearchHit,
+  PromptVersionSearchHit,
   ReviewCommentSearchHit,
 } from "@/lib/embeddings";
 
@@ -28,6 +30,32 @@ function reviewHit(overrides: Partial<ReviewCommentSearchHit> = {}): ReviewComme
     pullRequestTitle: "Add feature",
     pullRequestNumber: 42,
     distance: 0.3,
+    ...overrides,
+  };
+}
+
+function promptVersionHit(
+  overrides: Partial<PromptVersionSearchHit> = {},
+): PromptVersionSearchHit {
+  return {
+    kind: "prompt_version",
+    id: "version-1",
+    promptId: "prompt-1",
+    promptTitle: "コードレビュー用",
+    content: "以下の差分をレビューしてください: {{diff}}",
+    distance: 0.4,
+    ...overrides,
+  };
+}
+
+function executionHit(overrides: Partial<ExecutionSearchHit> = {}): ExecutionSearchHit {
+  return {
+    kind: "execution",
+    id: "execution-1",
+    promptId: "prompt-1",
+    promptTitle: "コードレビュー用",
+    resultText: "実行結果の本文",
+    distance: 0.4,
     ...overrides,
   };
 }
@@ -66,6 +94,25 @@ describe("buildChatContext", () => {
   it("review_commentはPR番号・タイトル・ファイルパスをラベルにする", () => {
     const [entry] = buildChatContext([reviewHit()], 1);
     expect(entry.source.label).toBe("PR #42 Add feature(src/foo.ts)");
+  });
+
+  it("prompt_versionはpromptTitleをラベルにする", () => {
+    const [entry] = buildChatContext([promptVersionHit({ promptTitle: "要約用" })], 1);
+    expect(entry.source).toEqual({
+      kind: "prompt_version",
+      label: "要約用",
+      promptId: "prompt-1",
+    });
+  });
+
+  it("executionは「プロンプト名の実行結果」をラベルにする", () => {
+    const [entry] = buildChatContext([executionHit({ promptTitle: "要約用" })], 1);
+    expect(entry.source).toEqual({
+      kind: "execution",
+      label: "要約用の実行結果",
+      promptId: "prompt-1",
+    });
+    expect(entry.text).toBe("実行結果の本文");
   });
 });
 

@@ -8,7 +8,9 @@ import { Spinner } from "@/components/spinner";
 
 type ChatSource =
   | { index: number; kind: "document_chunk"; label: string; documentId: string }
-  | { index: number; kind: "review_comment"; label: string; reviewId: string };
+  | { index: number; kind: "review_comment"; label: string; reviewId: string }
+  | { index: number; kind: "prompt_version"; label: string; promptId: string }
+  | { index: number; kind: "execution"; label: string; promptId: string };
 
 type ChatTurn = {
   question: string;
@@ -74,6 +76,13 @@ export function ChatPanel() {
                         {source.kind === "review_comment" ? (
                           <Link
                             href={`/reviews/${source.reviewId}`}
+                            className="hover:underline"
+                          >
+                            {source.label}
+                          </Link>
+                        ) : source.kind === "prompt_version" || source.kind === "execution" ? (
+                          <Link
+                            href={`/prompts/${source.promptId}`}
                             className="hover:underline"
                           >
                             {source.label}

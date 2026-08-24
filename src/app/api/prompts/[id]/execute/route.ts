@@ -6,6 +6,9 @@ import { renderTemplate } from "@/lib/prompt-variables";
 import { DEFAULT_MODEL } from "@/lib/models";
 import { checkExecutionRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { runAiExecution } from "@/lib/run-ai-execution";
+import { embedDocuments } from "@/lib/voyage";
+import { setExecutionEmbedding } from "@/lib/embeddings";
+import { logError } from "@/lib/error-log";
 
 export async function POST(
   request: Request,
@@ -82,6 +85,32 @@ export async function POST(
       };
     },
   });
+
+  // Executionの埋め込み生成はRAG検索チャットの検索対象を増やすための副次的な処理であり、
+  // 失敗してもプロンプト実行自体は既に成功しているため、ベストエフォートで行う
+  // (ReviewCommentの埋め込み生成と同じ方針。docs/db-design.md参照)。
+  // このエンドポイント(POST /api/prompts/:id/execute)はReviewを作らない
+  // Phase 1のプロンプト実行専用ルートのため、ここで作られるExecutionは常に
+  // 対応するReviewを持たない(Phase 2のAIレビュー実行はPOST /api/repositories/:id/reviews
+  // が同じrunAiExecution()を直接呼び出しており、この埋め込み生成は経由しない)。
+  // レビュー由来のExecution.resultTextはReviewCommentとして既に個別に埋め込み済みのため、
+  // 対象をこのルートに限定してJSON構造化出力全体の重複埋め込みを避ける
+  // (docs/phase4-design.md参照)。
+  if (outcome.status === "SUCCESS" && outcome.execution.resultText) {
+    try {
+      const [embedding] = await embedDocuments([outcome.execution.resultText]);
+      await setExecutionEmbedding(outcome.execution.id, embedding);
+    } catch (error) {
+      await logError({
+        source: "SERVER",
+        message: `Executionの埋め込み生成に失敗しました: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        path: `/api/prompts/${id}/execute`,
+        userId: session.user.id,
+      });
+    }
+  }
 
   // 実行失敗(status: FAILED)はリクエスト自体は正常に処理できているため200を返す。
   // 201はExecutionが成功として作成された場合のみ。

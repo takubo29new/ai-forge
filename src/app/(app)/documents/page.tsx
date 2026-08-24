@@ -13,7 +13,13 @@ export default async function DocumentsPage({
   const { limit: limitParam } = await searchParams;
   const limit = parsePageSize(limitParam);
 
-  const [documents, lastSyncedDocument, pendingEmbeddingCount] = await Promise.all([
+  const [
+    documents,
+    lastSyncedDocument,
+    pendingEmbeddingCount,
+    pendingPromptVersionEmbeddingCount,
+    pendingExecutionEmbeddingCount,
+  ] = await Promise.all([
     prisma.document.findMany({
       where: { userId },
       include: { _count: { select: { chunks: true } } },
@@ -32,6 +38,21 @@ export default async function DocumentsPage({
     // あるかどうかを、実行日時よりも直接的に示す指標として使う。
     prisma.reviewComment.count({
       where: { review: { userId }, embedding: null },
+    }),
+    // 埋め込み未生成のプロンプトバージョン数(Phase 4)。
+    prisma.promptVersion.count({
+      where: { prompt: { userId }, embedding: null },
+    }),
+    // 埋め込み未生成の実行結果数(Phase 4)。対象はreviewIdが無いSUCCESSな実行のみ
+    // (レビュー由来のresultTextはReviewCommentとして既に埋め込み済みのため対象外)。
+    prisma.execution.count({
+      where: {
+        userId,
+        status: "SUCCESS",
+        resultText: { not: null },
+        review: null,
+        embedding: null,
+      },
     }),
   ]);
 
@@ -59,6 +80,8 @@ export default async function DocumentsPage({
         }))}
         initialLastSyncedAt={lastSyncedDocument?.updatedAt.toISOString() ?? null}
         initialPendingEmbeddingCount={pendingEmbeddingCount}
+        initialPendingPromptVersionEmbeddingCount={pendingPromptVersionEmbeddingCount}
+        initialPendingExecutionEmbeddingCount={pendingExecutionEmbeddingCount}
         currentLimit={limit}
       />
     </div>

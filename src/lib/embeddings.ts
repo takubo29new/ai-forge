@@ -30,6 +30,28 @@ export async function setReviewCommentEmbedding(
   `;
 }
 
+export async function setPromptVersionEmbedding(
+  promptVersionId: string,
+  embedding: number[],
+) {
+  await prisma.$executeRaw`
+    INSERT INTO "PromptVersionEmbedding" ("promptVersionId", "embedding")
+    VALUES (${promptVersionId}, ${toVectorLiteral(embedding)}::vector)
+    ON CONFLICT ("promptVersionId") DO UPDATE SET embedding = EXCLUDED.embedding
+  `;
+}
+
+export async function setExecutionEmbedding(
+  executionId: string,
+  embedding: number[],
+) {
+  await prisma.$executeRaw`
+    INSERT INTO "ExecutionEmbedding" ("executionId", "embedding")
+    VALUES (${executionId}, ${toVectorLiteral(embedding)}::vector)
+    ON CONFLICT ("executionId") DO UPDATE SET embedding = EXCLUDED.embedding
+  `;
+}
+
 export type DocumentChunkSearchHit = {
   kind: "document_chunk";
   id: string;
@@ -48,6 +70,24 @@ export type ReviewCommentSearchHit = {
   body: string;
   pullRequestTitle: string;
   pullRequestNumber: number;
+  distance: number;
+};
+
+export type PromptVersionSearchHit = {
+  kind: "prompt_version";
+  id: string;
+  promptId: string;
+  promptTitle: string;
+  content: string;
+  distance: number;
+};
+
+export type ExecutionSearchHit = {
+  kind: "execution";
+  id: string;
+  promptId: string;
+  promptTitle: string;
+  resultText: string;
   distance: number;
 };
 
@@ -98,4 +138,45 @@ export async function searchReviewComments(
     LIMIT ${limit}
   `;
   return rows.map((row) => ({ kind: "review_comment", ...row }));
+}
+
+export async function searchPromptVersions(
+  userId: string,
+  queryEmbedding: number[],
+  limit: number,
+): Promise<PromptVersionSearchHit[]> {
+  const rows = await prisma.$queryRaw<
+    { id: string; promptId: string; promptTitle: string; content: string; distance: number }[]
+  >`
+    SELECT pv.id, pv."promptId", p.title AS "promptTitle", pv.content,
+           pve.embedding <=> ${toVectorLiteral(queryEmbedding)}::vector AS distance
+    FROM "PromptVersionEmbedding" pve
+    JOIN "PromptVersion" pv ON pv.id = pve."promptVersionId"
+    JOIN "Prompt" p ON p.id = pv."promptId"
+    WHERE p."userId" = ${userId}
+    ORDER BY distance ASC
+    LIMIT ${limit}
+  `;
+  return rows.map((row) => ({ kind: "prompt_version", ...row }));
+}
+
+export async function searchExecutions(
+  userId: string,
+  queryEmbedding: number[],
+  limit: number,
+): Promise<ExecutionSearchHit[]> {
+  const rows = await prisma.$queryRaw<
+    { id: string; promptId: string; promptTitle: string; resultText: string; distance: number }[]
+  >`
+    SELECT e.id, p.id AS "promptId", p.title AS "promptTitle", e."resultText",
+           ee.embedding <=> ${toVectorLiteral(queryEmbedding)}::vector AS distance
+    FROM "ExecutionEmbedding" ee
+    JOIN "Execution" e ON e.id = ee."executionId"
+    JOIN "PromptVersion" pv ON pv.id = e."promptVersionId"
+    JOIN "Prompt" p ON p.id = pv."promptId"
+    WHERE e."userId" = ${userId}
+    ORDER BY distance ASC
+    LIMIT ${limit}
+  `;
+  return rows.map((row) => ({ kind: "execution", ...row }));
 }

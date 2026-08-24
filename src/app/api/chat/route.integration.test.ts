@@ -13,7 +13,12 @@ import { auth } from "@/auth";
 import { anthropic } from "@/lib/anthropic";
 import { embedQuery } from "@/lib/voyage";
 import { prisma } from "@/lib/prisma";
-import { setDocumentChunkEmbedding, setReviewCommentEmbedding } from "@/lib/embeddings";
+import {
+  setDocumentChunkEmbedding,
+  setExecutionEmbedding,
+  setPromptVersionEmbedding,
+  setReviewCommentEmbedding,
+} from "@/lib/embeddings";
 import { POST } from "./route";
 import { cleanupTestUser, createTestUser } from "@/test/db-helpers";
 
@@ -131,5 +136,57 @@ describe("POST /api/chat", () => {
 
     const promptSent = mockCreate.mock.calls[0][0].messages[0].content as string;
     expect(promptSent).toContain("RateLimitBucketはupsertでアトミックに更新する");
+  });
+
+  it("プロンプトバージョン・実行結果からも検索し、出典付きで回答を返す", async () => {
+    const prompt = await prisma.prompt.create({
+      data: {
+        title: "要約用プロンプト",
+        userId,
+        versions: { create: { versionNumber: 1, content: "以下を要約して: {{text}}" } },
+      },
+      include: { versions: true },
+    });
+    await setPromptVersionEmbedding(prompt.versions[0].id, vector(1));
+
+    const execution = await prisma.execution.create({
+      data: {
+        promptVersionId: prompt.versions[0].id,
+        userId,
+        model: "claude-test",
+        resultText: "要約結果のテキスト",
+        status: "SUCCESS",
+      },
+    });
+    await setExecutionEmbedding(execution.id, vector(1, 0.01));
+
+    mockEmbedQuery.mockResolvedValue(vector(1));
+    mockCreate.mockResolvedValue({
+      content: [{ type: "text", text: "要約結果です[出典1]" }],
+    } as never);
+
+    const res = await POST(request({ question: "要約プロンプトの内容は?" }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    const kinds = body.sources.map((s: { kind: string }) => s.kind);
+    expect(kinds).toContain("prompt_version");
+    expect(kinds).toContain("execution");
+
+    const promptVersionSource = body.sources.find(
+      (s: { kind: string }) => s.kind === "prompt_version",
+    );
+    expect(promptVersionSource).toMatchObject({
+      label: "要約用プロンプト",
+      promptId: prompt.id,
+    });
+
+    const executionSource = body.sources.find(
+      (s: { kind: string }) => s.kind === "execution",
+    );
+    expect(executionSource).toMatchObject({
+      label: "要約用プロンプトの実行結果",
+      promptId: prompt.id,
+    });
   });
 });
