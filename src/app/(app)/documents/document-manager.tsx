@@ -125,16 +125,16 @@ export function DocumentManager({
   return (
     <div className="flex flex-col gap-6">
       <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
-        <p className="mb-2 text-sm font-medium">リポジトリファイル同期</p>
+        <p className="mb-2 text-sm font-medium">ai-forgeの設計書を同期</p>
         <p className="mb-3 text-xs text-zinc-500">
-          docs/配下のMarkdownファイル・README.md・ai-dev-tool-handoff.mdを取り込みます。再度実行すると、同じファイルのドキュメントは最新の内容で作り直されます。
+          このai-forgeプロジェクト自身のdocs/配下のMarkdownファイル・README.md・ai-dev-tool-handoff.mdを取り込みます(GitHubで接続した他のリポジトリではなく、今動いているこのアプリ自身のファイルが対象です)。再度実行すると、同じファイルのドキュメントは最新の内容で作り直されます。
         </p>
         <button
           onClick={handleSync}
           disabled={sync.pending}
           className="rounded border border-zinc-300 px-3 py-1.5 text-xs disabled:opacity-50 dark:border-zinc-700"
         >
-          {sync.pending ? "同期中..." : "リポジトリから同期"}
+          {sync.pending ? "同期中..." : "設計書を同期"}
         </button>
         {syncMessage && (
           <p className="mt-2 text-xs text-zinc-500">{syncMessage}</p>

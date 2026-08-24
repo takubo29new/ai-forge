@@ -68,7 +68,8 @@ Phase 2完了後、経験豊富なWebエンジニアの視点でmainの実装を
 
 ルートレベルのAPI統合テスト(`npm run test:integration`)もCI導入後に追加した。GitHub Actions上のPostgresサービスコンテナに対し、認可判定・レート制限・AI実行の成否分岐など回帰しやすい箇所を検証している。詳細は[`docs/quality-improvements.md`](./docs/quality-improvements.md)を参照。
 
-Phase 3(RAG検索チャットボット)は統合ダッシュボードを除き実装完了。埋め込みモデルはAnthropicがRAG用途で公式に推奨する[Voyage AI](https://www.voyageai.com/)の`voyage-3`を採用。pgvector拡張(0.8.6)を有効化し`Document`/`DocumentChunk`/`ReviewCommentEmbedding`のスキーマを追加、`/documents`でのドキュメント手動登録・リポジトリファイル同期(`docs/*.md`・`README.md`・`ai-dev-tool-handoff.md`を自動取り込み)・既存レビュー指摘の埋め込みバックフィルに続けて、RAG検索チャット(`/chat`)を実装した。質問文を埋め込み、ドキュメント・レビュー指摘の両方からコサイン類似検索で関連箇所を取得し、Claudeに文脈として渡して出典付きの回答を生成する。統合ダッシュボード(`/dashboard`)は未実装。詳細は[`docs/phase3-design.md`](./docs/phase3-design.md)を参照。
+Phase 3(RAG検索チャットボット)は統合ダッシュボードを除き実装完了。埋め込みモデルはAnthropicがRAG用途で公式に推奨する[Voyage AI](https://www.voyageai.com/)の`voyage-3`を採用。pgvector拡張(0.8.6)を有効化し`Document`/`DocumentChunk`/`ReviewCommentEmbedding`のスキーマを追加、`/documents`でのドキュメント手動登録・設計書の自動同期(`docs/*.md`・`README.md`・`ai-dev-tool-handoff.md`。今のところai-forge自身のリポジトリのみが対象)・既存レビュー指摘の埋め込みバックフィルに続けて、RAG検索チャット(`/chat`)を実装した。質問文を埋め込み、ドキュメント・レビュー指摘の両方からコサイン類似検索で関連箇所を取得し、Claudeに文脈として渡して出典付きの回答を生成する。統合ダッシュボード(`/dashboard`)は未実装。詳細は[`docs/phase3-design.md`](./docs/phase3-design.md)を参照。
 
 ## 次のステップ候補
 - Phase 3: 統合ダッシュボード(`/dashboard`)の実装([`docs/phase3-design.md`](./docs/phase3-design.md)の「実装状況」参照)
+- Phase 3: 複数リポジトリの同期・プロジェクト単位のRAG検索チャット(Phase 2で接続済みのGitHubリポジトリごとにドキュメントを同期し、`/chat`で対象リポジトリを絞り込めるようにする。詳細は[`docs/phase3-design.md`](./docs/phase3-design.md)の「今後の拡張候補」参照)
