@@ -4,12 +4,12 @@ import { auth, signIn } from "@/auth";
 export default async function LoginPage() {
   const session = await auth();
   if (session) {
-    redirect("/prompts");
+    redirect("/dashboard");
   }
 
   async function signInWithGitHub() {
     "use server";
-    await signIn("github", { redirectTo: "/prompts" });
+    await signIn("github", { redirectTo: "/dashboard" });
   }
 
   return (

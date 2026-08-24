@@ -1,33 +1,46 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/session";
+import { parsePageSize } from "@/lib/list-limits";
+import { PageSizeSelect } from "@/components/page-size-select";
 
 const SOURCE_STYLE: Record<string, string> = {
   SERVER: "text-red-600 dark:text-red-400",
   CLIENT: "text-amber-600 dark:text-amber-400",
 };
 
-export default async function ErrorsPage() {
+export default async function ErrorsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ limit?: string }>;
+}) {
   const userId = await requireUserId();
+  const { limit: limitParam } = await searchParams;
+  const limit = parsePageSize(limitParam);
 
   const logs = await prisma.errorLog.findMany({
     where: { OR: [{ userId }, { userId: null }] },
     orderBy: { createdAt: "desc" },
-    take: 50,
+    take: limit,
   });
 
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-10">
       <Link
-        href="/prompts"
+        href="/dashboard"
         className="text-sm text-zinc-500 hover:underline dark:text-zinc-400"
       >
-        ← 一覧へ戻る
+        ← ダッシュボードへ
       </Link>
-      <h1 className="mt-4 mb-1 text-xl font-semibold">エラーログ</h1>
-      <p className="mb-6 text-sm text-zinc-500">
-        アプリで発生した想定外のエラーの直近{logs.length}件
-      </p>
+      <div className="mt-4 mb-6 flex items-end justify-between gap-3">
+        <div>
+          <h1 className="mb-1 text-xl font-semibold">エラーログ</h1>
+          <p className="text-sm text-zinc-500">
+            アプリで発生した想定外のエラーの直近{logs.length}件
+          </p>
+        </div>
+        <PageSizeSelect current={limit} />
+      </div>
 
       {logs.length === 0 && (
         <p className="py-16 text-center text-sm text-zinc-500">

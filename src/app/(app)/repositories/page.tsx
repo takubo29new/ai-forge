@@ -15,10 +15,10 @@ export default async function RepositoriesPage() {
   return (
     <div className="mx-auto w-full max-w-2xl px-6 py-10">
       <Link
-        href="/prompts"
+        href="/dashboard"
         className="text-sm text-zinc-500 hover:underline dark:text-zinc-400"
       >
-        ← プロンプト一覧へ
+        ← ダッシュボードへ
       </Link>
       <h1 className="mt-4 mb-6 text-xl font-semibold">接続済みリポジトリ</h1>
       <RepositoryManager
