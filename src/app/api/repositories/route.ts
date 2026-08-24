@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getGitHubClient } from "@/lib/github";
+import { logError } from "@/lib/error-log";
 
 function serializeRepository(repo: {
   id: string;
@@ -68,7 +69,16 @@ export async function POST(request: Request) {
   try {
     const { data } = await octokit.rest.repos.get({ owner, repo: name });
     repoInfo = data;
-  } catch {
+  } catch (error) {
+    await logError({
+      source: "SERVER",
+      message: `GitHubリポジトリ情報の取得に失敗しました(${owner}/${name}): ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      path: "/api/repositories",
+      method: "POST",
+      userId: session.user.id,
+    });
     return NextResponse.json(
       { error: "指定されたリポジトリにアクセスできませんでした" },
       { status: 400 },
