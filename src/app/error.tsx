@@ -23,7 +23,7 @@ export default function ErrorBoundary({
       <button
         type="button"
         onClick={() => retry()}
-        className="rounded-full bg-foreground px-6 py-2 text-sm font-medium text-background"
+        className="rounded-full bg-accent transition-opacity hover:opacity-90 px-6 py-2 text-sm font-medium text-white"
       >
         再試行
       </button>

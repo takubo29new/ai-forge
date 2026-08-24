@@ -4,6 +4,7 @@ import { signOut } from "@/auth";
 import { getSession } from "@/lib/session";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ErrorLogIcon, HelpIcon } from "@/components/icons";
+import { NavLinks } from "@/components/nav-links";
 
 // プロンプト関連(プロンプト一覧・そのカテゴリ管理)とそれ以外の機能を
 // 視覚的に区切って表示する。カテゴリ管理は単体では意味を持たず、あくまで
@@ -35,25 +36,9 @@ export async function AppHeader() {
           ai-forge
         </Link>
         <span className="mx-1 h-4 w-px bg-zinc-300 dark:bg-zinc-700" aria-hidden />
-        {PROMPT_NAV_LINKS.map((link) => (
-          <Link
-            key={link.href}
-            href={link.href}
-            className="text-sm text-zinc-600 hover:underline dark:text-zinc-400"
-          >
-            {link.label}
-          </Link>
-        ))}
+        <NavLinks links={PROMPT_NAV_LINKS} />
         <span className="mx-1 h-4 w-px bg-zinc-300 dark:bg-zinc-700" aria-hidden />
-        {OTHER_NAV_LINKS.map((link) => (
-          <Link
-            key={link.href}
-            href={link.href}
-            className="text-sm text-zinc-600 hover:underline dark:text-zinc-400"
-          >
-            {link.label}
-          </Link>
-        ))}
+        <NavLinks links={OTHER_NAV_LINKS} />
       </nav>
       <div className="flex items-center gap-3">
         <Link

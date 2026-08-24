@@ -222,7 +222,7 @@ export function DocumentManager({
           <button
             type="submit"
             disabled={pending}
-            className="inline-flex items-center gap-1.5 self-start rounded bg-foreground px-4 py-1.5 text-sm font-medium text-background disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 self-start rounded bg-accent transition-opacity hover:opacity-90 px-4 py-1.5 text-sm font-medium text-white disabled:opacity-50"
           >
             {pending && <Spinner className="h-4 w-4" />}
             {pending ? "登録中..." : "登録"}

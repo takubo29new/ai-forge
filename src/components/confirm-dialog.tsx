@@ -52,7 +52,7 @@ export function ConfirmDialog({
           className={`rounded px-4 py-1.5 text-sm font-medium disabled:opacity-50 ${
             danger
               ? "bg-red-600 text-white hover:bg-red-700"
-              : "bg-foreground text-background"
+              : "bg-accent transition-opacity hover:opacity-90 text-white"
           }`}
         >
           {pending ? "処理中..." : confirmLabel}

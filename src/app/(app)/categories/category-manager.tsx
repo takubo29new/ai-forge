@@ -105,7 +105,7 @@ export function CategoryManager({
         <button
           type="submit"
           disabled={pending}
-          className="rounded bg-foreground px-4 py-1.5 text-sm font-medium text-background disabled:opacity-50"
+          className="rounded bg-accent transition-opacity hover:opacity-90 px-4 py-1.5 text-sm font-medium text-white disabled:opacity-50"
         >
           追加
         </button>
@@ -140,7 +140,7 @@ export function CategoryManager({
                   <button
                     onClick={() => handleUpdate(category.id)}
                     disabled={pending}
-                    className="rounded bg-foreground px-3 py-1.5 text-xs font-medium text-background disabled:opacity-50"
+                    className="rounded bg-accent transition-opacity hover:opacity-90 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
                   >
                     保存
                   </button>
