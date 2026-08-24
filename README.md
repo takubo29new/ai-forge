@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/takubo29new/ai-forge/actions/workflows/ci.yml/badge.svg)](https://github.com/takubo29new/ai-forge/actions/workflows/ci.yml)
 
-統合AI開発支援ツール — プロンプト管理・AIコードレビュー・RAGドキュメント検索チャットボットを段階的に統合するポートフォリオ向けプラットフォーム。
+統合AI開発支援ツール — プロンプト管理・AIコードレビュー・RAGドキュメント検索チャットボットを段階的に統合するポートフォリオ向けプラットフォーム。v1.0.0としてVercelに本番デプロイ済み。
 
-プロダクトコンセプトや技術スタック、開発ロードマップの詳細は [`ai-dev-tool-handoff.md`](./ai-dev-tool-handoff.md) を参照。
+プロダクトコンセプトや技術スタック、開発ロードマップの詳細は [`ai-dev-tool-handoff.md`](./ai-dev-tool-handoff.md) を参照。開発の記録(実働時間・従来開発との比較・スクリーンショット)は[ポートフォリオ資料](https://claude.ai/code/artifact/e576878d-7b47-4222-b507-0cdd8a970fe6)にまとめている。
 
 ## 現在の状態
 
@@ -37,6 +37,8 @@ GitHubリポジトリを接続し、PRの差分をPhase 1のプロンプト資�
 - 確認ダイアログのアクセシビリティ対応(フォーカストラップ・Escで閉じる・背景コンテンツの`inert`化)
 - ダークモード手動トグル(OS設定に加え、ユーザーごとの手動切り替えとブラウザへの保存)
 - エラーログ収集(サーバー側は`instrumentation.ts`の`onRequestError`、クライアント側はエラーバウンダリ経由でDBに記録し、`/errors`ページで確認可能)
+- UI/UXデザインシステム(共通トースト通知・ブランドアクセントカラー・ヘッダーナビのアクティブ表示など)
+- GitHubアクセストークンの暗号化保存(AES-256-GCM)・`refresh_token`による自動更新
 
 設計判断の詳細は [`docs/quality-improvements.md`](./docs/quality-improvements.md) を参照。
 
@@ -58,9 +60,11 @@ GitHubリポジトリを接続し、PRの差分をPhase 1のプロンプト資�
 | 領域 | 技術 |
 | --- | --- |
 | フロントエンド / バックエンド | Next.js(App Router)+ TypeScript + Tailwind CSS |
-| DB | PostgreSQL + Prisma(ローカルはDocker) |
+| DB | PostgreSQL + pgvector + Prisma(ローカルはDocker) |
 | 認証 | NextAuth.js(GitHub OAuth)+ Prisma Adapter |
-| AI | Anthropic API(`@anthropic-ai/sdk`) |
+| AI(実行・レビュー) | Anthropic API(`@anthropic-ai/sdk`) |
+| AI(埋め込み) | [Voyage AI](https://www.voyageai.com/)(`voyage-3`) |
+| デプロイ | Vercel |
 
 ## セットアップ
 
