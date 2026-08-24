@@ -3,6 +3,7 @@ import Link from "next/link";
 import { signOut } from "@/auth";
 import { getSession } from "@/lib/session";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { ErrorLogIcon, HelpIcon } from "@/components/icons";
 
 // プロンプト関連(プロンプト一覧・そのカテゴリ管理)とそれ以外の機能を
 // 視覚的に区切って表示する。カテゴリ管理は単体では意味を持たず、あくまで
@@ -16,8 +17,6 @@ const OTHER_NAV_LINKS = [
   { href: "/repositories", label: "リポジトリ" },
   { href: "/documents", label: "ドキュメント" },
   { href: "/chat", label: "チャット" },
-  { href: "/errors", label: "エラーログ" },
-  { href: "/help", label: "ヘルプ" },
 ];
 
 export async function AppHeader() {
@@ -57,6 +56,23 @@ export async function AppHeader() {
         ))}
       </nav>
       <div className="flex items-center gap-3">
+        <Link
+          href="/errors"
+          title="エラーログ"
+          aria-label="エラーログ"
+          className="rounded p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-100"
+        >
+          <ErrorLogIcon />
+        </Link>
+        <Link
+          href="/help"
+          title="ヘルプ"
+          aria-label="ヘルプ"
+          className="rounded p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-100"
+        >
+          <HelpIcon />
+        </Link>
+        <span className="mx-1 h-4 w-px bg-zinc-300 dark:bg-zinc-700" aria-hidden />
         <ThemeToggle />
         {session.user.image && (
           <Image

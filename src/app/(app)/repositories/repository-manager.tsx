@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Modal } from "@/components/modal";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useApiMutation } from "@/lib/use-api-mutation";
+import { useToast } from "@/components/toast-provider";
 
 type Repository = {
   id: string;
@@ -38,6 +39,7 @@ export function RepositoryManager({
 
   const connectMutation = useApiMutation();
   const disconnectMutation = useApiMutation();
+  const { showToast } = useToast();
 
   async function openConnectModal() {
     setShowModal(true);
@@ -67,6 +69,7 @@ export function RepositoryManager({
     setAvailable((prev) =>
       prev.filter((r) => r.githubRepoId !== repo.githubRepoId),
     );
+    showToast(`「${repo.owner}/${repo.name}」を接続しました`);
   }
 
   async function handleDisconnect() {
@@ -81,6 +84,7 @@ export function RepositoryManager({
     if (result === null) return;
     setRepositories((prev) => prev.filter((r) => r.id !== repo.id));
     setDisconnectTarget(null);
+    showToast(`「${repo.owner}/${repo.name}」の接続を解除しました`);
   }
 
   return (

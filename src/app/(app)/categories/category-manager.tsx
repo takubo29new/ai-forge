@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useApiMutation } from "@/lib/use-api-mutation";
+import { useToast } from "@/components/toast-provider";
 
 type Category = {
   id: string;
@@ -24,6 +25,7 @@ export function CategoryManager({
   const [editDescription, setEditDescription] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
   const { mutate, pending, error, setError } = useApiMutation();
+  const { showToast } = useToast();
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -36,6 +38,7 @@ export function CategoryManager({
     setCategories((prev) => [...prev, { ...data, promptCount: 0 }]);
     setNewName("");
     setNewDescription("");
+    showToast("カテゴリを作成しました");
   }
 
   function startEdit(category: Category) {
@@ -54,6 +57,7 @@ export function CategoryManager({
     if (!data) return;
     setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, ...data } : c)));
     setEditingId(null);
+    showToast("カテゴリを更新しました");
   }
 
   async function handleDelete() {
@@ -68,6 +72,7 @@ export function CategoryManager({
     if (result === null) return;
     setCategories((prev) => prev.filter((c) => c.id !== category.id));
     setDeleteTarget(null);
+    showToast("カテゴリを削除しました");
   }
 
   return (
