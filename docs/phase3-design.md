@@ -1,6 +1,6 @@
 # Phase 3 基本設計書(RAG検索チャットボット)
 
-対象: RAG検索チャットボット(Phase 3)。アーキテクチャ・認証は [`phase1-design.md`](./phase1-design.md) を、DB設計の全体像は [`db-design.md`](./db-design.md) を参照。本ドキュメントはPhase 3で新規に追加するDB・画面・APIをまとめる。**統合ダッシュボード以外は実装済み。**詳細は「実装状況」を参照。
+対象: RAG検索チャットボット(Phase 3)。アーキテクチャ・認証は [`phase1-design.md`](./phase1-design.md) を、DB設計の全体像は [`db-design.md`](./db-design.md) を参照。本ドキュメントはPhase 3で新規に追加するDB・画面・APIをまとめる。**実装完了。**詳細は「実装状況」を参照。
 
 ## 概要
 
@@ -163,7 +163,7 @@ flowchart TD
 3. ~~リポジトリファイル同期の実装~~ → 完了。`POST /api/documents/sync`が`docs/*.md`・`README.md`・`ai-dev-tool-handoff.md`を読み込み、ファイル横断で1回のVoyage AI呼び出しにまとめて埋め込みを生成する。再同期時は同じ`sourcePath`のDocumentを丸ごと作り直す(差分検出はしない)。埋め込み生成に失敗した場合はDBへの書き込みを一切行わない
 4. ~~既存`ReviewComment`への埋め込みバックフィル~~ → 完了。上記「レビュー指摘の埋め込みバックフィル」参照
 5. ~~RAG検索チャット(`/chat`)の実装~~ → 完了。上記「RAG検索チャットの回答生成方針」参照
-6. 統合ダッシュボード(`/dashboard`)の実装 — 未着手
+6. ~~統合ダッシュボード(`/dashboard`)の実装~~ → 完了。プロンプト数・接続リポジトリ数・累計レビュー指摘件数(重要度別)・登録ドキュメント数(チャンク数込み)を表示。専用APIは設けず、Phase 2の「傾向」タブと同じ方針でServer Componentから直接Prismaに問い合わせる(`count`/`groupBy`)
 
 ## 今後の拡張候補
 

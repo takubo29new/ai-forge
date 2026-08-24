@@ -5,6 +5,7 @@ import { getSession } from "@/lib/session";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 const NAV_LINKS = [
+  { href: "/dashboard", label: "ダッシュボード" },
   { href: "/categories", label: "カテゴリ管理" },
   { href: "/repositories", label: "リポジトリ" },
   { href: "/documents", label: "ドキュメント" },
