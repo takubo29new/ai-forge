@@ -1,6 +1,7 @@
 import { Octokit } from "octokit";
 import { prisma } from "@/lib/prisma";
 import { logError } from "@/lib/error-log";
+import { decryptToken, encryptToken, isEncryptedToken } from "@/lib/token-crypto";
 
 // GitHub Appのユーザートークンは既定で8時間程度で失効する(GitHub OAuth Appとは異なる仕様)。
 // refresh_tokenを使って更新しないと、ログインから数時間後にAPI呼び出しが
@@ -9,9 +10,9 @@ const TOKEN_REFRESH_BUFFER_SECONDS = 60;
 
 async function refreshGitHubAccessToken(account: {
   id: string;
-  refresh_token: string | null;
+  refreshToken: string | null;
 }): Promise<string | null> {
-  if (!account.refresh_token) return null;
+  if (!account.refreshToken) return null;
 
   const res = await fetch("https://github.com/login/oauth/access_token", {
     method: "POST",
@@ -20,7 +21,7 @@ async function refreshGitHubAccessToken(account: {
       client_id: process.env.GITHUB_CLIENT_ID,
       client_secret: process.env.GITHUB_CLIENT_SECRET,
       grant_type: "refresh_token",
-      refresh_token: account.refresh_token,
+      refresh_token: account.refreshToken,
     }),
   });
   const data = await res.json();
@@ -36,8 +37,8 @@ async function refreshGitHubAccessToken(account: {
   await prisma.account.update({
     where: { id: account.id },
     data: {
-      access_token: data.access_token,
-      refresh_token: data.refresh_token ?? account.refresh_token,
+      access_token: encryptToken(data.access_token),
+      refresh_token: encryptToken(data.refresh_token ?? account.refreshToken),
       expires_at:
         typeof data.expires_in === "number"
           ? Math.floor(Date.now() / 1000) + data.expires_in
@@ -56,16 +57,40 @@ export async function getGitHubClient(userId: string) {
   });
   if (!account?.access_token) return null;
 
+  // 暗号化導入前に平文で保存された既存データは、読み取った際に暗号化して
+  // 書き戻すことで自然に移行させる(専用の移行スクリプトを設けない)。
+  const needsMigration =
+    !isEncryptedToken(account.access_token) ||
+    (account.refresh_token !== null && !isEncryptedToken(account.refresh_token));
+
+  const accessToken = decryptToken(account.access_token);
+  const refreshToken = account.refresh_token
+    ? decryptToken(account.refresh_token)
+    : null;
+
+  if (needsMigration) {
+    await prisma.account.update({
+      where: { id: account.id },
+      data: {
+        access_token: encryptToken(accessToken),
+        refresh_token: refreshToken ? encryptToken(refreshToken) : account.refresh_token,
+      },
+    });
+  }
+
   const isExpired =
     account.expires_at !== null &&
     account.expires_at <
       Math.floor(Date.now() / 1000) + TOKEN_REFRESH_BUFFER_SECONDS;
 
   if (!isExpired) {
-    return new Octokit({ auth: account.access_token });
+    return new Octokit({ auth: accessToken });
   }
 
-  const refreshedToken = await refreshGitHubAccessToken(account);
+  const refreshedToken = await refreshGitHubAccessToken({
+    id: account.id,
+    refreshToken,
+  });
   if (!refreshedToken) return null;
   return new Octokit({ auth: refreshedToken });
 }
