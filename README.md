@@ -49,8 +49,9 @@ GitHubリポジトリを接続し、PRの差分をPhase 1のプロンプト資�
 - ai-forge自身の設計書の自動同期(`docs/*.md`・`README.md`・`ai-dev-tool-handoff.md`を自動取り込み。再同期で最新内容に作り直す。他のGitHubリポジトリの同期は未対応)
 - 既存レビュー指摘の埋め込みバックフィル(新規レビューは自動、既存分は`/documents`の「既存のレビュー指摘を取り込む」ボタンから)
 - RAG検索チャット(`/chat`。ドキュメント・レビュー指摘を横断検索し、Claudeが出典付きで回答)
+- 統合ダッシュボード(`/dashboard`。プロンプト数・接続リポジトリ数・累計レビュー指摘件数・登録ドキュメント数の横断サマリ)
 
-統合ダッシュボード(`/dashboard`)は未実装。画面遷移・DB設計・実装状況は [`docs/phase3-design.md`](./docs/phase3-design.md) を参照。
+画面遷移・DB設計・実装状況は [`docs/phase3-design.md`](./docs/phase3-design.md) を参照。
 
 ## 技術スタック
 

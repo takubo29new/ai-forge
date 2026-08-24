@@ -13,6 +13,7 @@ const SECTIONS = [
   { id: "trends", label: "レビュー履歴・傾向" },
   { id: "documents", label: "ドキュメント" },
   { id: "chat", label: "RAG検索チャット" },
+  { id: "dashboard", label: "ダッシュボード" },
   { id: "appearance", label: "表示設定・エラーログ" },
   { id: "faq", label: "よくある質問" },
 ];
@@ -161,6 +162,13 @@ export default async function HelpPage() {
           </p>
           <p className="text-sm text-zinc-700 dark:text-zinc-300">
             会話履歴はブラウザ上にのみ保持され、ページを離れると失われます。関連するドキュメント・レビュー指摘が見つからない場合は、その旨がそのまま返されます。
+          </p>
+        </section>
+
+        <section id="dashboard">
+          <h2 className="mb-2 text-lg font-semibold">ダッシュボード</h2>
+          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+            「ダッシュボード」ページで、プロンプト数・接続リポジトリ数・累計レビュー指摘件数(重要度別)・登録ドキュメント数をまとめて確認できます。「チャットで質問する」「ドキュメントを管理」から各画面にすぐ移動できます。
           </p>
         </section>
 
