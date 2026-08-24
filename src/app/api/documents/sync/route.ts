@@ -9,6 +9,14 @@ import { setDocumentChunkEmbedding } from "@/lib/embeddings";
 import { checkDocumentRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { voyageErrorResponse } from "@/lib/voyage-error-response";
 
+// 本番環境ではDBがVercelのFunctionから地理的に離れている場合があり、
+// ファイル数だけ発生するdeleteMany+createの往復がPrismaの既定の
+// トランザクションタイムアウト(5秒)を超えることがあるため延長する。
+// あわせてVercelの関数自体の実行時間上限も引き上げる(ファイル読み込み
+// →Voyage AI呼び出し→このトランザクション、を1リクエストで行うため)。
+export const maxDuration = 60;
+const SYNC_TRANSACTION_TIMEOUT_MS = 30_000;
+
 // リポジトリ内の設計書を自動取り込みするための固定の対象一覧。ユーザー入力の
 // パスを受け付けるとパストラバーサルの懸念があるため、あえて動的なパス指定は
 // 許可せず、docs/配下のMarkdownファイルとルートの2ファイルに限定している。
@@ -101,7 +109,7 @@ export async function POST() {
       });
       chunkIdsInOrder.push(...document.chunks.map((c) => c.id));
     }
-  });
+  }, { timeout: SYNC_TRANSACTION_TIMEOUT_MS });
 
   await Promise.all(
     chunkIdsInOrder.map((id) =>
