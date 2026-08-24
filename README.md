@@ -101,6 +101,7 @@ cp .env.example .env
 | `NEXTAUTH_URL` | ローカルでは `http://localhost:3000` |
 | `ANTHROPIC_API_KEY` | [console.anthropic.com](https://console.anthropic.com) の「API Keys」で発行(要クレジット残高) |
 | `VOYAGE_API_KEY` | [dashboard.voyageai.com](https://dashboard.voyageai.com) で発行(Phase 3のドキュメント埋め込みに使用) |
+| `TOKEN_ENCRYPTION_KEY` | `openssl rand -base64 32` 等で生成したランダムな文字列(GitHubのaccess_token/refresh_tokenをDBに暗号化して保存するための鍵。既存の`.env`にこの変数が無い状態でアップデートした場合、GitHub連携機能を使う前に必ず設定すること) |
 
 ### 4. DBマイグレーション
 

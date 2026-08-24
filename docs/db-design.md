@@ -26,7 +26,7 @@ NextAuthのPrisma Adapterが要求する標準スキーマ([公式ドキュメ�
 
 ### AIコードレビュードメイン(Phase 2)
 
-GitHub OAuthのアクセストークンは、Phase 1の認証ですでに`Account.access_token`に保存されているものを再利用する(Phase 2専用のトークン保存は行わない)。
+GitHub OAuthのアクセストークンは、Phase 1の認証ですでに`Account.access_token`に保存されているものを再利用する(Phase 2専用のトークン保存は行わない)。GitHub Appのユーザートークンは約8時間で失効する仕様のため、`getGitHubClient()`(`src/lib/github.ts`)が`expires_at`を見て`refresh_token`から自動更新する。`access_token`/`refresh_token`はDBカラム上はいずれも平文の`String? @db.Text`のままだが、アプリケーション層(`src/lib/token-crypto.ts`、AES-256-GCM、鍵は`TOKEN_ENCRYPTION_KEY`)で暗号化してから保存する。書き込み経路は初回ログイン連携時(`src/auth.ts`でPrismaAdapterの`linkAccount`をラップ)とトークン自動更新時の2箇所のみ。暗号化導入前に保存された平文データは、`getGitHubClient()`が読み取った際に検知して暗号化し直すことで、専用の移行スクリプトなしに自然に移行する。
 
 - `Repository` — ユーザーがai-forgeに接続したGitHubリポジトリ。`githubRepoId`(GitHub側の数値ID)で一意に識別する
 - `Review` — PRに対するAIレビューの実行単位。どのリポジトリ・PR・`PromptVersion`(レビュー用プロンプト)・`Execution`(実際のAI呼び出し)に対応するかを記録する
