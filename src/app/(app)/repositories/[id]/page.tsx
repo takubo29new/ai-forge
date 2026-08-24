@@ -10,7 +10,8 @@ import {
   countBySeverity,
 } from "@/lib/review-severity";
 import { PullRequestList } from "./pull-request-list";
-import { LIST_LIMIT } from "@/lib/list-limits";
+import { parsePageSize } from "@/lib/list-limits";
+import { PageSizeSelect } from "@/components/page-size-select";
 
 const TABS = [
   { key: "pulls", label: "オープンなPR" },
@@ -25,15 +26,16 @@ export default async function RepositoryDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; limit?: string }>;
 }) {
   const userId = await requireUserId();
 
   const { id } = await params;
-  const { tab: tabParam } = await searchParams;
+  const { tab: tabParam, limit: limitParam } = await searchParams;
   const tab: TabKey = TABS.some((t) => t.key === tabParam)
     ? (tabParam as TabKey)
     : "pulls";
+  const limit = parsePageSize(limitParam);
 
   const repository = await prisma.repository.findUnique({ where: { id } });
   if (!repository || repository.userId !== userId) {
@@ -77,7 +79,7 @@ export default async function RepositoryDetailPage({
           where: { repositoryId: id },
           include: { _count: { select: { comments: true } } },
           orderBy: { createdAt: "desc" },
-          take: LIST_LIMIT,
+          take: limit,
         })
       : null;
 
@@ -188,7 +190,11 @@ export default async function RepositoryDetailPage({
       )}
 
       {tab === "history" && reviews && (
-        <ul className="flex flex-col gap-2">
+        <>
+          <div className="mb-3 flex justify-end">
+            <PageSizeSelect current={limit} />
+          </div>
+          <ul className="flex flex-col gap-2">
           {reviews.length === 0 && (
             <li className="py-16 text-center text-sm text-zinc-500">
               レビュー履歴はまだありません
@@ -210,7 +216,8 @@ export default async function RepositoryDetailPage({
               </Link>
             </li>
           ))}
-        </ul>
+          </ul>
+        </>
       )}
 
       {tab === "trends" && severityTotals && (

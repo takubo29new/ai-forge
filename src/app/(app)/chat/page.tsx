@@ -8,10 +8,10 @@ export default async function ChatPage() {
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col px-6 py-10">
       <Link
-        href="/prompts"
+        href="/dashboard"
         className="text-sm text-zinc-500 hover:underline dark:text-zinc-400"
       >
-        ← 一覧へ戻る
+        ← ダッシュボードへ
       </Link>
       <h1 className="mt-4 mb-2 text-xl font-semibold">RAG検索チャット</h1>
       <p className="mb-6 text-sm text-zinc-600 dark:text-zinc-400">

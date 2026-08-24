@@ -5,7 +5,8 @@ import { requireUserId } from "@/lib/session";
 import { EditTab } from "./edit-tab";
 import { ExecuteTab } from "./execute-tab";
 import { Markdown } from "@/components/markdown";
-import { LIST_LIMIT } from "@/lib/list-limits";
+import { LIST_LIMIT, parsePageSize } from "@/lib/list-limits";
+import { PageSizeSelect } from "@/components/page-size-select";
 
 const TABS = [
   { key: "edit", label: "編集" },
@@ -21,15 +22,16 @@ export default async function PromptDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; limit?: string }>;
 }) {
   const userId = await requireUserId();
 
   const { id } = await params;
-  const { tab: tabParam } = await searchParams;
+  const { tab: tabParam, limit: limitParam } = await searchParams;
   const tab: TabKey = TABS.some((t) => t.key === tabParam)
     ? (tabParam as TabKey)
     : "edit";
+  const limit = parsePageSize(limitParam);
 
   const [prompt, categories] = await Promise.all([
     prisma.prompt.findUnique({
@@ -51,14 +53,23 @@ export default async function PromptDetailPage({
 
   const latestVersion = prompt.versions[0];
 
+  // 「実行」タブのバージョン選択には表示件数の設定を影響させたくないため
+  // (選べるバージョンが減ってしまうと紛らわしい)、常にLIST_LIMIT件まで取得する。
+  // 「バージョン履歴」タブの一覧だけがユーザーの選んだ表示件数(limit)に従う。
   const versions =
-    tab === "versions" || tab === "execute"
+    tab === "versions"
       ? await prisma.promptVersion.findMany({
           where: { promptId: id },
           orderBy: { versionNumber: "desc" },
-          take: LIST_LIMIT,
+          take: limit,
         })
-      : null;
+      : tab === "execute"
+        ? await prisma.promptVersion.findMany({
+            where: { promptId: id },
+            orderBy: { versionNumber: "desc" },
+            take: LIST_LIMIT,
+          })
+        : null;
 
   const executions =
     tab === "history"
@@ -66,7 +77,7 @@ export default async function PromptDetailPage({
           where: { promptVersion: { promptId: id } },
           include: { promptVersion: { select: { versionNumber: true } } },
           orderBy: { createdAt: "desc" },
-          take: LIST_LIMIT,
+          take: limit,
         })
       : null;
 
@@ -105,6 +116,12 @@ export default async function PromptDetailPage({
           versionNumber={latestVersion?.versionNumber ?? 0}
           categories={categories}
         />
+      )}
+
+      {(tab === "versions" || tab === "history") && (
+        <div className="mb-3 flex justify-end">
+          <PageSizeSelect current={limit} />
+        </div>
       )}
 
       {tab === "versions" && versions && (

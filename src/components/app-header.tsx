@@ -4,9 +4,15 @@ import { signOut } from "@/auth";
 import { getSession } from "@/lib/session";
 import { ThemeToggle } from "@/components/theme-toggle";
 
-const NAV_LINKS = [
-  { href: "/dashboard", label: "ダッシュボード" },
+// プロンプト関連(プロンプト一覧・そのカテゴリ管理)とそれ以外の機能を
+// 視覚的に区切って表示する。カテゴリ管理は単体では意味を持たず、あくまで
+// プロンプトの分類機能であることが分かるよう、プロンプトの隣に置く。
+const PROMPT_NAV_LINKS = [
+  { href: "/prompts", label: "プロンプト" },
   { href: "/categories", label: "カテゴリ管理" },
+];
+
+const OTHER_NAV_LINKS = [
   { href: "/repositories", label: "リポジトリ" },
   { href: "/documents", label: "ドキュメント" },
   { href: "/chat", label: "チャット" },
@@ -26,10 +32,21 @@ export async function AppHeader() {
   return (
     <header className="flex items-center justify-between border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
       <nav className="flex items-center gap-4">
-        <Link href="/prompts" className="font-semibold">
+        <Link href="/dashboard" className="font-semibold">
           ai-forge
         </Link>
-        {NAV_LINKS.map((link) => (
+        <span className="mx-1 h-4 w-px bg-zinc-300 dark:bg-zinc-700" aria-hidden />
+        {PROMPT_NAV_LINKS.map((link) => (
+          <Link
+            key={link.href}
+            href={link.href}
+            className="text-sm text-zinc-600 hover:underline dark:text-zinc-400"
+          >
+            {link.label}
+          </Link>
+        ))}
+        <span className="mx-1 h-4 w-px bg-zinc-300 dark:bg-zinc-700" aria-hidden />
+        {OTHER_NAV_LINKS.map((link) => (
           <Link
             key={link.href}
             href={link.href}
