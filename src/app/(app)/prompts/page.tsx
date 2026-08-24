@@ -60,7 +60,7 @@ export default async function PromptsPage({
         </button>
         <Link
           href="/prompts/new"
-          className="ml-auto rounded-full bg-foreground px-4 py-1.5 text-sm font-medium text-background"
+          className="ml-auto rounded-full bg-accent transition-opacity hover:opacity-90 px-4 py-1.5 text-sm font-medium text-white"
         >
           + 新規作成
         </Link>

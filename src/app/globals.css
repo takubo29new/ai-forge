@@ -5,11 +5,18 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  /* ブランドアクセント(インディゴ系)。危険操作の赤・警告の琥珀色とは
+     独立させ、主要な操作導線(プライマリボタン・アクティブなナビ・
+     フォーカスリング)にのみ使う */
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -17,16 +24,23 @@
 :root.dark {
   --background: #0a0a0a;
   --foreground: #ededed;
+  --accent: #818cf8;
+  --accent-hover: #a5b4fc;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
 @media (prefers-reduced-motion: no-preference) {
   html {
     scroll-behavior: smooth;
   }
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }

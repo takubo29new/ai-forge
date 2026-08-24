@@ -79,7 +79,7 @@ export function NewPromptForm({ categories }: { categories: Category[] }) {
       <button
         type="submit"
         disabled={pending}
-        className="self-start rounded-full bg-foreground px-6 py-2 text-sm font-medium text-background disabled:opacity-50"
+        className="self-start rounded-full bg-accent transition-opacity hover:opacity-90 px-6 py-2 text-sm font-medium text-white disabled:opacity-50"
       >
         作成
       </button>

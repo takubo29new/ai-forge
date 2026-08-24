@@ -100,7 +100,7 @@ export function PullRequestList({
                 <button
                   onClick={() => handleRun(pr)}
                   disabled={pending || !selectedPrompt?.usesDiff}
-                  className="inline-flex items-center gap-1.5 rounded bg-foreground px-4 py-1.5 text-xs font-medium text-background disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded bg-accent transition-opacity hover:opacity-90 px-4 py-1.5 text-xs font-medium text-white disabled:opacity-50"
                 >
                   {pending && <Spinner className="h-3.5 w-3.5" />}
                   {pending ? "実行中..." : "実行"}

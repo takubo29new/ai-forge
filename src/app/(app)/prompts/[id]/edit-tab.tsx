@@ -135,7 +135,7 @@ export function EditTab({
         <button
           type="submit"
           disabled={pending}
-          className="rounded-full bg-foreground px-6 py-2 text-sm font-medium text-background disabled:opacity-50"
+          className="rounded-full bg-accent transition-opacity hover:opacity-90 px-6 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
           新しいバージョンとして保存
         </button>

@@ -95,7 +95,7 @@ export function RepositoryManager({
         </p>
         <button
           onClick={openConnectModal}
-          className="rounded-full bg-foreground px-4 py-1.5 text-sm font-medium text-background"
+          className="rounded-full bg-accent transition-opacity hover:opacity-90 px-4 py-1.5 text-sm font-medium text-white"
         >
           + リポジトリを接続
         </button>
@@ -195,7 +195,7 @@ export function RepositoryManager({
               <button
                 onClick={() => handleConnect(repo)}
                 disabled={connectMutation.pending}
-                className="rounded bg-foreground px-3 py-1 text-xs font-medium text-background disabled:opacity-50"
+                className="rounded bg-accent transition-opacity hover:opacity-90 px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
               >
                 接続
               </button>
