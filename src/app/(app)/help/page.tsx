@@ -14,6 +14,7 @@ const SECTIONS = [
   { id: "trends", label: "レビュー履歴・傾向" },
   { id: "documents", label: "ドキュメント" },
   { id: "chat", label: "RAG検索チャット" },
+  { id: "evaluations", label: "画像評価" },
   { id: "dashboard", label: "ダッシュボード" },
   { id: "appearance", label: "表示設定・エラーログ" },
   { id: "faq", label: "よくある質問" },
@@ -150,6 +151,16 @@ export default async function HelpPage() {
           </p>
           <p className="text-sm text-zinc-700 dark:text-zinc-300">
             会話履歴はブラウザ上にのみ保持され、ページを離れると失われます。関連するドキュメント・レビュー指摘が見つからない場合は、その旨がそのまま返されます。
+          </p>
+        </section>
+
+        <section id="evaluations" className="scroll-mt-6">
+          <h2 className="mb-2 text-lg font-semibold">画像評価</h2>
+          <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
+            「評価」ページから、画像(料理の写真・自作の絵など)とプロンプトを選んで「評価を実行」を押すと、Claudeが画像を見て観点別のコメント(良い点・提案・気になる点)と総評を返します。コードレビューと同じ「プロンプトを選んでClaudeに実行させる」仕組みを画像入力向けに広げたものです。
+          </p>
+          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+            アップロードした画像自体はサーバーに保存されません。Claudeへのリクエストで使われるだけで、評価結果(テキスト)のみが記録されます。
           </p>
         </section>
 

@@ -33,6 +33,7 @@ model User {
   rateLimitBuckets RateLimitBucket[]
   errorLogs        ErrorLog[]
   documents        Document[]
+  evaluations      Evaluation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -123,8 +124,9 @@ model PromptVersion {
   promptId String
   prompt   Prompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
 
-  executions Execution[]
-  reviews    Review[]
+  executions  Execution[]
+  reviews     Review[]
+  evaluations Evaluation[]
 
   createdAt DateTime @default(now())
 
@@ -158,7 +160,8 @@ model Execution {
   completionTokens Int?
   durationMs       Int?
 
-  review Review?
+  review     Review?
+  evaluation Evaluation?
 
   createdAt DateTime @default(now())
 
@@ -353,4 +356,74 @@ model ReviewCommentEmbedding {
   embedding Unsupported("vector(1024)")?
 
   createdAt DateTime @default(now())
+}
+
+// --- 汎用AI評価ドメイン(Phase 5) ---
+// コードレビュー(Review)とは意図的に分離した並行の概念。Reviewはコード固有の
+// フィールド(filePath/line等)を持ち既存機能(傾向ダッシュボード・RAG出典表示)と
+// 深く統合されているため、無理に汎用化せず新設する(docs/phase5-design.md参照)。
+// 最初のプロトタイプでは画像評価(IMAGE)のみ実装し、画像自体は永続化しない
+// (Claudeへのリクエストで使うのみ。結果のテキストのみ保存する)。
+
+enum EvaluationInputType {
+  IMAGE
+  TEXT
+}
+
+enum EvaluationStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+// 1回のAI評価の実行単位。実際のAI呼び出しはExecutionに委譲し、Evaluationは
+// その結果をどのプロンプト・入力形式に対するものかという文脈に紐付ける
+// (Reviewと同じ構造)。
+model Evaluation {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 評価に使ったプロンプト(バージョン)。Reviewと同様、後から追跡できるよう
+  // PromptVersionを削除してもEvaluation履歴は消えないようRestrictにする。
+  promptVersionId String
+  promptVersion   PromptVersion @relation(fields: [promptVersionId], references: [id], onDelete: Restrict)
+
+  executionId String?    @unique
+  execution   Execution? @relation(fields: [executionId], references: [id], onDelete: SetNull)
+
+  inputType EvaluationInputType
+  title     String
+  status    EvaluationStatus    @default(PENDING)
+
+  findings EvaluationFinding[]
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+enum EvaluationTone {
+  POSITIVE
+  SUGGESTION
+  CONCERN
+}
+
+// AI評価が返した個別の観点別コメント。Evaluation.execution.resultTextから
+// 構造化して抽出する(ReviewCommentのコード非依存版)。
+model EvaluationFinding {
+  id String @id @default(cuid())
+
+  evaluationId String
+  evaluation   Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+
+  label String
+  tone  EvaluationTone
+  score Int?
+  body  String         @db.Text
+
+  createdAt DateTime @default(now())
+
+  @@index([evaluationId])
 }
