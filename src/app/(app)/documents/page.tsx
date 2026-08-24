@@ -1,32 +1,43 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/session";
-import { LIST_LIMIT } from "@/lib/list-limits";
+import { parsePageSize } from "@/lib/list-limits";
+import { PageSizeSelect } from "@/components/page-size-select";
 import { DocumentManager } from "./document-manager";
 
-export default async function DocumentsPage() {
+export default async function DocumentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ limit?: string }>;
+}) {
   const userId = await requireUserId();
+  const { limit: limitParam } = await searchParams;
+  const limit = parsePageSize(limitParam);
 
   const documents = await prisma.document.findMany({
     where: { userId },
     include: { _count: { select: { chunks: true } } },
     orderBy: { createdAt: "desc" },
-    take: LIST_LIMIT,
+    take: limit,
   });
 
   return (
     <div className="mx-auto w-full max-w-2xl px-6 py-10">
       <Link
-        href="/prompts"
+        href="/dashboard"
         className="text-sm text-zinc-500 hover:underline dark:text-zinc-400"
       >
-        ← 一覧へ戻る
+        ← ダッシュボードへ
       </Link>
-      <h1 className="mt-4 mb-2 text-xl font-semibold">ドキュメント</h1>
-      <p className="mb-6 text-sm text-zinc-600 dark:text-zinc-400">
-        登録したドキュメントはチャンクに分割され、埋め込みベクトルとして保存されます(Phase
-        3・RAG検索チャットの検索対象。チャット画面は未実装)。
-      </p>
+      <div className="mt-4 mb-6 flex items-end justify-between gap-3">
+        <div>
+          <h1 className="mb-2 text-xl font-semibold">ドキュメント</h1>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            登録したドキュメントはチャンクに分割され、埋め込みベクトルとして保存されます(RAG検索チャット「/chat」の検索対象)。
+          </p>
+        </div>
+        <PageSizeSelect current={limit} />
+      </div>
       <DocumentManager
         initialDocuments={documents.map((d) => ({
           id: d.id,

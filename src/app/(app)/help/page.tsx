@@ -24,10 +24,10 @@ export default async function HelpPage() {
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-10">
       <Link
-        href="/prompts"
+        href="/dashboard"
         className="text-sm text-zinc-500 hover:underline dark:text-zinc-400"
       >
-        ← 一覧へ戻る
+        ← ダッシュボードへ
       </Link>
       <h1 className="mt-4 mb-2 text-2xl font-semibold">ヘルプ</h1>
       <p className="mb-8 text-zinc-600 dark:text-zinc-400">

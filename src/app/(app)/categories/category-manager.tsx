@@ -172,7 +172,7 @@ export function CategoryManager({
                   <button
                     onClick={() => setDeleteTarget(category)}
                     disabled={pending}
-                    className="rounded border border-zinc-300 px-3 py-1.5 text-xs disabled:opacity-50 dark:border-zinc-700"
+                    className="rounded border border-red-300 px-3 py-1.5 text-xs text-red-600 disabled:opacity-50 dark:border-red-900 dark:text-red-400"
                   >
                     削除
                   </button>
