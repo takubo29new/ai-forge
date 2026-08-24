@@ -88,6 +88,22 @@ export function EditTab({
 
       <p className="text-xs text-zinc-500">現在のバージョン: v{versionNumber}</p>
 
+      <p className="text-xs text-zinc-500">
+        本文に{" "}
+        <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono dark:bg-zinc-800">
+          {"{{変数名}}"}
+        </code>{" "}
+        と書くと、実行時にその名前の入力欄が自動で表示されます(例:{" "}
+        <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono dark:bg-zinc-800">
+          {"{{topic}}について説明してください"}
+        </code>
+        )。AIレビューに使うプロンプトの場合は、PRの差分を受け取るために必ず{" "}
+        <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono dark:bg-zinc-800">
+          {"{{diff}}"}
+        </code>{" "}
+        を含めてください。
+      </p>
+
       <textarea
         value={content}
         onChange={(e) => setContent(e.target.value)}
