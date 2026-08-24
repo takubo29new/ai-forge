@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getGitHubClient, listOpenPullRequests } from "@/lib/github";
+import { logError } from "@/lib/error-log";
 
 export async function GET(
   _request: Request,
@@ -36,7 +37,15 @@ export async function GET(
       repository.name,
     );
     return NextResponse.json(pulls);
-  } catch {
+  } catch (error) {
+    await logError({
+      source: "SERVER",
+      message: `オープンなPR一覧の取得に失敗しました(${repository.owner}/${repository.name}): ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      path: `/api/repositories/${id}/pulls`,
+      userId: session.user.id,
+    });
     return NextResponse.json(
       { error: "オープンなPRの取得に失敗しました" },
       { status: 502 },

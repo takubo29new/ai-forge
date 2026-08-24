@@ -1,17 +1,73 @@
 import { Octokit } from "octokit";
 import { prisma } from "@/lib/prisma";
+import { logError } from "@/lib/error-log";
 
-export async function getGitHubAccessToken(userId: string) {
-  const account = await prisma.account.findFirst({
-    where: { userId, provider: "github" },
+// GitHub Appのユーザートークンは既定で8時間程度で失効する(GitHub OAuth Appとは異なる仕様)。
+// refresh_tokenを使って更新しないと、ログインから数時間後にAPI呼び出しが
+// 401 Bad credentialsで失敗するようになる。
+const TOKEN_REFRESH_BUFFER_SECONDS = 60;
+
+async function refreshGitHubAccessToken(account: {
+  id: string;
+  refresh_token: string | null;
+}): Promise<string | null> {
+  if (!account.refresh_token) return null;
+
+  const res = await fetch("https://github.com/login/oauth/access_token", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({
+      client_id: process.env.GITHUB_CLIENT_ID,
+      client_secret: process.env.GITHUB_CLIENT_SECRET,
+      grant_type: "refresh_token",
+      refresh_token: account.refresh_token,
+    }),
   });
-  return account?.access_token ?? null;
+  const data = await res.json();
+
+  if (!res.ok || !data.access_token) {
+    await logError({
+      source: "SERVER",
+      message: `GitHubアクセストークンの更新に失敗しました: ${data.error ?? res.status}`,
+    });
+    return null;
+  }
+
+  await prisma.account.update({
+    where: { id: account.id },
+    data: {
+      access_token: data.access_token,
+      refresh_token: data.refresh_token ?? account.refresh_token,
+      expires_at:
+        typeof data.expires_in === "number"
+          ? Math.floor(Date.now() / 1000) + data.expires_in
+          : null,
+      token_type: data.token_type ?? undefined,
+      scope: data.scope ?? undefined,
+    },
+  });
+
+  return data.access_token as string;
 }
 
 export async function getGitHubClient(userId: string) {
-  const token = await getGitHubAccessToken(userId);
-  if (!token) return null;
-  return new Octokit({ auth: token });
+  const account = await prisma.account.findFirst({
+    where: { userId, provider: "github" },
+  });
+  if (!account?.access_token) return null;
+
+  const isExpired =
+    account.expires_at !== null &&
+    account.expires_at <
+      Math.floor(Date.now() / 1000) + TOKEN_REFRESH_BUFFER_SECONDS;
+
+  if (!isExpired) {
+    return new Octokit({ auth: account.access_token });
+  }
+
+  const refreshedToken = await refreshGitHubAccessToken(account);
+  if (!refreshedToken) return null;
+  return new Octokit({ auth: refreshedToken });
 }
 
 export async function listOpenPullRequests(

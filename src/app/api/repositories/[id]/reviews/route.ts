@@ -122,7 +122,15 @@ export async function POST(
       repository.name,
       pullRequestNumber,
     ));
-  } catch {
+  } catch (error) {
+    await logError({
+      source: "SERVER",
+      message: `PR#${pullRequestNumber}の取得に失敗しました(${repository.owner}/${repository.name}): ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      path: `/api/repositories/${repository.id}/reviews`,
+      userId,
+    });
     return NextResponse.json(
       { error: "PRの取得に失敗しました" },
       { status: 502 },
