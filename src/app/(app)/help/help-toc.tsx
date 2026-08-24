@@ -53,9 +53,9 @@ export function HelpToc({ sections }: { sections: Section[] }) {
           key={s.id}
           href={`#${s.id}`}
           onClick={(e) => handleClick(e, s.id)}
-          className={`shrink-0 rounded px-2.5 py-1.5 text-sm whitespace-nowrap md:whitespace-normal ${
+          className={`shrink-0 rounded px-2.5 py-1.5 text-sm whitespace-nowrap transition-colors md:whitespace-normal ${
             activeId === s.id
-              ? "bg-zinc-100 font-medium text-foreground dark:bg-zinc-800"
+              ? "bg-accent/10 font-medium text-accent"
               : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
           }`}
         >

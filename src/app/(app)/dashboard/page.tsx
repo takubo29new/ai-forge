@@ -44,14 +44,14 @@ export default async function DashboardPage() {
       <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Link
           href="/prompts"
-          className="rounded-lg border border-zinc-200 p-4 hover:border-zinc-400 dark:border-zinc-800 dark:hover:border-zinc-600"
+          className="rounded-lg border border-zinc-200 p-4 transition-all hover:-translate-y-0.5 hover:border-accent hover:shadow-md dark:border-zinc-800"
         >
           <p className="text-2xl font-semibold">{promptCount}</p>
           <p className="text-xs text-zinc-500">プロンプト</p>
         </Link>
         <Link
           href="/repositories"
-          className="rounded-lg border border-zinc-200 p-4 hover:border-zinc-400 dark:border-zinc-800 dark:hover:border-zinc-600"
+          className="rounded-lg border border-zinc-200 p-4 transition-all hover:-translate-y-0.5 hover:border-accent hover:shadow-md dark:border-zinc-800"
         >
           <p className="text-2xl font-semibold">{repositoryCount}</p>
           <p className="text-xs text-zinc-500">接続リポジトリ</p>
@@ -62,7 +62,7 @@ export default async function DashboardPage() {
         </div>
         <Link
           href="/documents"
-          className="rounded-lg border border-zinc-200 p-4 hover:border-zinc-400 dark:border-zinc-800 dark:hover:border-zinc-600"
+          className="rounded-lg border border-zinc-200 p-4 transition-all hover:-translate-y-0.5 hover:border-accent hover:shadow-md dark:border-zinc-800"
         >
           <p className="text-2xl font-semibold">{documentCount}</p>
           <p className="text-xs text-zinc-500">
@@ -92,7 +92,7 @@ export default async function DashboardPage() {
       <div className="flex flex-wrap gap-3">
         <Link
           href="/chat"
-          className="rounded bg-foreground px-4 py-2 text-sm font-medium text-background"
+          className="rounded bg-accent transition-opacity hover:opacity-90 px-4 py-2 text-sm font-medium text-white"
         >
           チャットで質問する
         </Link>

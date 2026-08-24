@@ -23,7 +23,7 @@ export default async function LoginPage() {
       <form action={signInWithGitHub}>
         <button
           type="submit"
-          className="rounded-full bg-foreground px-6 py-3 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
+          className="rounded-full bg-accent px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
         >
           GitHubでログイン
         </button>
