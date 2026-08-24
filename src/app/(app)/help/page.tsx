@@ -39,21 +39,21 @@ export default async function HelpPage() {
         <HelpToc sections={SECTIONS} />
 
         <div className="flex max-w-3xl flex-col gap-10">
-        <section id="login">
+        <section id="login" className="scroll-mt-6">
           <h2 className="mb-2 text-lg font-semibold">ログイン</h2>
           <p className="text-sm text-zinc-700 dark:text-zinc-300">
             GitHubアカウントでログインします。トップページにアクセスすると未ログイン時は自動的にログイン画面に移動するので、「GitHubでログイン」を押してGitHub側で許可すれば、プロンプト一覧画面に入れます。ログアウトはヘッダー右側のボタンから行えます。
           </p>
         </section>
 
-        <section id="categories">
+        <section id="categories" className="scroll-mt-6">
           <h2 className="mb-2 text-lg font-semibold">カテゴリ</h2>
           <p className="text-sm text-zinc-700 dark:text-zinc-300">
             プロンプトを分類するためのラベルです。プロンプト一覧の「カテゴリ管理」から作成・編集・削除できます。カテゴリを削除しても、そこに属していたプロンプトは削除されず「未分類」になります(確認ダイアログで対象件数が表示されます)。カテゴリ名は自分のアカウント内で一意である必要があります。
           </p>
         </section>
 
-        <section id="prompts">
+        <section id="prompts" className="scroll-mt-6">
           <h2 className="mb-2 text-lg font-semibold">プロンプトの作成・編集</h2>
           <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
             プロンプト一覧の「+ 新規作成」からタイトル・カテゴリ・本文を入力して作成します。作成後はプロンプト詳細画面の「編集」タブでいつでも本文を書き換えられます。
@@ -64,14 +64,14 @@ export default async function HelpPage() {
           </p>
         </section>
 
-        <section id="versions">
+        <section id="versions" className="scroll-mt-6">
           <h2 className="mb-2 text-lg font-semibold">バージョン履歴</h2>
           <p className="text-sm text-zinc-700 dark:text-zinc-300">
             プロンプト詳細画面の「バージョン履歴」タブで、過去に保存したすべてのバージョンを新しい順に確認できます。各行をクリックすると、その時点の本文を読み取り専用で表示できます(そこから直接編集はできません。編集は常に最新バージョンに対して行います)。
           </p>
         </section>
 
-        <section id="execute">
+        <section id="execute" className="scroll-mt-6">
           <h2 className="mb-2 text-lg font-semibold">実行</h2>
           <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
             「実行」タブで、実行するバージョンとモデル(Claude Opus 5 / Sonnet 5 / Haiku 4.5)を選び、Claudeにプロンプトを送信できます。
@@ -91,14 +91,14 @@ export default async function HelpPage() {
           </p>
         </section>
 
-        <section id="history">
+        <section id="history" className="scroll-mt-6">
           <h2 className="mb-2 text-lg font-semibold">実行履歴</h2>
           <p className="text-sm text-zinc-700 dark:text-zinc-300">
             「実行履歴」タブで、これまでの実行結果を新しい順に確認できます。各行を開くと、結果本文(失敗した場合はエラー内容)、使用したバージョン、トークン数、実行時間が表示されます。
           </p>
         </section>
 
-        <section id="repositories">
+        <section id="repositories" className="scroll-mt-6">
           <h2 className="mb-2 text-lg font-semibold">リポジトリ連携</h2>
           <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
             「リポジトリ」ページから、自分のGitHubリポジトリを接続できます。「+ リポジトリを接続」を押すとGitHub上のリポジトリ一覧がモーダルで表示されるので、選んで接続します。プライベートリポジトリも接続できます(初回のみGitHub側で追加の権限承認が必要になる場合があります)。
@@ -108,7 +108,7 @@ export default async function HelpPage() {
           </p>
         </section>
 
-        <section id="review">
+        <section id="review" className="scroll-mt-6">
           <h2 className="mb-2 text-lg font-semibold">AIレビュー</h2>
           <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
             接続したリポジトリの詳細画面の「オープンなPR」タブから、レビューしたいPRを選び、使用するプロンプトを選んで「レビューを実行」を押すと、PRの差分をClaudeが解析して指摘事項を返します。
@@ -120,7 +120,7 @@ export default async function HelpPage() {
           </p>
         </section>
 
-        <section id="trends">
+        <section id="trends" className="scroll-mt-6">
           <h2 className="mb-2 text-lg font-semibold">レビュー履歴・傾向</h2>
           <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
             リポジトリ詳細画面の「レビュー履歴」タブで、過去に実行したレビューを新しい順に確認できます。各行を開くと、ファイルごとの指摘事項と重要度(CRITICAL / WARNING / INFO)を確認できます。
@@ -130,7 +130,7 @@ export default async function HelpPage() {
           </p>
         </section>
 
-        <section id="documents">
+        <section id="documents" className="scroll-mt-6">
           <h2 className="mb-2 text-lg font-semibold">ドキュメント</h2>
           <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
             「ドキュメント」ページから、設計書やメモをタイトル・本文で登録できます。本文はMarkdownの見出し(<code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">##</code>や<code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">###</code>)単位で自動的にチャンク分割され、それぞれに検索用の埋め込みベクトルが生成されます。
@@ -143,7 +143,7 @@ export default async function HelpPage() {
           </p>
         </section>
 
-        <section id="chat">
+        <section id="chat" className="scroll-mt-6">
           <h2 className="mb-2 text-lg font-semibold">RAG検索チャット</h2>
           <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
             「チャット」ページから、登録したドキュメントや過去のAIレビュー指摘について自然文で質問できます。質問に関連する内容をベクトル検索で探し、Claudeがその内容だけを根拠に回答します(文脈に無いことは推測で答えません)。回答の下に表示される出典から、元のレビュー詳細画面に遷移できます。
@@ -153,14 +153,14 @@ export default async function HelpPage() {
           </p>
         </section>
 
-        <section id="dashboard">
+        <section id="dashboard" className="scroll-mt-6">
           <h2 className="mb-2 text-lg font-semibold">ダッシュボード</h2>
           <p className="text-sm text-zinc-700 dark:text-zinc-300">
             「ダッシュボード」ページで、プロンプト数・接続リポジトリ数・累計レビュー指摘件数(重要度別)・登録ドキュメント数をまとめて確認できます。「チャットで質問する」「ドキュメントを管理」から各画面にすぐ移動できます。
           </p>
         </section>
 
-        <section id="appearance">
+        <section id="appearance" className="scroll-mt-6">
           <h2 className="mb-2 text-lg font-semibold">表示設定・エラーログ</h2>
           <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
             ヘッダー右側の太陽・月アイコンで、ライトモード/ダークモードを手動で切り替えられます。何も操作しなければお使いの端末の設定(OSのライト/ダークモード)に従います。選択内容はこの端末のブラウザに保存され、次回アクセス時も引き継がれます。
@@ -170,7 +170,7 @@ export default async function HelpPage() {
           </p>
         </section>
 
-        <section id="faq">
+        <section id="faq" className="scroll-mt-6">
           <h2 className="mb-4 text-lg font-semibold">よくある質問</h2>
           <div className="flex flex-col gap-4">
             <div>

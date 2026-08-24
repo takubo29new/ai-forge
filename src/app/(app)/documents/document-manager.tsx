@@ -5,6 +5,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useApiMutation } from "@/lib/use-api-mutation";
 import { Spinner } from "@/components/spinner";
 import { useToast } from "@/components/toast-provider";
+import { PageSizeSelect } from "@/components/page-size-select";
 
 type Document = {
   id: string;
@@ -28,10 +29,12 @@ export function DocumentManager({
   initialDocuments,
   initialLastSyncedAt,
   initialPendingEmbeddingCount,
+  currentLimit,
 }: {
   initialDocuments: Document[];
   initialLastSyncedAt: string | null;
   initialPendingEmbeddingCount: number;
+  currentLimit: number;
 }) {
   const [documents, setDocuments] = useState(initialDocuments);
   const [title, setTitle] = useState("");
@@ -231,9 +234,12 @@ export function DocumentManager({
       </section>
 
       <section>
-        <h2 className="mb-3 text-sm font-medium text-zinc-500">
-          登録済みドキュメント({documents.length}件)
-        </h2>
+        <div className="mb-3 flex items-end justify-between gap-3">
+          <h2 className="text-sm font-medium text-zinc-500">
+            登録済みドキュメント({documents.length}件)
+          </h2>
+          <PageSizeSelect current={currentLimit} />
+        </div>
         <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
           {documents.length === 0 && (
             <li className="px-4 py-6 text-center text-sm text-zinc-500">

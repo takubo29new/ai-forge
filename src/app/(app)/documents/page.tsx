@@ -2,7 +2,6 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/session";
 import { parsePageSize } from "@/lib/list-limits";
-import { PageSizeSelect } from "@/components/page-size-select";
 import { DocumentManager } from "./document-manager";
 
 export default async function DocumentsPage({
@@ -44,14 +43,11 @@ export default async function DocumentsPage({
       >
         ← ダッシュボードへ
       </Link>
-      <div className="mt-4 mb-6 flex items-end justify-between gap-3">
-        <div>
-          <h1 className="mb-2 text-xl font-semibold">ドキュメント</h1>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            登録したドキュメントはチャンクに分割され、埋め込みベクトルとして保存されます(RAG検索チャット「/chat」の検索対象)。
-          </p>
-        </div>
-        <PageSizeSelect current={limit} />
+      <div className="mt-4 mb-6">
+        <h1 className="mb-2 text-xl font-semibold">ドキュメント</h1>
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          登録したドキュメントはチャンクに分割され、埋め込みベクトルとして保存されます(RAG検索チャット「/chat」の検索対象)。
+        </p>
       </div>
       <DocumentManager
         initialDocuments={documents.map((d) => ({
@@ -63,6 +59,7 @@ export default async function DocumentsPage({
         }))}
         initialLastSyncedAt={lastSyncedDocument?.updatedAt.toISOString() ?? null}
         initialPendingEmbeddingCount={pendingEmbeddingCount}
+        currentLimit={limit}
       />
     </div>
   );
