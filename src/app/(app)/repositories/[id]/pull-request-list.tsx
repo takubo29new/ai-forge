@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useApiMutation } from "@/lib/use-api-mutation";
+import { Spinner } from "@/components/spinner";
 
 type PullRequest = {
   number: number;
@@ -99,8 +100,9 @@ export function PullRequestList({
                 <button
                   onClick={() => handleRun(pr)}
                   disabled={pending || !selectedPrompt?.usesDiff}
-                  className="rounded bg-foreground px-4 py-1.5 text-xs font-medium text-background disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded bg-foreground px-4 py-1.5 text-xs font-medium text-background disabled:opacity-50"
                 >
+                  {pending && <Spinner className="h-3.5 w-3.5" />}
                   {pending ? "実行中..." : "実行"}
                 </button>
               </div>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useApiMutation } from "@/lib/use-api-mutation";
+import { Spinner } from "@/components/spinner";
 
 type Document = {
   id: string;
@@ -132,8 +133,9 @@ export function DocumentManager({
         <button
           onClick={handleSync}
           disabled={sync.pending}
-          className="rounded border border-zinc-300 px-3 py-1.5 text-xs disabled:opacity-50 dark:border-zinc-700"
+          className="inline-flex items-center gap-1.5 rounded border border-zinc-300 px-3 py-1.5 text-xs disabled:opacity-50 dark:border-zinc-700"
         >
+          {sync.pending && <Spinner className="h-3.5 w-3.5" />}
           {sync.pending ? "同期中..." : "設計書を同期"}
         </button>
         {syncMessage && (
@@ -174,8 +176,9 @@ export function DocumentManager({
         <button
           type="submit"
           disabled={pending}
-          className="self-start rounded bg-foreground px-4 py-1.5 text-sm font-medium text-background disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 self-start rounded bg-foreground px-4 py-1.5 text-sm font-medium text-background disabled:opacity-50"
         >
+          {pending && <Spinner className="h-4 w-4" />}
           {pending ? "登録中..." : "登録"}
         </button>
       </form>
@@ -221,8 +224,9 @@ export function DocumentManager({
         <button
           onClick={handleBackfill}
           disabled={backfill.pending}
-          className="rounded border border-zinc-300 px-3 py-1.5 text-xs disabled:opacity-50 dark:border-zinc-700"
+          className="inline-flex items-center gap-1.5 rounded border border-zinc-300 px-3 py-1.5 text-xs disabled:opacity-50 dark:border-zinc-700"
         >
+          {backfill.pending && <Spinner className="h-3.5 w-3.5" />}
           {backfill.pending ? "処理中..." : "既存のレビュー指摘を取り込む"}
         </button>
         {backfillMessage && (

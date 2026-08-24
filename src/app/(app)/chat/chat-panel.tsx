@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Markdown } from "@/components/markdown";
 import { useApiMutation } from "@/lib/use-api-mutation";
+import { Spinner } from "@/components/spinner";
 
 type ChatSource =
   | { index: number; kind: "document_chunk"; label: string; documentId: string }
@@ -76,6 +77,15 @@ export function ChatPanel() {
             </div>
           </div>
         ))}
+        {pending && (
+          <div className="flex flex-col gap-2">
+            <p className="text-sm font-medium">Q. {question}</p>
+            <div className="flex items-center gap-2 rounded-lg border border-zinc-200 p-4 text-sm text-zinc-500 dark:border-zinc-800">
+              <Spinner className="h-4 w-4" />
+              回答を生成中...
+            </div>
+          </div>
+        )}
       </div>
 
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
@@ -91,8 +101,9 @@ export function ChatPanel() {
         <button
           type="submit"
           disabled={pending}
-          className="rounded bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-50"
         >
+          {pending && <Spinner className="h-4 w-4" />}
           {pending ? "考え中..." : "送信"}
         </button>
       </form>
