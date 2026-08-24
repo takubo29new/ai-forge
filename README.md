@@ -46,7 +46,7 @@ GitHubリポジトリを接続し、PRの差分をPhase 1のプロンプト資�
 
 - pgvector拡張を有効化し、`Document`/`DocumentChunk`/`ReviewCommentEmbedding`のスキーマを追加(HNSWインデックスでのコサイン類似検索)
 - ドキュメント取り込み(`/documents`。タイトル+本文を見出し単位でチャンク分割し、埋め込みを生成)
-- リポジトリファイル同期(`docs/*.md`・`README.md`・`ai-dev-tool-handoff.md`を自動取り込み。再同期で最新内容に作り直す)
+- ai-forge自身の設計書の自動同期(`docs/*.md`・`README.md`・`ai-dev-tool-handoff.md`を自動取り込み。再同期で最新内容に作り直す。他のGitHubリポジトリの同期は未対応)
 - 既存レビュー指摘の埋め込みバックフィル(新規レビューは自動、既存分は`/documents`の「既存のレビュー指摘を取り込む」ボタンから)
 - RAG検索チャット(`/chat`。ドキュメント・レビュー指摘を横断検索し、Claudeが出典付きで回答)
 
