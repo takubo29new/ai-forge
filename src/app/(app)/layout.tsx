@@ -1,5 +1,6 @@
 import { AppHeader } from "@/components/app-header";
 import { requireUserId } from "@/lib/session";
+import { ToastProvider } from "@/components/toast-provider";
 
 export default async function AppLayout({
   children,
@@ -9,9 +10,11 @@ export default async function AppLayout({
   await requireUserId();
 
   return (
-    <div className="flex flex-1 flex-col">
-      <AppHeader />
-      {children}
-    </div>
+    <ToastProvider>
+      <div className="flex flex-1 flex-col">
+        <AppHeader />
+        {children}
+      </div>
+    </ToastProvider>
   );
 }

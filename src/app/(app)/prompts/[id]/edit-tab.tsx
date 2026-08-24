@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useApiMutation } from "@/lib/use-api-mutation";
+import { useToast } from "@/components/toast-provider";
 
 type Category = { id: string; name: string };
 
@@ -29,6 +30,7 @@ export function EditTab({
   const [note, setNote] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const { mutate, pending, error, setError } = useApiMutation();
+  const { showToast } = useToast();
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -40,6 +42,7 @@ export function EditTab({
     if (!data) return;
     setNote("");
     router.refresh();
+    showToast("新しいバージョンとして保存しました");
   }
 
   async function handleDelete() {
@@ -51,6 +54,7 @@ export function EditTab({
     if (result === null) return;
     setConfirmDelete(false);
     router.push("/prompts");
+    showToast("プロンプトを削除しました");
   }
 
   return (

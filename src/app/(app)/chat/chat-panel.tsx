@@ -21,11 +21,16 @@ type ChatResponse = { answer: string; sources: ChatSource[] };
 export function ChatPanel() {
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [question, setQuestion] = useState("");
+  // 送信中に表示する質問文。inputはすぐ空にしたいので、表示用に別途保持する。
+  const [pendingQuestion, setPendingQuestion] = useState("");
   const { mutate, pending, error } = useApiMutation();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const submitted = question;
+    const submitted = question.trim();
+    if (!submitted) return;
+    setQuestion("");
+    setPendingQuestion(submitted);
     const data = await mutate<ChatResponse>(
       "/api/chat",
       { method: "POST", body: { question: submitted } },
@@ -36,7 +41,14 @@ export function ChatPanel() {
       ...prev,
       { question: submitted, answer: data.answer, sources: data.sources },
     ]);
-    setQuestion("");
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    // Enterで送信、Shift+Enterで改行(一般的なチャット入力の操作感に合わせる)。
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      e.currentTarget.form?.requestSubmit();
+    }
   }
 
   return (
@@ -79,7 +91,7 @@ export function ChatPanel() {
         ))}
         {pending && (
           <div className="flex flex-col gap-2">
-            <p className="text-sm font-medium">Q. {question}</p>
+            <p className="text-sm font-medium">Q. {pendingQuestion}</p>
             <div className="flex items-center gap-2 rounded-lg border border-zinc-200 p-4 text-sm text-zinc-500 dark:border-zinc-800">
               <Spinner className="h-4 w-4" />
               回答を生成中...
@@ -90,18 +102,20 @@ export function ChatPanel() {
 
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
-      <form onSubmit={handleSubmit} className="flex gap-2">
-        <input
+      <form onSubmit={handleSubmit} className="flex items-end gap-2">
+        <textarea
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
+          onKeyDown={handleKeyDown}
           required
-          placeholder="質問を入力"
-          className="flex-1 rounded border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          rows={2}
+          placeholder="質問を入力(Enterで送信、Shift+Enterで改行)"
+          className="flex-1 resize-none rounded border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
         />
         <button
           type="submit"
           disabled={pending}
-          className="inline-flex items-center gap-1.5 rounded bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 self-stretch rounded bg-foreground px-4 text-sm font-medium text-background disabled:opacity-50"
         >
           {pending && <Spinner className="h-4 w-4" />}
           {pending ? "考え中..." : "送信"}
