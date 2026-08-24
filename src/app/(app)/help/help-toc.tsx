@@ -30,6 +30,19 @@ export function HelpToc({ sections }: { sections: Section[] }) {
     return () => observer.disconnect();
   }, [sections]);
 
+  // クリック時はブラウザのネイティブなアンカー遷移(+IntersectionObserverによる
+  // ハイライト更新)に任せず、対象セクションへ直接scrollIntoWindowし、ハイライトも
+  // 即座に切り替える。スムーズスクロール中に他の見出しが観測範囲を通過して
+  // ハイライトが横取りされたり、遷移先がずれて見えたりするのを防ぐため。
+  function handleClick(e: React.MouseEvent<HTMLAnchorElement>, id: string) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    e.preventDefault();
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    history.pushState(null, "", `#${id}`);
+    setActiveId(id);
+  }
+
   return (
     <nav className="flex gap-1 overflow-x-auto md:sticky md:top-6 md:flex-col md:gap-0.5 md:overflow-visible">
       <p className="hidden text-xs font-medium text-zinc-500 md:mb-2 md:block">
@@ -39,6 +52,7 @@ export function HelpToc({ sections }: { sections: Section[] }) {
         <a
           key={s.id}
           href={`#${s.id}`}
+          onClick={(e) => handleClick(e, s.id)}
           className={`shrink-0 rounded px-2.5 py-1.5 text-sm whitespace-nowrap md:whitespace-normal ${
             activeId === s.id
               ? "bg-zinc-100 font-medium text-foreground dark:bg-zinc-800"
