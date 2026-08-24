@@ -133,13 +133,15 @@ CIでは両方とも実行される。詳細は[`docs/quality-improvements.md`](
 
 ## 本番デプロイ(Vercel)
 
-Vercelへのデプロイを想定した構成になっている。
+Vercelへのデプロイを想定した構成になっている(実際にv1.0.0をVercelにデプロイして動作確認済み)。
 
-1. **Postgres(pgvector対応)を用意する**: Vercel PostgresはNeonベースでpgvector拡張に対応している。Vercelのダッシュボードでプロジェクトを作成する際に併せてプロビジョニングできる
+1. **Postgres(pgvector対応)を用意する**: Vercelの「Storage」タブに専用のPostgresが無い場合は、「Integrations」(Marketplace)タブで「Prisma Postgres」または「Neon」を探して接続する。いずれもpgvector拡張に対応している
+   - このプロジェクトは`@prisma/adapter-pg`(直接TCP接続のドライバーアダプタ)を使っているため、`DATABASE_URL`には**直接接続の文字列**(`postgres://...`)が必要。Accelerateやプーリング用の`prisma+postgres://`・`prisma://`形式は使えない
 2. **本番用GitHub OAuth Appを用意する**: [GitHub OAuth App](https://github.com/settings/applications/new)を新規作成(ローカル開発用とは別に用意する)。Authorization callback URLはVercelのデプロイURL(例: `https://your-app.vercel.app/api/auth/callback/github`)を指定する
 3. **VercelでGitHubリポジトリをインポート**し、以下の環境変数を設定する(`.env.example`参照。値はすべて本番用に新規発行し、ローカルの`.env`とは分ける):
    `DATABASE_URL` / `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` / `NEXTAUTH_SECRET` / `NEXTAUTH_URL`(本番ドメイン) / `ANTHROPIC_API_KEY` / `VOYAGE_API_KEY` / `TOKEN_ENCRYPTION_KEY`
-4. デプロイを実行する。ビルドコマンドは[`vercel.json`](./vercel.json)で`prisma migrate deploy && next build`に設定済みのため、デプロイのたびにDBマイグレーションが自動適用される(初回はpgvector拡張の有効化・HNSWインデックス作成を含む)
+   - **`DATABASE_URL`は「Sensitive」にしないこと**。Sensitiveな環境変数はFunctionの実行時にしか渡されず、ビルド時に実行される`prisma migrate deploy`から見えなくなり`Connection url is empty`エラーになる。他の変数(ビルド時に使わないもの)はSensitiveのままで問題ない
+4. デプロイを実行する。ビルドコマンドは[`vercel.json`](./vercel.json)で`prisma migrate deploy && next build`に設定済みのため、デプロイのたびにDBマイグレーションが自動適用される(初回はpgvector拡張の有効化・HNSWインデックス作成を含む)。`ignoreCommand`により、`main`以外のブランチへのpushではビルド自体をスキップする(Previewデプロイを作らない)設定にしている
 
 ## ブランチ運用
 
