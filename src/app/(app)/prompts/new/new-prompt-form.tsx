@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useApiMutation } from "@/lib/use-api-mutation";
+import { useToast } from "@/components/toast-provider";
 
 type Category = { id: string; name: string };
 
@@ -12,6 +13,7 @@ export function NewPromptForm({ categories }: { categories: Category[] }) {
   const [categoryId, setCategoryId] = useState("");
   const [content, setContent] = useState("");
   const { mutate, pending, error } = useApiMutation();
+  const { showToast } = useToast();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -22,6 +24,7 @@ export function NewPromptForm({ categories }: { categories: Category[] }) {
     );
     if (!data) return;
     router.push(`/prompts/${data.id}`);
+    showToast("プロンプトを作成しました");
   }
 
   return (

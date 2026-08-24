@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useApiMutation } from "@/lib/use-api-mutation";
 import { Spinner } from "@/components/spinner";
+import { useToast } from "@/components/toast-provider";
 
 type Document = {
   id: string;
@@ -37,6 +38,7 @@ export function DocumentManager({
   const [content, setContent] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Document | null>(null);
   const { mutate, pending, error, setError } = useApiMutation();
+  const { showToast } = useToast();
 
   const backfill = useApiMutation();
   const [pendingEmbeddingCount, setPendingEmbeddingCount] = useState(
@@ -75,9 +77,11 @@ export function DocumentManager({
         })),
       );
     }
+    showToast(`設計書を同期しました(${data.syncedDocuments}件)`);
   }
 
   async function handleBackfill() {
+    let totalProcessed = 0;
     for (;;) {
       const data = await backfill.mutate<{ processed: number; remaining: boolean }>(
         "/api/review-comments/backfill-embeddings",
@@ -85,9 +89,11 @@ export function DocumentManager({
         "埋め込みの更新に失敗しました",
       );
       if (!data) return;
+      totalProcessed += data.processed;
       setPendingEmbeddingCount((prev) => Math.max(0, prev - data.processed));
       if (!data.remaining) break;
     }
+    showToast(`レビュー指摘の埋め込みを${totalProcessed}件取り込みました`);
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -110,6 +116,7 @@ export function DocumentManager({
     ]);
     setTitle("");
     setContent("");
+    showToast("ドキュメントを登録しました");
   }
 
   async function handleDelete() {
@@ -124,6 +131,7 @@ export function DocumentManager({
     if (result === null) return;
     setDocuments((prev) => prev.filter((d) => d.id !== target.id));
     setDeleteTarget(null);
+    showToast("ドキュメントを削除しました");
   }
 
   return (
