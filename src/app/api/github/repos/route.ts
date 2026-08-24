@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getGitHubClient } from "@/lib/github";
+import { logError } from "@/lib/error-log";
 
 export async function GET() {
   const session = await auth();
@@ -41,7 +42,15 @@ export async function GET() {
       }));
 
     return NextResponse.json(repos);
-  } catch {
+  } catch (error) {
+    await logError({
+      source: "SERVER",
+      message: `GitHubリポジトリ一覧の取得に失敗しました: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      path: "/api/github/repos",
+      userId: session.user.id,
+    });
     return NextResponse.json(
       {
         error:
