@@ -6,6 +6,7 @@ import { AVAILABLE_MODELS, DEFAULT_MODEL } from "@/lib/models";
 import { extractVariableNames } from "@/lib/prompt-variables";
 import { Markdown } from "@/components/markdown";
 import { useApiMutation } from "@/lib/use-api-mutation";
+import { Spinner } from "@/components/spinner";
 
 type Version = { id: string; versionNumber: number; content: string };
 
@@ -124,8 +125,9 @@ export function ExecuteTab({
       <button
         type="submit"
         disabled={pending}
-        className="self-start rounded-full bg-foreground px-6 py-2 text-sm font-medium text-background disabled:opacity-50"
+        className="inline-flex items-center gap-2 self-start rounded-full bg-foreground px-6 py-2 text-sm font-medium text-background disabled:opacity-50"
       >
+        {pending && <Spinner className="h-4 w-4" />}
         {pending ? "実行中..." : "実行"}
       </button>
 
