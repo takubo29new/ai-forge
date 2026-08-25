@@ -55,6 +55,25 @@ GitHubリポジトリを接続し、PRの差分をPhase 1のプロンプト資�
 
 画面遷移・DB設計・実装状況は [`docs/phase3-design.md`](./docs/phase3-design.md) を参照。
 
+### Phase 4: 統合基盤の強化(RAG検索対象の拡張)
+
+Phase 1〜3を「別々の機能」から「データを掛け合わせて初めて作れる機能」へ発展させる4項目のうち、項目1を実装済み。
+
+- `PromptVersion`(プロンプト本文)・`Execution`(レビュー由来を除くプロンプト実行結果)を`PromptVersionEmbedding`/`ExecutionEmbedding`として埋め込み、`/chat`の検索対象に追加
+- 既存データの一括埋め込み(バックフィル)API・`/documents`ページのボタン
+
+プロジェクト単位のドキュメント管理・レビュー指摘蓄積からのプロンプト改善提案・チャットからの直接アクション実行は設計のみで未着手。設計・実装状況は [`docs/phase4-design.md`](./docs/phase4-design.md) を参照。
+
+### Phase 5: 汎用AI評価ツール(画像評価プロトタイプ)
+
+コードレビューに限らず、画像・テキストなど他の入力形式を評価する汎用AI評価ツールへの拡張。「実装方針(段階的ロールアウト)」の1段階目として画像評価を実装済み。
+
+- `Evaluation`/`EvaluationFinding`をReviewとは独立したモデルとして追加(コード専用のReviewを無理に汎用化しない設計判断)
+- `/evaluations`から画像+プロンプトを送信し、Claude Visionで評価・観点別コメント(トーン・スコア)を取得
+- 画像はDB/ストレージに永続化せず、リクエスト内でClaudeに渡すのみ
+
+テキスト評価・画像の永続化・バックグラウンド処理・共有リンクは設計のみで未着手。設計・実装状況は [`docs/phase5-design.md`](./docs/phase5-design.md) を参照。
+
 ## 技術スタック
 
 | 領域 | 技術 |

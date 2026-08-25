@@ -1,6 +1,6 @@
 # DB設計
 
-Phase 1(プロンプト管理ツール)・Phase 2(AIコードレビューツール)・Phase 3(RAG検索チャットボット、ドキュメント取り込みまで)・Phase 4項目1(RAG検索対象の拡張)に必要なテーブル構成。スキーマの実体は [`prisma/schema.prisma`](../prisma/schema.prisma)。ORMはPrisma。詳細は[`phase3-design.md`](./phase3-design.md)・[`phase4-design.md`](./phase4-design.md)を参照。
+Phase 1(プロンプト管理ツール)・Phase 2(AIコードレビューツール)・Phase 3(RAG検索チャットボット、ドキュメント取り込みまで)・Phase 4項目1(RAG検索対象の拡張)・Phase 5(汎用AI評価ツール、画像評価プロトタイプ)に必要なテーブル構成。スキーマの実体は [`prisma/schema.prisma`](../prisma/schema.prisma)。ORMはPrisma。詳細は[`phase3-design.md`](./phase3-design.md)・[`phase4-design.md`](./phase4-design.md)・[`phase5-design.md`](./phase5-design.md)を参照。
 
 ## テーブル一覧
 
@@ -47,6 +47,13 @@ pgvector拡張(`vector`、0.8.6)をここで初めて有効化した。詳細は
 - `PromptVersionEmbedding` — `PromptVersion.content`に対する埋め込みを1:1で追加する別テーブル(`ReviewCommentEmbedding`と同じパターン)。新しいバージョンが保存されるたびに生成し、過去バージョンは差し替えない
 - `ExecutionEmbedding` — `Execution.resultText`に対する埋め込みを1:1で追加する別テーブル。`reviewId`が無い(Phase 2のレビュー実行ではない)`SUCCESS`な実行のみを対象とする。レビュー由来の`resultText`は既に`ReviewComment`として個別に埋め込み済みのため、重複を避けてあえて対象外にしている
 
+### 汎用AI評価ドメイン(Phase 5)
+
+コードレビュー(`Review`)とは意図的に分離した並行の概念。詳細は[`phase5-design.md`](./phase5-design.md)を参照。
+
+- `Evaluation` — 1回のAI評価の実行単位。`Review`と同じ構造(`promptVersionId`は`onDelete: Restrict`、`executionId`は`onDelete: SetNull`)で、どのプロンプト・入力形式に対するものかを記録する
+- `EvaluationFinding` — AI評価が返した観点別コメント(ラベル・トーン・スコア・本文)。`ReviewComment`のコード非依存版
+
 ## 設計上の判断
 
 - **本文をPromptではなくPromptVersionに持たせた理由**: 「実行履歴・バージョン管理(過去の実行結果とプロンプトの変更履歴を保存)」という要件上、"どのバージョンで何を実行したか"を後から正確に辿れる必要があるため、Prompt本体には本文を持たせず、常にバージョン行を経由する設計にした。最新版の判定は`versionNumber`の最大値、または`createdAt`降順で取得する。
@@ -85,6 +92,11 @@ pgvector拡張(`vector`、0.8.6)をここで初めて有効化した。詳細は
 
 - **`PromptVersionEmbedding`/`ExecutionEmbedding`も`ReviewCommentEmbedding`と同じ1:1別テーブルパターンを踏襲**: 埋め込み対象が増えるたびに本体テーブルへ埋め込み列を追加していくのではなく、既存パターンを繰り返すことで「埋め込みは`Unsupported`型の別テーブル、読み書きは`$queryRaw`/`$executeRaw`」という設計を一貫させている
 - **`prisma migrate dev`で生成した差分をそのまま使わず手で修正した**: `Unsupported`型の列に手動追加したHNSWインデックス(`DocumentChunk`・`ReviewCommentEmbedding`)は`schema.prisma`上で宣言されていないため、Prismaのスキーマ差分検出はこれらを「消えたもの」と誤認識し、生成された`migration.sql`には既存インデックスへの`DROP INDEX`が含まれていた。これをそのまま適用すると本番の類似検索インデックスを消してしまうため、`DROP INDEX`を取り除き、新規2テーブル分の`CREATE INDEX ... USING hnsw`を`20260823224800_add_phase3_rag_schema`と同じ形で手動追加した。`Unsupported`型の列を含むテーブルに対して`prisma migrate dev`を実行するときは、生成された差分に想定外の`DROP INDEX`が無いか必ず確認する必要がある
+
+### Phase 5の設計判断
+
+- **`Evaluation`/`EvaluationFinding`は`Review`/`ReviewComment`を汎用化せず新設した**: `Review`はコード固有のフィールド(`filePath`・`line`)を持ち、既存のリポジトリ「傾向」タブ・RAG出典表示と深く統合されている。無理に汎用化して両方の呼び出し元を分岐だらけにするより、同じFKパターン(`promptVersionId`は`Restrict`、`executionId`は`SetNull`)を踏襲した並行モデルとして新設するほうが、既存機能への影響もレビューの負担も小さいと判断した。理由の詳細は[`phase5-design.md`](./phase5-design.md)を参照
+- **`Evaluation`に画像そのものを保持する列は無い**: 画像はリクエスト内でClaudeに渡すのみでDB/ストレージに永続化しない設計のため(理由は[`phase5-design.md`](./phase5-design.md)「画像の扱い: 保存しない方針」を参照)。結果のテキスト(`EvaluationFinding`・`Execution.resultText`)のみを保存する
 
 ## DB環境構築
 
