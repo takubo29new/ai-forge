@@ -1,6 +1,6 @@
 # DB設計
 
-Phase 1(プロンプト管理ツール)・Phase 2(AIコードレビューツール)・Phase 3(RAG検索チャットボット、ドキュメント取り込みまで)に必要なテーブル構成。スキーマの実体は [`prisma/schema.prisma`](../prisma/schema.prisma)。ORMはPrisma。詳細は[`phase3-design.md`](./phase3-design.md)を参照。
+Phase 1(プロンプト管理ツール)・Phase 2(AIコードレビューツール)・Phase 3(RAG検索チャットボット、ドキュメント取り込みまで)・Phase 4項目1(RAG検索対象の拡張)に必要なテーブル構成。スキーマの実体は [`prisma/schema.prisma`](../prisma/schema.prisma)。ORMはPrisma。詳細は[`phase3-design.md`](./phase3-design.md)・[`phase4-design.md`](./phase4-design.md)を参照。
 
 ## テーブル一覧
 
@@ -38,7 +38,14 @@ pgvector拡張(`vector`、0.8.6)をここで初めて有効化した。詳細は
 
 - `Document` — 取り込んだドキュメント本体(手動貼り付け、またはリポジトリファイル同期)
 - `DocumentChunk` — `Document`を見出し単位で分割した1チャンク。埋め込みベクトル(`vector(1024)`)を持つ
-- `ReviewCommentEmbedding` — `ReviewComment`に対する埋め込みを1:1で追加する別テーブル(未着手。既存指摘へのバックフィルが必要)
+- `ReviewCommentEmbedding` — `ReviewComment`に対する埋め込みを1:1で追加する別テーブル
+
+### RAG検索対象の拡張(Phase 4項目1)
+
+`Document`・`ReviewComment`に続き、Phase 1の資産(`PromptVersion`・`Execution`)もRAG検索チャット(`/chat`)の検索対象にする。詳細は[`phase4-design.md`](./phase4-design.md)を参照。
+
+- `PromptVersionEmbedding` — `PromptVersion.content`に対する埋め込みを1:1で追加する別テーブル(`ReviewCommentEmbedding`と同じパターン)。新しいバージョンが保存されるたびに生成し、過去バージョンは差し替えない
+- `ExecutionEmbedding` — `Execution.resultText`に対する埋め込みを1:1で追加する別テーブル。`reviewId`が無い(Phase 2のレビュー実行ではない)`SUCCESS`な実行のみを対象とする。レビュー由来の`resultText`は既に`ReviewComment`として個別に埋め込み済みのため、重複を避けてあえて対象外にしている
 
 ## 設計上の判断
 
@@ -73,6 +80,11 @@ pgvector拡張(`vector`、0.8.6)をここで初めて有効化した。詳細は
 - **RAG検索チャット(`/chat`)のAI呼び出しはExecutionを経由しない**: Phase 1・2のAI呼び出しは`Execution`(`promptVersionId`必須)を通すが、チャットの質問はユーザーが管理する`PromptVersion`ではなくシステム側が組み立てるプロンプトのため、この枠組みには馴染まない。無理に`Execution`へ合わせず、`src/app/api/chat/route.ts`で直接Claudeを呼び出す設計にした
 - **リポジトリファイル同期はユーザー入力のパスを受け付けない**: `POST /api/documents/sync`は`docs/*.md`・`README.md`・`ai-dev-tool-handoff.md`という固定の対象一覧のみを読み込む。任意のファイルパスをリクエストで受け取る設計にするとパストラバーサルの懸念があるため、あえて動的な指定を許可していない
 - **リポジトリファイル同期は差分検出をせず全置き換え**: 再同期のたびに、同じ`sourcePath`の`Document`を削除してから作り直す。差分(変更されたファイルだけを更新)を検出する実装は複雑さの割にメリットが薄いと判断した(単一ユーザーのポートフォリオ用途では、対象ファイルの総チャンク数がVoyage AIの1回のバッチ呼び出しに収まる規模のため)
+
+### Phase 4(項目1)の設計判断
+
+- **`PromptVersionEmbedding`/`ExecutionEmbedding`も`ReviewCommentEmbedding`と同じ1:1別テーブルパターンを踏襲**: 埋め込み対象が増えるたびに本体テーブルへ埋め込み列を追加していくのではなく、既存パターンを繰り返すことで「埋め込みは`Unsupported`型の別テーブル、読み書きは`$queryRaw`/`$executeRaw`」という設計を一貫させている
+- **`prisma migrate dev`で生成した差分をそのまま使わず手で修正した**: `Unsupported`型の列に手動追加したHNSWインデックス(`DocumentChunk`・`ReviewCommentEmbedding`)は`schema.prisma`上で宣言されていないため、Prismaのスキーマ差分検出はこれらを「消えたもの」と誤認識し、生成された`migration.sql`には既存インデックスへの`DROP INDEX`が含まれていた。これをそのまま適用すると本番の類似検索インデックスを消してしまうため、`DROP INDEX`を取り除き、新規2テーブル分の`CREATE INDEX ... USING hnsw`を`20260823224800_add_phase3_rag_schema`と同じ形で手動追加した。`Unsupported`型の列を含むテーブルに対して`prisma migrate dev`を実行するときは、生成された差分に想定外の`DROP INDEX`が無いか必ず確認する必要がある
 
 ## DB環境構築
 

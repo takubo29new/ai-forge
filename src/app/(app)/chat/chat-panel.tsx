@@ -5,18 +5,17 @@ import Link from "next/link";
 import { Markdown } from "@/components/markdown";
 import { useApiMutation } from "@/lib/use-api-mutation";
 import { Spinner } from "@/components/spinner";
+import type { ChatSource } from "@/lib/chat-context";
 
-type ChatSource =
-  | { index: number; kind: "document_chunk"; label: string; documentId: string }
-  | { index: number; kind: "review_comment"; label: string; reviewId: string };
+type IndexedChatSource = { index: number } & ChatSource;
 
 type ChatTurn = {
   question: string;
   answer: string;
-  sources: ChatSource[];
+  sources: IndexedChatSource[];
 };
 
-type ChatResponse = { answer: string; sources: ChatSource[] };
+type ChatResponse = { answer: string; sources: IndexedChatSource[] };
 
 export function ChatPanel() {
   const [turns, setTurns] = useState<ChatTurn[]>([]);
@@ -74,6 +73,13 @@ export function ChatPanel() {
                         {source.kind === "review_comment" ? (
                           <Link
                             href={`/reviews/${source.reviewId}`}
+                            className="hover:underline"
+                          >
+                            {source.label}
+                          </Link>
+                        ) : source.kind === "prompt_version" || source.kind === "execution" ? (
+                          <Link
+                            href={`/prompts/${source.promptId}`}
                             className="hover:underline"
                           >
                             {source.label}

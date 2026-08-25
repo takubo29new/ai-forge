@@ -3,7 +3,12 @@ import { auth } from "@/auth";
 import { anthropic } from "@/lib/anthropic";
 import { DEFAULT_MODEL } from "@/lib/models";
 import { embedQuery } from "@/lib/voyage";
-import { searchDocumentChunks, searchReviewComments } from "@/lib/embeddings";
+import {
+  searchDocumentChunks,
+  searchExecutions,
+  searchPromptVersions,
+  searchReviewComments,
+} from "@/lib/embeddings";
 import { buildChatContext, renderContextForPrompt } from "@/lib/chat-context";
 import { checkChatRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { voyageErrorResponse } from "@/lib/voyage-error-response";
@@ -41,12 +46,17 @@ export async function POST(request: Request) {
     return voyageErrorResponse(error, { path: "/api/chat", userId });
   }
 
-  const [docHits, reviewHits] = await Promise.all([
+  const [docHits, reviewHits, promptVersionHits, executionHits] = await Promise.all([
     searchDocumentChunks(userId, queryEmbedding, SEARCH_LIMIT_PER_SOURCE),
     searchReviewComments(userId, queryEmbedding, SEARCH_LIMIT_PER_SOURCE),
+    searchPromptVersions(userId, queryEmbedding, SEARCH_LIMIT_PER_SOURCE),
+    searchExecutions(userId, queryEmbedding, SEARCH_LIMIT_PER_SOURCE),
   ]);
 
-  const contextEntries = buildChatContext([...docHits, ...reviewHits], CONTEXT_LIMIT);
+  const contextEntries = buildChatContext(
+    [...docHits, ...reviewHits, ...promptVersionHits, ...executionHits],
+    CONTEXT_LIMIT,
+  );
 
   if (contextEntries.length === 0) {
     return NextResponse.json({

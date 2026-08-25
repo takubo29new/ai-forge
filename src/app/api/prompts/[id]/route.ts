@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { embedDocuments } from "@/lib/voyage";
+import { setPromptVersionEmbedding } from "@/lib/embeddings";
+import { logError } from "@/lib/error-log";
 
 export async function GET(
   _request: Request,
@@ -92,6 +95,8 @@ export async function PATCH(
     );
   }
 
+  let createdVersionId: string | undefined;
+
   const prompt = await prisma.$transaction(async (tx) => {
     if (Object.keys(data).length > 0) {
       await tx.prompt.update({ where: { id }, data });
@@ -102,7 +107,7 @@ export async function PATCH(
         where: { promptId: id },
         orderBy: { versionNumber: "desc" },
       });
-      await tx.promptVersion.create({
+      const created = await tx.promptVersion.create({
         data: {
           promptId: id,
           versionNumber: (latest?.versionNumber ?? 0) + 1,
@@ -110,6 +115,7 @@ export async function PATCH(
           note,
         },
       });
+      createdVersionId = created.id;
     }
 
     return tx.prompt.findUniqueOrThrow({
@@ -120,6 +126,26 @@ export async function PATCH(
       },
     });
   });
+
+  // 新バージョンの埋め込み生成はRAG検索チャットの検索対象を増やすための副次的な処理であり、
+  // 失敗してもプロンプト保存自体は既に成功しているため、ベストエフォートで行う
+  // (ReviewCommentの埋め込み生成と同じ方針。docs/db-design.md参照)。埋め込みが無い
+  // バージョンは/api/prompt-versions/backfill-embeddingsで後から埋められる。
+  if (createdVersionId !== undefined && content !== undefined) {
+    try {
+      const [embedding] = await embedDocuments([content]);
+      await setPromptVersionEmbedding(createdVersionId, embedding);
+    } catch (error) {
+      await logError({
+        source: "SERVER",
+        message: `PromptVersionの埋め込み生成に失敗しました: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        path: `/api/prompts/${id}`,
+        userId: session.user.id,
+      });
+    }
+  }
 
   return NextResponse.json(prompt);
 }

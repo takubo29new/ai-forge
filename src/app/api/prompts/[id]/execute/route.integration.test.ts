@@ -4,9 +4,14 @@ vi.mock("@/auth", () => ({ auth: vi.fn() }));
 vi.mock("@/lib/anthropic", () => ({
   anthropic: { messages: { create: vi.fn() } },
 }));
+vi.mock("@/lib/voyage", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/voyage")>()),
+  embedDocuments: vi.fn(),
+}));
 
 import { auth } from "@/auth";
 import { anthropic } from "@/lib/anthropic";
+import { embedDocuments } from "@/lib/voyage";
 import { prisma } from "@/lib/prisma";
 import { POST } from "./route";
 import {
@@ -22,6 +27,11 @@ const mockAuth = vi.mocked(auth) as unknown as Mock<
   () => Promise<{ user: { id: string } } | null>
 >;
 const mockCreate = vi.mocked(anthropic.messages.create);
+const mockEmbedDocuments = vi.mocked(embedDocuments);
+
+function fakeEmbedding(seed: number) {
+  return Array.from({ length: 1024 }, (_, i) => (i === 0 ? seed : 0));
+}
 
 function request(body: unknown) {
   return new Request("http://localhost/api/prompts/x/execute", {
@@ -46,6 +56,7 @@ describe("POST /api/prompts/:id/execute", () => {
 
     mockAuth.mockReset();
     mockCreate.mockReset();
+    mockEmbedDocuments.mockReset();
   });
 
   afterEach(async () => {
@@ -79,6 +90,7 @@ describe("POST /api/prompts/:id/execute", () => {
       content: [{ type: "text", text: "こんにちは、太郎さん" }],
       usage: { input_tokens: 10, output_tokens: 5 },
     } as never);
+    mockEmbedDocuments.mockResolvedValue([fakeEmbedding(1)]);
 
     const res = await POST(
       request({ variables: { name: "太郎" } }),
@@ -94,6 +106,33 @@ describe("POST /api/prompts/:id/execute", () => {
       where: { id: body.id },
     });
     expect(execution?.status).toBe("SUCCESS");
+
+    // reviewを伴わないSUCCESS実行のため、埋め込みが生成されるはず
+    // (docs/phase4-design.md参照)。
+    expect(mockEmbedDocuments).toHaveBeenCalledWith(["こんにちは、太郎さん"]);
+    const embedded = await prisma.$queryRaw<{ count: bigint }[]>`
+      SELECT COUNT(*)::int AS count FROM "ExecutionEmbedding"
+      WHERE "executionId" = ${body.id}
+    `;
+    expect(Number(embedded[0].count)).toBe(1);
+  });
+
+  it("埋め込み生成が失敗しても実行結果自体は201のまま返す(ベストエフォート)", async () => {
+    mockAuth.mockResolvedValue({ user: { id: userId } } as never);
+    mockCreate.mockResolvedValue({
+      content: [{ type: "text", text: "こんにちは、太郎さん" }],
+      usage: { input_tokens: 10, output_tokens: 5 },
+    } as never);
+    mockEmbedDocuments.mockRejectedValue(new Error("voyage boom"));
+
+    const res = await POST(
+      request({ variables: { name: "太郎" } }),
+      ctx(promptId),
+    );
+    expect(res.status).toBe(201);
+
+    const body = await res.json();
+    expect(body.status).toBe("SUCCESS");
   });
 
   it("AI呼び出し失敗時はExecutionをFAILEDで作成し200を返す(201にしない)", async () => {
