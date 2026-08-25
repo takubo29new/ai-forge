@@ -22,6 +22,12 @@ function isImageMediaType(value: string): value is ImageMediaType {
   return (ALLOWED_IMAGE_MEDIA_TYPES as readonly string[]).includes(value);
 }
 
+// クライアント側(evaluation-manager.tsxのMAX_IMAGE_BYTES)と同じ5MB上限を
+// サーバー側でも検証する。base64は3バイトを4文字にエンコードするため、
+// 上限バイト数から最大文字数を逆算する。
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_IMAGE_BASE64_LENGTH = Math.ceil(MAX_IMAGE_BYTES / 3) * 4;
+
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) {
@@ -62,6 +68,12 @@ export async function POST(request: Request) {
   if (!isImageMediaType(imageMediaType)) {
     return NextResponse.json(
       { error: "対応していない画像形式です(jpeg/png/gif/webpのみ)" },
+      { status: 400 },
+    );
+  }
+  if (imageBase64.length > MAX_IMAGE_BASE64_LENGTH) {
+    return NextResponse.json(
+      { error: "画像サイズが大きすぎます(5MB以下にしてください)" },
       { status: 400 },
     );
   }

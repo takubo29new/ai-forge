@@ -70,6 +70,12 @@ export default async function EvaluationDetailPage({
         )}
       </div>
 
+      {evaluation.status === "PENDING" && (
+        <p className="rounded-lg border border-zinc-200 px-4 py-3 text-sm text-zinc-500 dark:border-zinc-800">
+          処理中です。しばらくしてから再度確認してください。
+        </p>
+      )}
+
       {evaluation.status === "FAILED" && (
         <p className="rounded-lg border border-red-200 px-4 py-3 text-sm text-red-600 dark:border-red-900 dark:text-red-400">
           {evaluation.execution?.errorMessage ?? "評価の実行に失敗しました"}

@@ -61,12 +61,17 @@ export function EvaluationManager({
   const [promptId, setPromptId] = useState(prompts[0]?.id ?? "");
   const [file, setFile] = useState<File | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Evaluation | null>(null);
+  const [reading, setReading] = useState(false);
   const { mutate, pending, error, setError } = useApiMutation();
   const del = useApiMutation();
   const { showToast } = useToast();
+  // pendingはmutate()呼び出し以降しかtrueにならないため、それより前段の
+  // ファイル読み込み中もあわせてガードしないと二重送信を防げない。
+  const busy = pending || reading;
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
+    if (busy) return;
     if (!file) {
       setError("画像を選択してください");
       return;
@@ -76,13 +81,16 @@ export function EvaluationManager({
       return;
     }
 
+    setReading(true);
     let imageBase64: string;
     try {
       imageBase64 = await readFileAsBase64(file);
     } catch {
       setError("画像の読み込みに失敗しました");
+      setReading(false);
       return;
     }
+    setReading(false);
 
     const data = await mutate<{ id: string }>(
       "/api/evaluations",
@@ -162,11 +170,11 @@ export function EvaluationManager({
           </div>
           <button
             type="submit"
-            disabled={pending}
+            disabled={busy}
             className="inline-flex items-center gap-1.5 self-start rounded bg-accent transition-opacity hover:opacity-90 px-4 py-1.5 text-sm font-medium text-white disabled:opacity-50"
           >
-            {pending && <Spinner className="h-4 w-4" />}
-            {pending ? "評価中..." : "評価を実行"}
+            {busy && <Spinner className="h-4 w-4" />}
+            {busy ? "評価中..." : "評価を実行"}
           </button>
           {error && !deleteTarget && (
             <p className="text-sm text-red-600 dark:text-red-400">{error}</p>

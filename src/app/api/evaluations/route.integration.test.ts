@@ -90,6 +90,21 @@ describe("POST /api/evaluations", () => {
     expect(res.status).toBe(400);
   });
 
+  it("画像サイズの上限(base64換算)を超えると400を返す", async () => {
+    // クライアント側の5MB上限をbase64文字数に換算した値をわずかに超えるダミー文字列。
+    const oversized = "A".repeat(Math.ceil((5 * 1024 * 1024) / 3) * 4 + 4);
+    const res = await POST(
+      request({
+        title: "夕食",
+        promptId,
+        imageBase64: oversized,
+        imageMediaType: "image/png",
+      }),
+    );
+    expect(res.status).toBe(400);
+    expect(mockParse).not.toHaveBeenCalled();
+  });
+
   it("成功時はClaudeの評価どおりにEvaluationFindingを作成し201を返す", async () => {
     mockParse.mockResolvedValue({
       parsed_output: {
