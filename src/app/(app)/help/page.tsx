@@ -59,9 +59,12 @@ export default async function HelpPage() {
           <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
             プロンプト一覧の「+ 新規作成」からタイトル・カテゴリ・本文を入力して作成します。作成後はプロンプト詳細画面の「編集」タブでいつでも本文を書き換えられます。
           </p>
-          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+          <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
             <strong>保存すると、既存の内容を上書きするのではなく新しいバージョンとして追加されます。</strong>
             過去の内容は消えないので、安心して書き換えを試せます。更新メモを添えておくと、あとで見返すときに何を変えたか分かりやすくなります。
+          </p>
+          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+            AIレビューで一度でも使ったプロンプトには、「編集」タブの下に「レビュー指摘からの改善提案」が表示されます。過去の指摘の中から繰り返し発生しているパターンをAIが分析し、プロンプト本文の改善案を提案します(結果は保存されず、押すたびに生成し直します)。
           </p>
         </section>
 

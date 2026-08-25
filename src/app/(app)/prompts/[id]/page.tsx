@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/session";
 import { EditTab } from "./edit-tab";
 import { ExecuteTab } from "./execute-tab";
+import { ImprovementSuggestions } from "./improvement-suggestions";
 import { Markdown } from "@/components/markdown";
 import { LIST_LIMIT, parsePageSize } from "@/lib/list-limits";
 import { PageSizeSelect } from "@/components/page-size-select";
@@ -71,6 +72,13 @@ export default async function PromptDetailPage({
           })
         : null;
 
+  const reviewCommentCount =
+    tab === "edit"
+      ? await prisma.reviewComment.count({
+          where: { review: { status: "SUCCESS", promptVersion: { promptId: id } } },
+        })
+      : 0;
+
   const executions =
     tab === "history"
       ? await prisma.execution.findMany({
@@ -108,14 +116,20 @@ export default async function PromptDetailPage({
       </nav>
 
       {tab === "edit" && (
-        <EditTab
-          promptId={id}
-          title={prompt.title}
-          categoryId={prompt.categoryId}
-          content={latestVersion?.content ?? ""}
-          versionNumber={latestVersion?.versionNumber ?? 0}
-          categories={categories}
-        />
+        <>
+          <EditTab
+            promptId={id}
+            title={prompt.title}
+            categoryId={prompt.categoryId}
+            content={latestVersion?.content ?? ""}
+            versionNumber={latestVersion?.versionNumber ?? 0}
+            categories={categories}
+          />
+          <ImprovementSuggestions
+            promptId={id}
+            commentCount={reviewCommentCount}
+          />
+        </>
       )}
 
       {(tab === "versions" || tab === "history") && (
