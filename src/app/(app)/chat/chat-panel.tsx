@@ -5,17 +5,24 @@ import Link from "next/link";
 import { Markdown } from "@/components/markdown";
 import { useApiMutation } from "@/lib/use-api-mutation";
 import { Spinner } from "@/components/spinner";
-import type { ChatSource } from "@/lib/chat-context";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import type { ChatActionProposal, ChatSource } from "@/lib/chat-context";
 
 type IndexedChatSource = { index: number } & ChatSource;
 
-type ChatTurn = {
-  question: string;
-  answer: string;
-  sources: IndexedChatSource[];
-};
+type ChatTurn =
+  | { kind: "answer"; question: string; answer: string; sources: IndexedChatSource[] }
+  | {
+      kind: "action";
+      question: string;
+      proposal: ChatActionProposal;
+      status: "pending" | "confirmed" | "cancelled";
+      reviewId?: string;
+    };
 
-type ChatResponse = { answer: string; sources: IndexedChatSource[] };
+type ChatResponse =
+  | { answer: string; sources: IndexedChatSource[] }
+  | { actionProposal: ChatActionProposal };
 
 type RepositoryOption = { id: string; label: string };
 
@@ -26,6 +33,14 @@ export function ChatPanel({ repositories }: { repositories: RepositoryOption[] }
   const [pendingQuestion, setPendingQuestion] = useState("");
   const [repositoryId, setRepositoryId] = useState("");
   const { mutate, pending, error } = useApiMutation();
+  // 確認待ちのアクションが紐づくturnsのインデックス(同時に1件のみ想定)。
+  const [pendingActionIndex, setPendingActionIndex] = useState<number | null>(null);
+  const {
+    mutate: mutateAction,
+    pending: actionPending,
+    error: actionError,
+    setError: setActionError,
+  } = useApiMutation();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -44,10 +59,66 @@ export function ChatPanel({ repositories }: { repositories: RepositoryOption[] }
       "回答の生成に失敗しました",
     );
     if (!data) return;
+    if ("actionProposal" in data) {
+      setTurns((prev) => {
+        setPendingActionIndex(prev.length);
+        return [
+          ...prev,
+          {
+            kind: "action",
+            question: submitted,
+            proposal: data.actionProposal,
+            status: "pending",
+          },
+        ];
+      });
+      return;
+    }
     setTurns((prev) => [
       ...prev,
-      { question: submitted, answer: data.answer, sources: data.sources },
+      { kind: "answer", question: submitted, answer: data.answer, sources: data.sources },
     ]);
+  }
+
+  const pendingAction =
+    pendingActionIndex !== null ? turns[pendingActionIndex] : undefined;
+
+  async function handleConfirmAction() {
+    if (pendingActionIndex === null || pendingAction?.kind !== "action") return;
+    const { proposal } = pendingAction;
+    const data = await mutateAction<{ id: string }>(
+      `/api/repositories/${proposal.repositoryId}/reviews`,
+      {
+        method: "POST",
+        body: {
+          pullRequestNumber: proposal.pullRequestNumber,
+          promptId: proposal.promptId,
+        },
+      },
+      "レビューの実行に失敗しました",
+    );
+    if (!data) return;
+    const index = pendingActionIndex;
+    setTurns((prev) =>
+      prev.map((turn, i) =>
+        i === index && turn.kind === "action"
+          ? { ...turn, status: "confirmed", reviewId: data.id }
+          : turn,
+      ),
+    );
+    setPendingActionIndex(null);
+  }
+
+  function handleCancelAction() {
+    if (pendingActionIndex === null) return;
+    const index = pendingActionIndex;
+    setTurns((prev) =>
+      prev.map((turn, i) =>
+        i === index && turn.kind === "action" ? { ...turn, status: "cancelled" } : turn,
+      ),
+    );
+    setActionError(null);
+    setPendingActionIndex(null);
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -87,43 +158,66 @@ export function ChatPanel({ repositories }: { repositories: RepositoryOption[] }
             まだ質問がありません。下の入力欄から質問してみてください。
           </p>
         )}
-        {turns.map((turn, i) => (
-          <div key={i} className="flex flex-col gap-2">
-            <p className="text-sm font-medium">Q. {turn.question}</p>
-            <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
-              <Markdown>{turn.answer}</Markdown>
-              {turn.sources.length > 0 && (
-                <div className="mt-3 flex flex-col gap-1 border-t border-zinc-200 pt-3 dark:border-zinc-800">
-                  <p className="text-xs font-medium text-zinc-500">出典</p>
-                  <ul className="flex flex-col gap-0.5">
-                    {turn.sources.map((source) => (
-                      <li key={source.index} className="text-xs text-zinc-500">
-                        [出典{source.index}]{" "}
-                        {source.kind === "review_comment" ? (
-                          <Link
-                            href={`/reviews/${source.reviewId}`}
-                            className="hover:underline"
-                          >
-                            {source.label}
-                          </Link>
-                        ) : source.kind === "prompt_version" || source.kind === "execution" ? (
-                          <Link
-                            href={`/prompts/${source.promptId}`}
-                            className="hover:underline"
-                          >
-                            {source.label}
-                          </Link>
-                        ) : (
-                          source.label
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+        {turns.map((turn, i) =>
+          turn.kind === "action" ? (
+            <div key={i} className="flex flex-col gap-2">
+              <p className="text-sm font-medium">Q. {turn.question}</p>
+              <div className="rounded-lg border border-zinc-200 p-4 text-sm dark:border-zinc-800">
+                <p>次の操作の実行を提案します。</p>
+                <p className="mt-1 font-medium">
+                  {turn.proposal.repositoryLabel} の PR #{turn.proposal.pullRequestNumber} を、
+                  プロンプト「{turn.proposal.promptLabel}」でレビュー
+                </p>
+                {turn.status === "cancelled" && (
+                  <p className="mt-2 text-xs text-zinc-500">キャンセルしました。</p>
+                )}
+                {turn.status === "confirmed" && turn.reviewId && (
+                  <p className="mt-2 text-xs">
+                    <Link href={`/reviews/${turn.reviewId}`} className="hover:underline">
+                      レビュー結果を見る →
+                    </Link>
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          ) : (
+            <div key={i} className="flex flex-col gap-2">
+              <p className="text-sm font-medium">Q. {turn.question}</p>
+              <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+                <Markdown>{turn.answer}</Markdown>
+                {turn.sources.length > 0 && (
+                  <div className="mt-3 flex flex-col gap-1 border-t border-zinc-200 pt-3 dark:border-zinc-800">
+                    <p className="text-xs font-medium text-zinc-500">出典</p>
+                    <ul className="flex flex-col gap-0.5">
+                      {turn.sources.map((source) => (
+                        <li key={source.index} className="text-xs text-zinc-500">
+                          [出典{source.index}]{" "}
+                          {source.kind === "review_comment" ? (
+                            <Link
+                              href={`/reviews/${source.reviewId}`}
+                              className="hover:underline"
+                            >
+                              {source.label}
+                            </Link>
+                          ) : source.kind === "prompt_version" || source.kind === "execution" ? (
+                            <Link
+                              href={`/prompts/${source.promptId}`}
+                              className="hover:underline"
+                            >
+                              {source.label}
+                            </Link>
+                          ) : (
+                            source.label
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+          ),
+        )}
         {pending && (
           <div className="flex flex-col gap-2">
             <p className="text-sm font-medium">Q. {pendingQuestion}</p>
@@ -156,6 +250,18 @@ export function ChatPanel({ repositories }: { repositories: RepositoryOption[] }
           {pending ? "考え中..." : "送信"}
         </button>
       </form>
+
+      {pendingAction?.kind === "action" && (
+        <ConfirmDialog
+          open
+          title="レビューを実行しますか?"
+          message={`${pendingAction.proposal.repositoryLabel} の PR #${pendingAction.proposal.pullRequestNumber} を、プロンプト「${pendingAction.proposal.promptLabel}」でレビューします。`}
+          pending={actionPending}
+          error={actionError}
+          onConfirm={handleConfirmAction}
+          onCancel={handleCancelAction}
+        />
+      )}
     </div>
   );
 }
