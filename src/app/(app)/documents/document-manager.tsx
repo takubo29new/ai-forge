@@ -1,11 +1,38 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type Dispatch, type SetStateAction } from "react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useApiMutation } from "@/lib/use-api-mutation";
 import { Spinner } from "@/components/spinner";
 import { useToast } from "@/components/toast-provider";
 import { PageSizeSelect } from "@/components/page-size-select";
+
+// review-comments/prompt-versions/executionsの埋め込みバックフィルで共通の
+// 「remaining: trueの間は処理件数を差し引きながら繰り返し呼び出す」ループ。
+// nullはエラー(呼び出し元のuseApiMutationのerror stateに既にセット済み)を表す。
+async function runBackfillLoop(
+  mutate: <T>(
+    url: string,
+    options: { method: "POST" },
+    fallbackErrorMessage?: string,
+  ) => Promise<T | null>,
+  url: string,
+  setCount: Dispatch<SetStateAction<number>>,
+): Promise<number | null> {
+  let totalProcessed = 0;
+  for (;;) {
+    const data = await mutate<{ processed: number; remaining: boolean }>(
+      url,
+      { method: "POST" },
+      "埋め込みの更新に失敗しました",
+    );
+    if (!data) return null;
+    totalProcessed += data.processed;
+    setCount((prev) => Math.max(0, prev - data.processed));
+    if (!data.remaining) break;
+  }
+  return totalProcessed;
+}
 
 type Document = {
   id: string;
@@ -97,56 +124,32 @@ export function DocumentManager({
   }
 
   async function handleBackfill() {
-    let totalProcessed = 0;
-    for (;;) {
-      const data = await backfill.mutate<{ processed: number; remaining: boolean }>(
-        "/api/review-comments/backfill-embeddings",
-        { method: "POST" },
-        "埋め込みの更新に失敗しました",
-      );
-      if (!data) return;
-      totalProcessed += data.processed;
-      setPendingEmbeddingCount((prev) => Math.max(0, prev - data.processed));
-      if (!data.remaining) break;
-    }
+    const totalProcessed = await runBackfillLoop(
+      backfill.mutate,
+      "/api/review-comments/backfill-embeddings",
+      setPendingEmbeddingCount,
+    );
+    if (totalProcessed === null) return;
     showToast(`レビュー指摘の埋め込みを${totalProcessed}件取り込みました`);
   }
 
   async function handlePromptVersionBackfill() {
-    let totalProcessed = 0;
-    for (;;) {
-      const data = await promptVersionBackfill.mutate<{
-        processed: number;
-        remaining: boolean;
-      }>(
-        "/api/prompt-versions/backfill-embeddings",
-        { method: "POST" },
-        "埋め込みの更新に失敗しました",
-      );
-      if (!data) return;
-      totalProcessed += data.processed;
-      setPendingPromptVersionEmbeddingCount((prev) => Math.max(0, prev - data.processed));
-      if (!data.remaining) break;
-    }
+    const totalProcessed = await runBackfillLoop(
+      promptVersionBackfill.mutate,
+      "/api/prompt-versions/backfill-embeddings",
+      setPendingPromptVersionEmbeddingCount,
+    );
+    if (totalProcessed === null) return;
     showToast(`プロンプトの埋め込みを${totalProcessed}件取り込みました`);
   }
 
   async function handleExecutionBackfill() {
-    let totalProcessed = 0;
-    for (;;) {
-      const data = await executionBackfill.mutate<{
-        processed: number;
-        remaining: boolean;
-      }>(
-        "/api/executions/backfill-embeddings",
-        { method: "POST" },
-        "埋め込みの更新に失敗しました",
-      );
-      if (!data) return;
-      totalProcessed += data.processed;
-      setPendingExecutionEmbeddingCount((prev) => Math.max(0, prev - data.processed));
-      if (!data.remaining) break;
-    }
+    const totalProcessed = await runBackfillLoop(
+      executionBackfill.mutate,
+      "/api/executions/backfill-embeddings",
+      setPendingExecutionEmbeddingCount,
+    );
+    if (totalProcessed === null) return;
     showToast(`実行結果の埋め込みを${totalProcessed}件取り込みました`);
   }
 
