@@ -7,6 +7,7 @@ const MAX_CLIENT_ERRORS_PER_WINDOW = 30;
 const MAX_DOCUMENTS_PER_WINDOW = 20;
 const MAX_CHAT_MESSAGES_PER_WINDOW = 30;
 const MAX_EVALUATIONS_PER_WINDOW = 20;
+const MAX_IMPROVEMENT_SUGGESTIONS_PER_WINDOW = 10;
 
 // 用途(purpose)ごとに独立したカウンタを持たせる。固定ウィンドウ(1時間単位)で
 // RateLimitBucketのcountをupsertでインクリメントする。このupsertはPostgres側で
@@ -57,6 +58,16 @@ export function checkChatRateLimit(userId: string) {
 // ため実行系(execution)とは別に数える。実行系と同程度の規模(1時間20回)にする。
 export function checkEvaluationRateLimit(userId: string) {
   return checkRateLimit(userId, "evaluation", MAX_EVALUATIONS_PER_WINDOW);
+}
+
+// プロンプト改善提案(過去のレビュー指摘を最大50件含むメタプロンプトになり
+// 1回あたりのトークン消費が大きい)用の別カウンタ。実行系より低めの上限にする。
+export function checkImprovementSuggestionRateLimit(userId: string) {
+  return checkRateLimit(
+    userId,
+    "improvement-suggestion",
+    MAX_IMPROVEMENT_SUGGESTIONS_PER_WINDOW,
+  );
 }
 
 export function rateLimitResponse(limit: number, message?: string) {

@@ -1,6 +1,6 @@
 # Phase 4 基本設計書(統合基盤の強化)
 
-対象: Phase 1〜3を「別々の機能」から「データを掛け合わせて初めて作れる機能」へ発展させる。アーキテクチャ・認証は [`phase1-design.md`](./phase1-design.md) を、DB設計の全体像は [`db-design.md`](./db-design.md) を参照。**項目1(RAG検索対象の拡張)は実装済み。項目2〜4は設計のみで実装は未着手。**
+対象: Phase 1〜3を「別々の機能」から「データを掛け合わせて初めて作れる機能」へ発展させる。アーキテクチャ・認証は [`phase1-design.md`](./phase1-design.md) を、DB設計の全体像は [`db-design.md`](./db-design.md) を参照。**項目1(RAG検索対象の拡張)・項目3(レビュー指摘蓄積からのプロンプト改善提案)は実装済み。項目2・4は設計のみで実装は未着手。**
 
 ## 概要
 
@@ -56,7 +56,7 @@ erDiagram
 - **同期方式の違いに注意**: 現状の「設計書を同期」(`POST /api/documents/sync`)はai-forge自身の`docs/*.md`をローカルの`fs`から直接読んでいるが、他のリポジトリを対象にする場合はローカルファイルではなくGitHub API経由(`octokit`の`repos.getContent`)でファイル一覧・内容を取得する必要がある。実装としては見た目以上に差分が大きく、`src/lib/github.ts`に新しい関数(`listMarkdownFiles()`のようなもの)を追加する形になる
 - **画面**: `/documents`の同期ボタンを「対象を選ぶ」形に変更(ai-forge自身 or 接続済みリポジトリの一覧から選択)。`/chat`にも対象リポジトリの絞り込みUIを追加(未指定時は全件横断のまま)
 
-## 3. レビュー指摘蓄積からのプロンプト改善提案
+## 3. レビュー指摘蓄積からのプロンプト改善提案(実装済み)
 
 ### 方針: 独自のパターン検出ロジックは作らない
 
@@ -65,10 +65,11 @@ erDiagram
 - 対象プロンプトの過去`Review`(`promptVersionId`経由)から`ReviewComment`を新しい順に一定件数取得
 - 元のプロンプト本文+指摘一覧をメタプロンプトとしてClaudeに渡し、「繰り返し発生している指摘パターン」「プロンプトの改善案」を構造化出力で受け取る
 - **永続化しない**: 生成のたびにClaudeを呼び直す設計にする(専用テーブルを増やさず、まずは「プロンプト詳細画面に改善案を見るボタンを置く」程度のシンプルな実装に留める。反応が良ければ提案履歴の保存を検討)
+- **`runAiExecution()`は使わない**: Review/Evaluationと異なり`Execution`レコードを作らずAnthropic APIを直接呼び出す。理由は2つ。(1)`Execution`は`/prompts/:id`の「実行履歴」タブに表示されるため、プロンプト本文を実行したわけではないメタ分析結果が混ざると紛らわしい。(2)`POST /api/executions/backfill-embeddings`は`review: null`のSUCCESS Executionを無差別に埋め込み対象にする(`evaluation: null`は見ていない)ため、Execution化するとメタ分析結果がRAG検索の対象として紛れ込んでしまう
 
 ### 画面
 
-プロンプト詳細画面(`/prompts/:id`)の編集タブ付近に「レビュー指摘から改善案を見る」ボタンを追加。過去に一度もレビューで使われていないプロンプトでは非表示。
+プロンプト詳細画面(`/prompts/:id`)の編集タブの下に「レビュー指摘からの改善提案」ボタンを追加(`src/app/(app)/prompts/[id]/improvement-suggestions.tsx`)。過去に一度もレビューで使われていないプロンプト(過去の`SUCCESS`な`ReviewComment`が0件)では非表示。API: `POST /api/prompts/:id/improvement-suggestions`(レート制限は専用purpose `improvement-suggestion`、1時間10回)。
 
 ## 4. チャットからの直接アクション実行
 
