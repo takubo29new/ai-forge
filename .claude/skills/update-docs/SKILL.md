@@ -1,6 +1,6 @@
 ---
 name: update-docs
-description: This skill should be used when the user asks to "ドキュメントを更新して", "READMEを更新して", "設計書を作成して", "○○の設計書を作って", or after finishing an implementation task in this repo (a feature/fix landed, a phase completed) when README.md / ai-dev-tool-handoff.md / docs/*.md have not yet been brought in sync with the code. Not for WORKLOG.md (see the `worklog` skill) and not for the app's own "設計書を同期"(`/documents`の埋め込み同期)機能 — this skill is about the human-readable Markdown docs in the repo.
+description: This skill should be used when the user asks to "ドキュメントを更新して", "READMEを更新して", "設計書を作成して", "○○の設計書を作って", "アーティファクトを更新して", "ポートフォリオ資料を更新して", or after finishing an implementation task in this repo (a feature/fix landed, a phase completed) when README.md / ai-dev-tool-handoff.md / docs/*.md / the published portfolio Artifacts have not yet been brought in sync with the code. Not for WORKLOG.md (see the `worklog` skill) and not for the app's own "設計書を同期"(`/documents`の埋め込み同期)機能 — this skill is about the human-readable Markdown docs in the repo and the public Artifacts derived from them.
 ---
 
 # ドキュメント更新・新規作成
@@ -17,6 +17,8 @@ description: This skill should be used when the user asks to "ドキュメント
 | `docs/db-design.md` | 全ドメインのテーブル一覧・設計判断の理由 | Prismaスキーマ変更のたび |
 | `docs/quality-improvements.md` | 機能追加ではない横断的な品質・セキュリティ・運用対応の記録(自動テスト・CI・トークン暗号化・本番デプロイ対応等) | その種の対応をしたたび、末尾に新しい番号の項目を追記 |
 | `/help`ページ(`src/app/(app)/help/page.tsx`) | アプリ内のエンドユーザー向けヘルプ。Markdownファイルではないがコード扱いのドキュメント | ユーザーが触る新しい画面・操作を追加したら |
+| 公開Artifact「ai-forge Build Log」 | ポートフォリオ用のプレゼン資料(実働時間・従来開発との比較・スクリーンショット等) | 大きめの節目(Phase完了、大きな運用対応の完了)ごと。細かい修正のたびには不要 |
+| 公開Artifact「技術設計ドキュメント」(3.2MB、`ai-dev-tool-handoff.md`相当の内容をArtifact化したもの) | リポジトリ外でも読める技術設計の全体像 | ai-dev-tool-handoff.mdの内容が大きく進んだとき |
 
 これらは互いにMarkdownリンクで参照し合っている(README・ai-dev-tool-handoff.mdからdocs/配下の詳細設計書へリンクする形)。新しいドキュメントを作ったら、参照元からのリンクも追加する。
 
@@ -31,6 +33,15 @@ description: This skill should be used when the user asks to "ドキュメント
 7. **quality-improvements.md**: 機能追加ではなく品質・セキュリティ・運用面の対応(リファクタ、CI、暗号化、デプロイ設定等)であれば、末尾に新しい番号の項目として追記する(既存の1〜12を参照し、同じ粒度・見出し形式に合わせる)。
 8. 更新後、**関係する記述に矛盾が残っていないか読み返す**(あるファイルは「完了」、別のファイルは「未着手」のままになっていないか)。
 9. コードを変更していなくても`npx eslint .`・`npm run build`を実行して確認する(既存の慣習。ドキュメントのみの変更で意図せずコードに手が入っていないことの確認も兼ねる)。
+10. **公開Artifactを更新するか判断する**: リポジトリのドキュメント更新のたびに追随させる必要はない。Phase完了や大きめの運用対応の完了など、節目にあたる場合のみ次の「公開Artifactの更新」を行う。判断に迷う場合はユーザーに確認する(Artifactの公開状態は過去にユーザーの意向で非公開のままにしたこともある)。
+
+## 公開Artifactの更新
+
+1. `Artifact action: "list"`で対象Artifactの現在のURLを取得する(URLをハードコードしない。再公開のたびに変わらないが、確認せず推測しない)。
+2. 内容が不明・古い可能性がある場合は`Artifact action: "read"`で現状を確認してから差分を考える。
+3. **技術設計ドキュメント(3.2MB)を更新する場合は、フォークエージェントに委任する**(過去にこの方法で行った実績あり)。この規模のHTMLを自分のコンテキストに読み込んで編集すると以降のやり取りが圧迫されるため、「ai-dev-tool-handoff.mdの最新内容を反映してURL『(list等で取得したURL)』のArtifactを更新して」という指示でフォークに任せる。
+4. **Build Log(ポートフォリオ)を更新する場合**は、視覚的な資料のため`artifact-design`スキルの観点(レイアウト・配色・情報の絞り込み)を意識して直接編集する。既存のセクション構成(実働時間比較・開発の流れ・実際のやり取り等)を壊さず、新しい実績(新Phase完了など)を追加する形にする。
+5. 更新後は`Artifact action: "publish"`で同じ`url`を指定して再公開する(別ファイルパスで新規publishすると別のURLになってしまうため、既存URLを明示的に渡す)。
 
 ## ワークフロー2: 新しいphaseN-design.mdを新規作成する
 
