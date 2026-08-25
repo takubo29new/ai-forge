@@ -128,6 +128,8 @@ model PromptVersion {
   reviews     Review[]
   evaluations Evaluation[]
 
+  embedding PromptVersionEmbedding?
+
   createdAt DateTime @default(now())
 
   @@unique([promptId, versionNumber])
@@ -162,6 +164,7 @@ model Execution {
 
   review     Review?
   evaluation Evaluation?
+  embedding  ExecutionEmbedding?
 
   createdAt DateTime @default(now())
 
@@ -352,6 +355,32 @@ model DocumentChunk {
 model ReviewCommentEmbedding {
   reviewCommentId String        @id
   reviewComment   ReviewComment @relation(fields: [reviewCommentId], references: [id], onDelete: Cascade)
+
+  embedding Unsupported("vector(1024)")?
+
+  createdAt DateTime @default(now())
+}
+
+// --- RAG検索対象の拡張(Phase 4) ---
+// PromptVersion・Executionのそれぞれへの埋め込みを1:1で追加する別テーブル。
+// ReviewCommentEmbeddingと同じパターン(db-design.md参照)。
+
+// PromptVersion.contentの埋め込み。新しいバージョンが保存されるたびに生成する
+// (過去バージョンは差し替えない。バージョンごとに検索できるようにするため)。
+model PromptVersionEmbedding {
+  promptVersionId String        @id
+  promptVersion   PromptVersion @relation(fields: [promptVersionId], references: [id], onDelete: Cascade)
+
+  embedding Unsupported("vector(1024)")?
+
+  createdAt DateTime @default(now())
+}
+
+// Execution.resultTextの埋め込み。reviewIdが無い(Phase 2のレビュー実行ではない、
+// Phase 1のプロンプト実行由来の)SUCCESSな実行のみを対象とする(docs/phase4-design.md参照)。
+model ExecutionEmbedding {
+  executionId String    @id
+  execution   Execution @relation(fields: [executionId], references: [id], onDelete: Cascade)
 
   embedding Unsupported("vector(1024)")?
 

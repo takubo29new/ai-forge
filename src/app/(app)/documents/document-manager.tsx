@@ -1,11 +1,38 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type Dispatch, type SetStateAction } from "react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useApiMutation } from "@/lib/use-api-mutation";
 import { Spinner } from "@/components/spinner";
 import { useToast } from "@/components/toast-provider";
 import { PageSizeSelect } from "@/components/page-size-select";
+
+// review-comments/prompt-versions/executionsの埋め込みバックフィルで共通の
+// 「remaining: trueの間は処理件数を差し引きながら繰り返し呼び出す」ループ。
+// nullはエラー(呼び出し元のuseApiMutationのerror stateに既にセット済み)を表す。
+async function runBackfillLoop(
+  mutate: <T>(
+    url: string,
+    options: { method: "POST" },
+    fallbackErrorMessage?: string,
+  ) => Promise<T | null>,
+  url: string,
+  setCount: Dispatch<SetStateAction<number>>,
+): Promise<number | null> {
+  let totalProcessed = 0;
+  for (;;) {
+    const data = await mutate<{ processed: number; remaining: boolean }>(
+      url,
+      { method: "POST" },
+      "埋め込みの更新に失敗しました",
+    );
+    if (!data) return null;
+    totalProcessed += data.processed;
+    setCount((prev) => Math.max(0, prev - data.processed));
+    if (!data.remaining) break;
+  }
+  return totalProcessed;
+}
 
 type Document = {
   id: string;
@@ -29,11 +56,15 @@ export function DocumentManager({
   initialDocuments,
   initialLastSyncedAt,
   initialPendingEmbeddingCount,
+  initialPendingPromptVersionEmbeddingCount,
+  initialPendingExecutionEmbeddingCount,
   currentLimit,
 }: {
   initialDocuments: Document[];
   initialLastSyncedAt: string | null;
   initialPendingEmbeddingCount: number;
+  initialPendingPromptVersionEmbeddingCount: number;
+  initialPendingExecutionEmbeddingCount: number;
   currentLimit: number;
 }) {
   const [documents, setDocuments] = useState(initialDocuments);
@@ -46,6 +77,15 @@ export function DocumentManager({
   const backfill = useApiMutation();
   const [pendingEmbeddingCount, setPendingEmbeddingCount] = useState(
     initialPendingEmbeddingCount,
+  );
+
+  const promptVersionBackfill = useApiMutation();
+  const [pendingPromptVersionEmbeddingCount, setPendingPromptVersionEmbeddingCount] =
+    useState(initialPendingPromptVersionEmbeddingCount);
+
+  const executionBackfill = useApiMutation();
+  const [pendingExecutionEmbeddingCount, setPendingExecutionEmbeddingCount] = useState(
+    initialPendingExecutionEmbeddingCount,
   );
 
   const sync = useApiMutation();
@@ -84,19 +124,33 @@ export function DocumentManager({
   }
 
   async function handleBackfill() {
-    let totalProcessed = 0;
-    for (;;) {
-      const data = await backfill.mutate<{ processed: number; remaining: boolean }>(
-        "/api/review-comments/backfill-embeddings",
-        { method: "POST" },
-        "埋め込みの更新に失敗しました",
-      );
-      if (!data) return;
-      totalProcessed += data.processed;
-      setPendingEmbeddingCount((prev) => Math.max(0, prev - data.processed));
-      if (!data.remaining) break;
-    }
+    const totalProcessed = await runBackfillLoop(
+      backfill.mutate,
+      "/api/review-comments/backfill-embeddings",
+      setPendingEmbeddingCount,
+    );
+    if (totalProcessed === null) return;
     showToast(`レビュー指摘の埋め込みを${totalProcessed}件取り込みました`);
+  }
+
+  async function handlePromptVersionBackfill() {
+    const totalProcessed = await runBackfillLoop(
+      promptVersionBackfill.mutate,
+      "/api/prompt-versions/backfill-embeddings",
+      setPendingPromptVersionEmbeddingCount,
+    );
+    if (totalProcessed === null) return;
+    showToast(`プロンプトの埋め込みを${totalProcessed}件取り込みました`);
+  }
+
+  async function handleExecutionBackfill() {
+    const totalProcessed = await runBackfillLoop(
+      executionBackfill.mutate,
+      "/api/executions/backfill-embeddings",
+      setPendingExecutionEmbeddingCount,
+    );
+    if (totalProcessed === null) return;
+    showToast(`実行結果の埋め込みを${totalProcessed}件取り込みました`);
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -186,6 +240,58 @@ export function DocumentManager({
             {backfill.error && (
               <p className="mt-2 text-xs text-red-600 dark:text-red-400">
                 {backfill.error}
+              </p>
+            )}
+          </div>
+
+          <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+            <p className="mb-2 text-sm font-medium">プロンプトの埋め込み</p>
+            <p className="mb-3 text-xs text-zinc-500">
+              過去に保存したプロンプトの本文をRAG検索チャットの検索対象にします。新しく保存したバージョンは自動で対象になるため、既存分を取り込むためのボタンです。
+            </p>
+            <p className="mb-3 text-xs text-zinc-400">
+              {pendingPromptVersionEmbeddingCount > 0
+                ? `未処理のバージョンが${pendingPromptVersionEmbeddingCount}件あります`
+                : "未処理のバージョンはありません"}
+            </p>
+            <button
+              onClick={handlePromptVersionBackfill}
+              disabled={
+                promptVersionBackfill.pending || pendingPromptVersionEmbeddingCount === 0
+              }
+              className="inline-flex items-center gap-1.5 rounded border border-zinc-300 px-3 py-1.5 text-xs disabled:opacity-50 dark:border-zinc-700"
+            >
+              {promptVersionBackfill.pending && <Spinner className="h-3.5 w-3.5" />}
+              {promptVersionBackfill.pending ? "処理中..." : "既存のプロンプトを取り込む"}
+            </button>
+            {promptVersionBackfill.error && (
+              <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+                {promptVersionBackfill.error}
+              </p>
+            )}
+          </div>
+
+          <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+            <p className="mb-2 text-sm font-medium">実行結果の埋め込み</p>
+            <p className="mb-3 text-xs text-zinc-500">
+              過去のプロンプト実行結果をRAG検索チャットの検索対象にします(AIレビューの実行は対象外)。新しく成功した実行は自動で対象になるため、既存分を取り込むためのボタンです。
+            </p>
+            <p className="mb-3 text-xs text-zinc-400">
+              {pendingExecutionEmbeddingCount > 0
+                ? `未処理の実行結果が${pendingExecutionEmbeddingCount}件あります`
+                : "未処理の実行結果はありません"}
+            </p>
+            <button
+              onClick={handleExecutionBackfill}
+              disabled={executionBackfill.pending || pendingExecutionEmbeddingCount === 0}
+              className="inline-flex items-center gap-1.5 rounded border border-zinc-300 px-3 py-1.5 text-xs disabled:opacity-50 dark:border-zinc-700"
+            >
+              {executionBackfill.pending && <Spinner className="h-3.5 w-3.5" />}
+              {executionBackfill.pending ? "処理中..." : "既存の実行結果を取り込む"}
+            </button>
+            {executionBackfill.error && (
+              <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+                {executionBackfill.error}
               </p>
             )}
           </div>
