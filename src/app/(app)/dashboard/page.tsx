@@ -11,12 +11,14 @@ export default async function DashboardPage() {
     repositoryCount,
     documentCount,
     documentChunkCount,
+    evaluationCount,
     severityGroups,
   ] = await Promise.all([
     prisma.prompt.count({ where: { userId } }),
     prisma.repository.count({ where: { userId } }),
     prisma.document.count({ where: { userId } }),
     prisma.documentChunk.count({ where: { document: { userId } } }),
+    prisma.evaluation.count({ where: { userId } }),
     prisma.reviewComment.groupBy({
       by: ["severity"],
       where: { review: { userId } },
@@ -41,7 +43,7 @@ export default async function DashboardPage() {
         プロンプト・リポジトリ・レビュー・ドキュメントを横断したサマリです。
       </p>
 
-      <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-5">
         <Link
           href="/prompts"
           className="rounded-lg border border-zinc-200 p-4 transition-all hover:-translate-y-0.5 hover:border-accent hover:shadow-md dark:border-zinc-800"
@@ -68,6 +70,13 @@ export default async function DashboardPage() {
           <p className="text-xs text-zinc-500">
             登録ドキュメント({documentChunkCount}チャンク)
           </p>
+        </Link>
+        <Link
+          href="/evaluations"
+          className="rounded-lg border border-zinc-200 p-4 transition-all hover:-translate-y-0.5 hover:border-accent hover:shadow-md dark:border-zinc-800"
+        >
+          <p className="text-2xl font-semibold">{evaluationCount}</p>
+          <p className="text-xs text-zinc-500">画像評価</p>
         </Link>
       </div>
 

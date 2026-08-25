@@ -18,6 +18,7 @@ const OTHER_NAV_LINKS = [
   { href: "/repositories", label: "リポジトリ" },
   { href: "/documents", label: "ドキュメント" },
   { href: "/chat", label: "チャット" },
+  { href: "/evaluations", label: "評価" },
 ];
 
 export async function AppHeader() {

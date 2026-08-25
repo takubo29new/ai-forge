@@ -39,6 +39,10 @@ export async function createTestRepository(userId: string) {
 export async function cleanupTestUser(userId: string) {
   await prisma.reviewComment.deleteMany({ where: { review: { userId } } });
   await prisma.review.deleteMany({ where: { userId } });
+  await prisma.evaluationFinding.deleteMany({
+    where: { evaluation: { userId } },
+  });
+  await prisma.evaluation.deleteMany({ where: { userId } });
   await prisma.execution.deleteMany({ where: { userId } });
   await prisma.promptVersion.deleteMany({ where: { prompt: { userId } } });
   await prisma.prompt.deleteMany({ where: { userId } });
