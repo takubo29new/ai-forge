@@ -38,14 +38,28 @@ type Document = {
   id: string;
   title: string;
   sourceType: "MANUAL" | "REPO_FILE";
+  repositoryLabel: string | null;
   chunkCount: number;
   createdAt: string;
+};
+
+type RepositoryOption = {
+  id: string;
+  label: string;
+  lastSyncedAt: string | null;
 };
 
 const SOURCE_TYPE_LABEL: Record<Document["sourceType"], string> = {
   MANUAL: "手動登録",
   REPO_FILE: "リポジトリ同期",
 };
+
+function documentSourceLabel(document: Document): string {
+  if (document.sourceType === "MANUAL") return SOURCE_TYPE_LABEL.MANUAL;
+  return document.repositoryLabel
+    ? `リポジトリ同期(${document.repositoryLabel})`
+    : "リポジトリ同期(ai-forge自身)";
+}
 
 function formatDateTime(iso: string | null): string {
   if (!iso) return "未実行";
@@ -55,6 +69,7 @@ function formatDateTime(iso: string | null): string {
 export function DocumentManager({
   initialDocuments,
   initialLastSyncedAt,
+  repositories,
   initialPendingEmbeddingCount,
   initialPendingPromptVersionEmbeddingCount,
   initialPendingExecutionEmbeddingCount,
@@ -62,6 +77,7 @@ export function DocumentManager({
 }: {
   initialDocuments: Document[];
   initialLastSyncedAt: string | null;
+  repositories: RepositoryOption[];
   initialPendingEmbeddingCount: number;
   initialPendingPromptVersionEmbeddingCount: number;
   initialPendingExecutionEmbeddingCount: number;
@@ -73,6 +89,14 @@ export function DocumentManager({
   const [deleteTarget, setDeleteTarget] = useState<Document | null>(null);
   const { mutate, pending, error, setError } = useApiMutation();
   const { showToast } = useToast();
+
+  const [selectedRepositoryId, setSelectedRepositoryId] = useState(
+    repositories[0]?.id ?? "",
+  );
+  const [repoLastSyncedAt, setRepoLastSyncedAt] = useState<Record<string, string | null>>(
+    Object.fromEntries(repositories.map((r) => [r.id, r.lastSyncedAt])),
+  );
+  const repoSync = useApiMutation();
 
   const backfill = useApiMutation();
   const [pendingEmbeddingCount, setPendingEmbeddingCount] = useState(
@@ -91,6 +115,31 @@ export function DocumentManager({
   const sync = useApiMutation();
   const [lastSyncedAt, setLastSyncedAt] = useState(initialLastSyncedAt);
 
+  // 同期はサーバー側で複数のDocumentを一括作り直すため、個々の差分を
+  // クライアント側で組み立てるより一覧を取得し直す方が単純で確実。
+  async function refreshDocuments() {
+    const res = await fetch("/api/documents");
+    if (!res.ok) return;
+    const raw: {
+      id: string;
+      title: string;
+      sourceType: Document["sourceType"];
+      createdAt: string;
+      repository: { owner: string; name: string } | null;
+      _count: { chunks: number };
+    }[] = await res.json();
+    setDocuments(
+      raw.map((d) => ({
+        id: d.id,
+        title: d.title,
+        sourceType: d.sourceType,
+        repositoryLabel: d.repository ? `${d.repository.owner}/${d.repository.name}` : null,
+        chunkCount: d._count.chunks,
+        createdAt: d.createdAt,
+      })),
+    );
+  }
+
   async function handleSync() {
     const data = await sync.mutate<{ syncedDocuments: number; syncedChunks: number }>(
       "/api/documents/sync",
@@ -99,28 +148,27 @@ export function DocumentManager({
     );
     if (!data) return;
     setLastSyncedAt(new Date().toISOString());
-    // 同期はサーバー側で複数のDocumentを一括作り直すため、個々の差分を
-    // クライアント側で組み立てるより一覧を取得し直す方が単純で確実。
-    const res = await fetch("/api/documents");
-    if (res.ok) {
-      const raw: {
-        id: string;
-        title: string;
-        sourceType: Document["sourceType"];
-        createdAt: string;
-        _count: { chunks: number };
-      }[] = await res.json();
-      setDocuments(
-        raw.map((d) => ({
-          id: d.id,
-          title: d.title,
-          sourceType: d.sourceType,
-          chunkCount: d._count.chunks,
-          createdAt: d.createdAt,
-        })),
-      );
-    }
+    await refreshDocuments();
     showToast(`設計書を同期しました(${data.syncedDocuments}件)`);
+  }
+
+  async function handleRepoSync() {
+    if (!selectedRepositoryId) return;
+    const repo = repositories.find((r) => r.id === selectedRepositoryId);
+    const data = await repoSync.mutate<{ syncedDocuments: number; syncedChunks: number }>(
+      `/api/repositories/${selectedRepositoryId}/documents/sync`,
+      { method: "POST" },
+      "同期に失敗しました",
+    );
+    if (!data) return;
+    setRepoLastSyncedAt((prev) => ({
+      ...prev,
+      [selectedRepositoryId]: new Date().toISOString(),
+    }));
+    await refreshDocuments();
+    showToast(
+      `${repo?.label ?? "リポジトリ"}の設計書を同期しました(${data.syncedDocuments}件)`,
+    );
   }
 
   async function handleBackfill() {
@@ -166,6 +214,7 @@ export function DocumentManager({
         id: data.id,
         title: data.title,
         sourceType: "MANUAL",
+        repositoryLabel: null,
         chunkCount: data.chunkCount,
         createdAt: new Date().toISOString(),
       },
@@ -216,6 +265,51 @@ export function DocumentManager({
               <p className="mt-2 text-xs text-red-600 dark:text-red-400">
                 {sync.error}
               </p>
+            )}
+          </div>
+
+          <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+            <p className="mb-2 text-sm font-medium">接続済みリポジトリの設計書を同期</p>
+            <p className="mb-3 text-xs text-zinc-500">
+              「リポジトリ」ページで接続したGitHubリポジトリのdocs/配下のMarkdownファイル・README.mdをGitHub API経由で取り込みます。再度実行すると、同じファイルのドキュメントは最新の内容で作り直されます。
+            </p>
+            {repositories.length === 0 ? (
+              <p className="text-xs text-zinc-400">
+                接続済みのリポジトリがありません。「リポジトリ」ページから接続してください。
+              </p>
+            ) : (
+              <>
+                <div className="mb-3 flex gap-2">
+                  <select
+                    value={selectedRepositoryId}
+                    onChange={(e) => setSelectedRepositoryId(e.target.value)}
+                    className="flex-1 rounded border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-900"
+                  >
+                    {repositories.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <p className="mb-3 text-xs text-zinc-400">
+                  最終実行:{" "}
+                  {formatDateTime(repoLastSyncedAt[selectedRepositoryId] ?? null)}
+                </p>
+                <button
+                  onClick={handleRepoSync}
+                  disabled={repoSync.pending}
+                  className="inline-flex items-center gap-1.5 rounded border border-zinc-300 px-3 py-1.5 text-xs disabled:opacity-50 dark:border-zinc-700"
+                >
+                  {repoSync.pending && <Spinner className="h-3.5 w-3.5" />}
+                  {repoSync.pending ? "同期中..." : "設計書を同期"}
+                </button>
+                {repoSync.error && (
+                  <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+                    {repoSync.error}
+                  </p>
+                )}
+              </>
             )}
           </div>
 
@@ -360,7 +454,7 @@ export function DocumentManager({
               <div>
                 <p className="text-sm font-medium">{document.title}</p>
                 <p className="text-xs text-zinc-500">
-                  {SOURCE_TYPE_LABEL[document.sourceType]} ・{" "}
+                  {documentSourceLabel(document)} ・{" "}
                   {document.chunkCount}チャンク
                 </p>
               </div>

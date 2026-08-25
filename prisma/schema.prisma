@@ -229,7 +229,8 @@ model Repository {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  reviews Review[]
+  reviews   Review[]
+  documents Document[]
 
   connectedAt DateTime @default(now())
 
@@ -325,13 +326,19 @@ model Document {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  // 接続済みリポジトリ由来のREPO_FILEのみ設定(Phase 4項目2)。ai-forge自身の
+  // 設計書同期・MANUAL登録はnullのまま。リポジトリの接続解除に連動して削除する
+  repositoryId String?
+  repository   Repository? @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
   chunks DocumentChunk[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([userId, sourcePath])
+  @@unique([userId, repositoryId, sourcePath])
   @@index([userId])
+  @@index([repositoryId])
 }
 
 // Documentを見出し単位で分割した1チャンク。類似検索のヒット単位。

@@ -17,11 +17,14 @@ type ChatTurn = {
 
 type ChatResponse = { answer: string; sources: IndexedChatSource[] };
 
-export function ChatPanel() {
+type RepositoryOption = { id: string; label: string };
+
+export function ChatPanel({ repositories }: { repositories: RepositoryOption[] }) {
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [question, setQuestion] = useState("");
   // 送信中に表示する質問文。inputはすぐ空にしたいので、表示用に別途保持する。
   const [pendingQuestion, setPendingQuestion] = useState("");
+  const [repositoryId, setRepositoryId] = useState("");
   const { mutate, pending, error } = useApiMutation();
 
   async function handleSubmit(e: React.FormEvent) {
@@ -32,7 +35,12 @@ export function ChatPanel() {
     setPendingQuestion(submitted);
     const data = await mutate<ChatResponse>(
       "/api/chat",
-      { method: "POST", body: { question: submitted } },
+      {
+        method: "POST",
+        body: repositoryId
+          ? { question: submitted, repositoryId }
+          : { question: submitted },
+      },
       "回答の生成に失敗しました",
     );
     if (!data) return;
@@ -52,6 +60,27 @@ export function ChatPanel() {
 
   return (
     <div className="flex flex-col gap-6">
+      {repositories.length > 0 && (
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-zinc-500" htmlFor="chat-repository-filter">
+            対象リポジトリ
+          </label>
+          <select
+            id="chat-repository-filter"
+            value={repositoryId}
+            onChange={(e) => setRepositoryId(e.target.value)}
+            className="rounded border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-900"
+          >
+            <option value="">すべて</option>
+            {repositories.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       <div className="flex flex-col gap-6">
         {turns.length === 0 && (
           <p className="rounded-lg border border-zinc-200 px-4 py-6 text-center text-sm text-zinc-500 dark:border-zinc-800">

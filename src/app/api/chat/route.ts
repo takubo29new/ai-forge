@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
 import { anthropic } from "@/lib/anthropic";
 import { DEFAULT_MODEL } from "@/lib/models";
 import { embedQuery } from "@/lib/voyage";
@@ -33,6 +34,23 @@ export async function POST(request: Request) {
   if (!question) {
     return NextResponse.json({ error: "質問を入力してください" }, { status: 400 });
   }
+  const repositoryId =
+    typeof body.repositoryId === "string" && body.repositoryId ? body.repositoryId : undefined;
+
+  // 絞り込み対象のリポジトリが本人の接続済みリポジトリかを確認する
+  // (他ユーザーのrepositoryIdを渡された場合はヒット0件になるだけで情報漏洩は
+  // しないが、意図しない挙動を早期に弾くため明示的にチェックする)。
+  if (repositoryId) {
+    const repository = await prisma.repository.findUnique({
+      where: { id: repositoryId },
+    });
+    if (!repository || repository.userId !== userId) {
+      return NextResponse.json(
+        { error: "リポジトリが見つかりません" },
+        { status: 400 },
+      );
+    }
+  }
 
   const rateLimit = await checkChatRateLimit(userId);
   if (!rateLimit.allowed) {
@@ -46,9 +64,12 @@ export async function POST(request: Request) {
     return voyageErrorResponse(error, { path: "/api/chat", userId });
   }
 
+  // PromptVersion・Executionはリポジトリに紐づく概念がないため、repositoryId
+  // 絞り込み時もDocument・ReviewCommentのみを絞り込み対象にする
+  // (docs/phase4-design.md「2. プロジェクト単位のドキュメント管理」参照)。
   const [docHits, reviewHits, promptVersionHits, executionHits] = await Promise.all([
-    searchDocumentChunks(userId, queryEmbedding, SEARCH_LIMIT_PER_SOURCE),
-    searchReviewComments(userId, queryEmbedding, SEARCH_LIMIT_PER_SOURCE),
+    searchDocumentChunks(userId, queryEmbedding, SEARCH_LIMIT_PER_SOURCE, repositoryId),
+    searchReviewComments(userId, queryEmbedding, SEARCH_LIMIT_PER_SOURCE, repositoryId),
     searchPromptVersions(userId, queryEmbedding, SEARCH_LIMIT_PER_SOURCE),
     searchExecutions(userId, queryEmbedding, SEARCH_LIMIT_PER_SOURCE),
   ]);

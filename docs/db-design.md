@@ -44,6 +44,10 @@ pgvector拡張(`vector`、0.8.6)をここで初めて有効化した。詳細は
 
 `Document`・`ReviewComment`に続き、Phase 1の資産(`PromptVersion`・`Execution`)もRAG検索チャット(`/chat`)の検索対象にする。詳細は[`phase4-design.md`](./phase4-design.md)を参照。
 
+### プロジェクト単位のドキュメント管理(Phase 4項目2)
+
+`Document`に`repositoryId String?`(FK、`onDelete: Cascade`)を追加し、接続済み`Repository`ごとにドキュメントを紐付けられるようにした。ユニーク制約も`[userId, sourcePath]`から`[userId, repositoryId, sourcePath]`に変更している(リポジトリをまたいだ同名ファイルを区別するため)。詳細は[`phase4-design.md`](./phase4-design.md)を参照。
+
 - `PromptVersionEmbedding` — `PromptVersion.content`に対する埋め込みを1:1で追加する別テーブル(`ReviewCommentEmbedding`と同じパターン)。新しいバージョンが保存されるたびに生成し、過去バージョンは差し替えない
 - `ExecutionEmbedding` — `Execution.resultText`に対する埋め込みを1:1で追加する別テーブル。`reviewId`が無い(Phase 2のレビュー実行ではない)`SUCCESS`な実行のみを対象とする。レビュー由来の`resultText`は既に`ReviewComment`として個別に埋め込み済みのため、重複を避けてあえて対象外にしている
 

@@ -189,4 +189,73 @@ describe("POST /api/chat", () => {
       promptId: prompt.id,
     });
   });
+
+  it("他ユーザーのrepositoryIdを指定すると400を返す", async () => {
+    const other = await createTestUser();
+    const otherRepo = await prisma.repository.create({
+      data: { userId: other.id, githubRepoId: BigInt(12345), owner: "o", name: "r" },
+    });
+
+    mockEmbedQuery.mockResolvedValue(vector(1));
+    const res = await POST(
+      request({ question: "質問", repositoryId: otherRepo.id }),
+    );
+    expect(res.status).toBe(400);
+
+    await cleanupTestUser(other.id);
+  });
+
+  it("repositoryId指定時は該当リポジトリのDocument・ReviewCommentのみに絞り込む", async () => {
+    const targetRepo = await prisma.repository.create({
+      data: { userId, githubRepoId: BigInt(1001), owner: "o", name: "target" },
+    });
+    const otherRepo = await prisma.repository.create({
+      data: { userId, githubRepoId: BigInt(1002), owner: "o", name: "other" },
+    });
+
+    const targetDoc = await prisma.document.create({
+      data: {
+        title: "target/README.md",
+        content: "本文",
+        sourceType: "REPO_FILE",
+        sourcePath: "README.md",
+        userId,
+        repositoryId: targetRepo.id,
+        chunks: { create: [{ chunkIndex: 0, content: "対象リポジトリの設計内容" }] },
+      },
+      include: { chunks: true },
+    });
+    await setDocumentChunkEmbedding(targetDoc.chunks[0].id, vector(1));
+
+    const otherDoc = await prisma.document.create({
+      data: {
+        title: "other/README.md",
+        content: "本文",
+        sourceType: "REPO_FILE",
+        sourcePath: "README.md",
+        userId,
+        repositoryId: otherRepo.id,
+        chunks: { create: [{ chunkIndex: 0, content: "別リポジトリの設計内容" }] },
+      },
+      include: { chunks: true },
+    });
+    await setDocumentChunkEmbedding(otherDoc.chunks[0].id, vector(1));
+
+    mockEmbedQuery.mockResolvedValue(vector(1));
+    mockCreate.mockResolvedValue({
+      content: [{ type: "text", text: "回答[出典1]" }],
+    } as never);
+
+    const res = await POST(
+      request({ question: "設計内容は?", repositoryId: targetRepo.id }),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    const documentIds = body.sources
+      .filter((s: { kind: string }) => s.kind === "document_chunk")
+      .map((s: { documentId: string }) => s.documentId);
+    expect(documentIds).toContain(targetDoc.id);
+    expect(documentIds).not.toContain(otherDoc.id);
+  });
 });
