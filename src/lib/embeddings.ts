@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@/generated/prisma/client";
 
 // pgvectorのvector型はPrismaのUnsupported型として宣言しており、Prisma Clientの
 // 通常のSELECT/INSERTには含まれないため、埋め込みの書き込みは$executeRawで行う
@@ -91,11 +92,18 @@ export type ExecutionSearchHit = {
   distance: number;
 };
 
+// repositoryIdを指定すると、そのリポジトリに同期されたDocumentのみに絞り込む
+// (Phase 4項目2「プロジェクト単位のドキュメント管理」、/chatの絞り込みUI用)。
+// 未指定時は従来通りユーザーの全Documentを横断する。
 export async function searchDocumentChunks(
   userId: string,
   queryEmbedding: number[],
   limit: number,
+  repositoryId?: string,
 ): Promise<DocumentChunkSearchHit[]> {
+  const repositoryFilter = repositoryId
+    ? Prisma.sql`AND d."repositoryId" = ${repositoryId}`
+    : Prisma.empty;
   const rows = await prisma.$queryRaw<
     { id: string; documentId: string; documentTitle: string; content: string; distance: number }[]
   >`
@@ -103,18 +111,24 @@ export async function searchDocumentChunks(
            dc.embedding <=> ${toVectorLiteral(queryEmbedding)}::vector AS distance
     FROM "DocumentChunk" dc
     JOIN "Document" d ON d.id = dc."documentId"
-    WHERE d."userId" = ${userId} AND dc.embedding IS NOT NULL
+    WHERE d."userId" = ${userId} AND dc.embedding IS NOT NULL ${repositoryFilter}
     ORDER BY distance ASC
     LIMIT ${limit}
   `;
   return rows.map((row) => ({ kind: "document_chunk", ...row }));
 }
 
+// repositoryId指定時はそのリポジトリに対するReviewの指摘のみに絞り込む
+// (Reviewはリポジトリに紐づくため、Documentと同じ絞り込みが可能)。
 export async function searchReviewComments(
   userId: string,
   queryEmbedding: number[],
   limit: number,
+  repositoryId?: string,
 ): Promise<ReviewCommentSearchHit[]> {
+  const repositoryFilter = repositoryId
+    ? Prisma.sql`AND r."repositoryId" = ${repositoryId}`
+    : Prisma.empty;
   const rows = await prisma.$queryRaw<
     {
       id: string;
@@ -133,7 +147,7 @@ export async function searchReviewComments(
     FROM "ReviewCommentEmbedding" rce
     JOIN "ReviewComment" rc ON rc.id = rce."reviewCommentId"
     JOIN "Review" r ON r.id = rc."reviewId"
-    WHERE r."userId" = ${userId}
+    WHERE r."userId" = ${userId} ${repositoryFilter}
     ORDER BY distance ASC
     LIMIT ${limit}
   `;

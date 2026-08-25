@@ -76,7 +76,7 @@ Phase 3完了後、ユーザーからの要望を受けてUI/UX改善(ナビゲ�
 
 開発の記録(実働時間・従来開発との比較・スクリーンショット)はポートフォリオ用資料としてまとめている。
 
-Phase 4(統合基盤の強化)は項目1「RAG検索対象の拡張」・項目3「レビュー指摘蓄積からのプロンプト改善提案」を実装完了。項目1では`PromptVersion`(プロンプト本文)・`Execution`(レビュー由来を除くプロンプト実行結果)を`PromptVersionEmbedding`/`ExecutionEmbedding`として埋め込み、`/chat`の検索対象が`Document`・`ReviewComment`に加えてこの2つにも広がった(既存データのバックフィルAPI・`/documents`ページのボタンも実装済み)。項目3では、プロンプト詳細画面(`/prompts/:id`)にボタンを追加し、過去の`ReviewComment`を分析してプロンプトの改善案をClaudeに構造化出力で生成させる。専用テーブルは持たず、押すたびに生成し直す(永続化しない)設計。項目2・4(プロジェクト単位のドキュメント管理・チャットからの直接アクション実行)は設計のみで未着手。詳細は[`docs/phase4-design.md`](./docs/phase4-design.md)を参照。
+Phase 4(統合基盤の強化)は項目1「RAG検索対象の拡張」・項目2「プロジェクト単位のドキュメント管理」・項目3「レビュー指摘蓄積からのプロンプト改善提案」を実装完了。項目1では`PromptVersion`(プロンプト本文)・`Execution`(レビュー由来を除くプロンプト実行結果)を`PromptVersionEmbedding`/`ExecutionEmbedding`として埋め込み、`/chat`の検索対象が`Document`・`ReviewComment`に加えてこの2つにも広がった(既存データのバックフィルAPI・`/documents`ページのボタンも実装済み)。項目2では`Document`に`repositoryId`(任意)を追加し、「リポジトリ」ページで接続したGitHubリポジトリごとにdocs/配下・README.mdをGitHub API経由で同期できるようになった(`/documents`の「接続済みリポジトリの設計書を同期」)。`/chat`にも対象リポジトリの絞り込みセレクトを追加し、指定時は`Document`・`ReviewComment`をそのリポジトリに限定する(`PromptVersion`・`Execution`はリポジトリに紐づかないため常に横断検索)。項目3では、プロンプト詳細画面(`/prompts/:id`)にボタンを追加し、過去の`ReviewComment`を分析してプロンプトの改善案をClaudeに構造化出力で生成させる。専用テーブルは持たず、押すたびに生成し直す(永続化しない)設計。項目4(チャットからの直接アクション実行)は設計のみで未着手。詳細は[`docs/phase4-design.md`](./docs/phase4-design.md)を参照。
 
 Phase 5(汎用AI評価ツール)は「実装方針(段階的ロールアウト)」の1段階目、画像評価(`inputType: IMAGE`)のプロトタイプを実装完了。`Evaluation`/`EvaluationFinding`をReviewとは独立したモデルとして追加し、`/evaluations`から画像+プロンプトを送るとClaude Visionで評価し観点別コメントを取得できる。画像はDBに永続化しない設計。テキスト評価・画像の永続化・バックグラウンド処理・共有リンクは未着手。詳細は[`docs/phase5-design.md`](./docs/phase5-design.md)を参照。
 
@@ -86,9 +86,8 @@ Phase 5(汎用AI評価ツール)は「実装方針(段階的ロールアウト)�
 
 ### Phase 4: 統合基盤の強化(残り項目)
 
-項目1「RAG検索対象の拡張」・項目3「レビュー指摘蓄積からのプロンプト改善提案」は実装完了(上記「進捗」参照)。残り2項目は設計のみで未着手(詳細は[`docs/phase4-design.md`](./docs/phase4-design.md)を参照)。
+項目1「RAG検索対象の拡張」・項目2「プロジェクト単位のドキュメント管理」・項目3「レビュー指摘蓄積からのプロンプト改善提案」は実装完了(上記「進捗」参照)。残り1項目は設計のみで未着手(詳細は[`docs/phase4-design.md`](./docs/phase4-design.md)を参照)。
 
-- **プロジェクト単位のドキュメント管理**: `Document`に`repositoryId`(任意)を追加し、Phase 2で接続済みのGitHubリポジトリごとにドキュメントを同期・`/chat`で対象を絞り込めるようにする。他リポジトリの同期はローカル`fs`ではなくGitHub API経由になる点に注意
 - **チャットからの直接アクション実行**: 検索基盤の上に構築。4項目で最もリスクが高いため、対応するアクションを「保存済みプロンプトでのAIレビュー実行」1種類に絞り、tool use抽出→人間の確認ステップを必ず挟む設計にした
 
 ### Phase 5: 汎用AI評価ツール(残りスコープ)

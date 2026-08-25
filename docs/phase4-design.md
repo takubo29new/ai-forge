@@ -1,6 +1,6 @@
 # Phase 4 基本設計書(統合基盤の強化)
 
-対象: Phase 1〜3を「別々の機能」から「データを掛け合わせて初めて作れる機能」へ発展させる。アーキテクチャ・認証は [`phase1-design.md`](./phase1-design.md) を、DB設計の全体像は [`db-design.md`](./db-design.md) を参照。**項目1(RAG検索対象の拡張)・項目3(レビュー指摘蓄積からのプロンプト改善提案)は実装済み。項目2・4は設計のみで実装は未着手。**
+対象: Phase 1〜3を「別々の機能」から「データを掛け合わせて初めて作れる機能」へ発展させる。アーキテクチャ・認証は [`phase1-design.md`](./phase1-design.md) を、DB設計の全体像は [`db-design.md`](./db-design.md) を参照。**項目1(RAG検索対象の拡張)・項目2(プロジェクト単位のドキュメント管理)・項目3(レビュー指摘蓄積からのプロンプト改善提案)は実装済み。項目4は設計のみで実装は未着手。**
 
 ## 概要
 
@@ -48,13 +48,14 @@ erDiagram
 
 既存の`POST /api/review-comments/backfill-embeddings`と同じ形で、`POST /api/prompt-versions/backfill-embeddings`・`POST /api/executions/backfill-embeddings`を追加する(1回`LIST_LIMIT`件まで処理し`remaining`で継続可否を返す)。`/documents`ページの「検索対象の取り込み」セクションに、未処理件数の表示とあわせて追加する。
 
-## 2. プロジェクト単位のドキュメント管理
+## 2. プロジェクト単位のドキュメント管理(実装済み)
 
-`docs/phase3-design.md`の「今後の拡張候補」で既に構想済みの内容を、Phase 4として実装に落とす。
+`docs/phase3-design.md`の「今後の拡張候補」で既に構想済みの内容を、Phase 4として実装した。
 
-- **DB**: `Document`に`repositoryId String?`(FK、`onDelete: Cascade`)を追加。既存の`Repository`解除時に紐づく`Review`が全削除される設計([`db-design.md`](./db-design.md)参照)と同じ考え方を踏襲し、リポジトリ接続を解除したら同期済みドキュメントも一緒に消す
-- **同期方式の違いに注意**: 現状の「設計書を同期」(`POST /api/documents/sync`)はai-forge自身の`docs/*.md`をローカルの`fs`から直接読んでいるが、他のリポジトリを対象にする場合はローカルファイルではなくGitHub API経由(`octokit`の`repos.getContent`)でファイル一覧・内容を取得する必要がある。実装としては見た目以上に差分が大きく、`src/lib/github.ts`に新しい関数(`listMarkdownFiles()`のようなもの)を追加する形になる
-- **画面**: `/documents`の同期ボタンを「対象を選ぶ」形に変更(ai-forge自身 or 接続済みリポジトリの一覧から選択)。`/chat`にも対象リポジトリの絞り込みUIを追加(未指定時は全件横断のまま)
+- **DB**: `Document`に`repositoryId String?`(FK、`onDelete: Cascade`)を追加。既存の`Repository`解除時に紐づく`Review`が全削除される設計([`db-design.md`](./db-design.md)参照)と同じ考え方を踏襲し、リポジトリ接続を解除したら同期済みドキュメントも一緒に消える。ユニーク制約は`[userId, sourcePath]`から`[userId, repositoryId, sourcePath]`に変更(リポジトリをまたいで同じファイル名(例: `README.md`)が存在しうるため)
+- **同期方式の違い**: ai-forge自身の同期(`POST /api/documents/sync`)はローカルの`fs`から直接読むが、接続済みリポジトリの同期(`POST /api/repositories/:id/documents/sync`)はGitHub API経由(`octokit`の`repos.getContent`)で取得する。対象範囲は両者で揃え、ルートの`README.md`・`docs/`配下のMarkdownファイルのみとした(ai-forge自身の`ai-dev-tool-handoff.md`のような追加のルートファイルは他リポジトリでは前提にできないため対象外)。共通する「チャンク分割→埋め込み生成→Documentを作り直す」処理は`src/lib/document-sync.ts`の`syncMarkdownDocuments()`に切り出し、取得方法の違い(fs vs GitHub API)だけを呼び出し元で吸収している
+- **画面**: `/documents`に「接続済みリポジトリの設計書を同期」カードを追加(ai-forge自身の同期カードとは別立て。対象リポジトリをセレクトボックスで選ぶ)。`/chat`にも対象リポジトリの絞り込みセレクトを追加(未指定時は全件横断のまま)
+- **`/chat`の絞り込み範囲**: `Document`(このリポジトリに同期されたもの)に加えて、`ReviewComment`も`Review.repositoryId`で同じリポジトリに絞り込む(Reviewはリポジトリに紐づく概念のため)。一方`PromptVersion`・`Execution`はどのリポジトリにも紐づかない(プロンプトは複数リポジトリで使い回される)ため、絞り込み時も対象外にせず常に横断検索する
 
 ## 3. レビュー指摘蓄積からのプロンプト改善提案(実装済み)
 

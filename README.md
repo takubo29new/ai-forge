@@ -48,21 +48,22 @@ GitHubリポジトリを接続し、PRの差分をPhase 1のプロンプト資�
 
 - pgvector拡張を有効化し、`Document`/`DocumentChunk`/`ReviewCommentEmbedding`のスキーマを追加(HNSWインデックスでのコサイン類似検索)
 - ドキュメント取り込み(`/documents`。タイトル+本文を見出し単位でチャンク分割し、埋め込みを生成)
-- ai-forge自身の設計書の自動同期(`docs/*.md`・`README.md`・`ai-dev-tool-handoff.md`を自動取り込み。再同期で最新内容に作り直す。他のGitHubリポジトリの同期は未対応)
+- ai-forge自身の設計書の自動同期(`docs/*.md`・`README.md`・`ai-dev-tool-handoff.md`を自動取り込み。再同期で最新内容に作り直す)。接続済みのGitHubリポジトリごとの同期はPhase 4で対応(下記)
 - 既存レビュー指摘の埋め込みバックフィル(新規レビューは自動、既存分は`/documents`の「既存のレビュー指摘を取り込む」ボタンから)
 - RAG検索チャット(`/chat`。ドキュメント・レビュー指摘を横断検索し、Claudeが出典付きで回答)
 - 統合ダッシュボード(`/dashboard`。プロンプト数・接続リポジトリ数・累計レビュー指摘件数・登録ドキュメント数の横断サマリ)
 
 画面遷移・DB設計・実装状況は [`docs/phase3-design.md`](./docs/phase3-design.md) を参照。
 
-### Phase 4: 統合基盤の強化(RAG検索対象の拡張)
+### Phase 4: 統合基盤の強化
 
-Phase 1〜3を「別々の機能」から「データを掛け合わせて初めて作れる機能」へ発展させる4項目のうち、項目1を実装済み。
+Phase 1〜3を「別々の機能」から「データを掛け合わせて初めて作れる機能」へ発展させる4項目のうち、項目1〜3を実装済み。
 
-- `PromptVersion`(プロンプト本文)・`Execution`(レビュー由来を除くプロンプト実行結果)を`PromptVersionEmbedding`/`ExecutionEmbedding`として埋め込み、`/chat`の検索対象に追加
-- 既存データの一括埋め込み(バックフィル)API・`/documents`ページのボタン
+- **RAG検索対象の拡張**: `PromptVersion`(プロンプト本文)・`Execution`(レビュー由来を除くプロンプト実行結果)を`PromptVersionEmbedding`/`ExecutionEmbedding`として埋め込み、`/chat`の検索対象に追加。既存データの一括埋め込み(バックフィル)API・`/documents`ページのボタンも実装
+- **プロジェクト単位のドキュメント管理**: `Document`に`repositoryId`(任意)を追加し、「リポジトリ」ページで接続したGitHubリポジトリごとにdocs/配下・README.mdをGitHub API経由で同期(`/documents`の「接続済みリポジトリの設計書を同期」)。`/chat`にも対象リポジトリの絞り込みセレクトを追加
+- **レビュー指摘蓄積からのプロンプト改善提案**: プロンプト詳細画面(`/prompts/:id`)から、過去のAIレビュー指摘を分析してプロンプトの改善案をClaudeに構造化出力で生成させるボタンを追加(永続化はせず、押すたびに生成し直す)
 
-プロジェクト単位のドキュメント管理・レビュー指摘蓄積からのプロンプト改善提案・チャットからの直接アクション実行は設計のみで未着手。設計・実装状況は [`docs/phase4-design.md`](./docs/phase4-design.md) を参照。
+チャットからの直接アクション実行は設計のみで未着手。設計・実装状況は [`docs/phase4-design.md`](./docs/phase4-design.md) を参照。
 
 ### Phase 5: 汎用AI評価ツール(画像評価プロトタイプ)
 

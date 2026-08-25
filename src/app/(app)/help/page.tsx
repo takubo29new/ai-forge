@@ -142,6 +142,9 @@ export default async function HelpPage() {
           <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
             「設計書を同期」を押すと、ai-forgeプロジェクト自身の設計書(docs/配下のMarkdownファイル・README.md・ai-dev-tool-handoff.md)をまとめて取り込めます(「リポジトリ連携」で接続した他のGitHubリポジトリではなく、今動いているこのアプリ自身のファイルが対象です)。再度押すと最新の内容で作り直されるため、設計書を更新した後は同期し直してください。
           </p>
+          <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
+            「接続済みリポジトリの設計書を同期」からは、「リポジトリ連携」で接続したGitHubリポジトリを選んで、そのリポジトリのdocs/配下・README.mdをGitHub API経由で取り込めます。プロジェクトごとに検索対象を分けたい場合に使います。接続を解除すると、そのリポジトリから取り込んだドキュメントも一緒に削除されます。
+          </p>
           <p className="text-sm text-zinc-700 dark:text-zinc-300">
             過去に実行したAIレビューの指摘は自動では検索対象になっていないため、「既存のレビュー指摘を取り込む」ボタンで一括して埋め込みを生成できます(新しく実行したレビューは自動で対象になります)。
           </p>
@@ -151,6 +154,9 @@ export default async function HelpPage() {
           <h2 className="mb-2 text-lg font-semibold">RAG検索チャット</h2>
           <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
             「チャット」ページから、登録したドキュメントや過去のAIレビュー指摘について自然文で質問できます。質問に関連する内容をベクトル検索で探し、Claudeがその内容だけを根拠に回答します(文脈に無いことは推測で答えません)。回答の下に表示される出典から、元のレビュー詳細画面に遷移できます。
+          </p>
+          <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
+            接続済みリポジトリがある場合、入力欄の上の「対象リポジトリ」から特定のリポジトリに絞り込んで質問できます(未選択時はすべてのドキュメント・レビュー指摘を横断して検索します)。
           </p>
           <p className="text-sm text-zinc-700 dark:text-zinc-300">
             会話履歴はブラウザ上にのみ保持され、ページを離れると失われます。関連するドキュメント・レビュー指摘が見つからない場合は、その旨がそのまま返されます。

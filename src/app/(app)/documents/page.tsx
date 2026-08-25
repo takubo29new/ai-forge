@@ -16,23 +16,39 @@ export default async function DocumentsPage({
   const [
     documents,
     lastSyncedDocument,
+    repositories,
+    repoLastSynced,
     pendingEmbeddingCount,
     pendingPromptVersionEmbeddingCount,
     pendingExecutionEmbeddingCount,
   ] = await Promise.all([
     prisma.document.findMany({
       where: { userId },
-      include: { _count: { select: { chunks: true } } },
+      include: {
+        _count: { select: { chunks: true } },
+        repository: { select: { owner: true, name: true } },
+      },
       orderBy: { createdAt: "desc" },
       take: limit,
     }),
-    // 「設計書を同期」の最終実行日時。再同期のたびにDocumentを作り直す
-    // (updatedAt = createdAt = 実行時刻になる)ため、REPO_FILE Documentの
-    // 最新updatedAtがそのまま最終同期日時になる。
+    // 「ai-forgeの設計書を同期」(repositoryId: null)の最終実行日時。再同期のたびに
+    // Documentを作り直す(updatedAt = createdAt = 実行時刻になる)ため、該当する
+    // REPO_FILE Documentの最新updatedAtがそのまま最終同期日時になる。
     prisma.document.findFirst({
-      where: { userId, sourceType: "REPO_FILE" },
+      where: { userId, sourceType: "REPO_FILE", repositoryId: null },
       orderBy: { updatedAt: "desc" },
       select: { updatedAt: true },
+    }),
+    prisma.repository.findMany({
+      where: { userId },
+      orderBy: { connectedAt: "desc" },
+      select: { id: true, owner: true, name: true },
+    }),
+    // 接続済みリポジトリごとの最終同期日時(上と同じ考え方)。
+    prisma.document.groupBy({
+      by: ["repositoryId"],
+      where: { userId, sourceType: "REPO_FILE", repositoryId: { not: null } },
+      _max: { updatedAt: true },
     }),
     // 埋め込み未生成のレビュー指摘数。バックフィルボタンを押す必要が
     // あるかどうかを、実行日時よりも直接的に示す指標として使う。
@@ -75,10 +91,19 @@ export default async function DocumentsPage({
           id: d.id,
           title: d.title,
           sourceType: d.sourceType,
+          repositoryLabel: d.repository ? `${d.repository.owner}/${d.repository.name}` : null,
           chunkCount: d._count.chunks,
           createdAt: d.createdAt.toISOString(),
         }))}
         initialLastSyncedAt={lastSyncedDocument?.updatedAt.toISOString() ?? null}
+        repositories={repositories.map((r) => {
+          const lastSynced = repoLastSynced.find((g) => g.repositoryId === r.id);
+          return {
+            id: r.id,
+            label: `${r.owner}/${r.name}`,
+            lastSyncedAt: lastSynced?._max.updatedAt?.toISOString() ?? null,
+          };
+        })}
         initialPendingEmbeddingCount={pendingEmbeddingCount}
         initialPendingPromptVersionEmbeddingCount={pendingPromptVersionEmbeddingCount}
         initialPendingExecutionEmbeddingCount={pendingExecutionEmbeddingCount}

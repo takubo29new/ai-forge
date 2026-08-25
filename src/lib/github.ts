@@ -166,3 +166,92 @@ export async function getPullRequestDiff(
   }
   return { diff, truncated: false };
 }
+
+function isNotFoundError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "status" in error &&
+    (error as { status: unknown }).status === 404
+  );
+}
+
+async function fetchFileContent(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  path: string,
+  ref?: string,
+): Promise<string | null> {
+  try {
+    // mediaType: { format: "raw" } を指定するとdataはファイルの生テキストになる
+    // (Octokitの型定義上は通常のcontentオブジェクトのままなので実行時の型に
+    // あわせてキャストする。getPullRequestDiff()と同じパターン)。デフォルトの
+    // JSON形式(content: base64)は1MB超のファイルでcontentが空文字列になり
+    // 中身を取得できないため、raw形式を使うことでその制限を避ける
+    const { data } = await octokit.rest.repos.getContent({
+      owner,
+      repo,
+      path,
+      ref,
+      mediaType: { format: "raw" },
+    });
+    return data as unknown as string;
+  } catch (error) {
+    if (isNotFoundError(error)) return null;
+    throw error;
+  }
+}
+
+async function listMarkdownFilePaths(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  dirPath: string,
+  ref?: string,
+): Promise<string[]> {
+  try {
+    const { data } = await octokit.rest.repos.getContent({
+      owner,
+      repo,
+      path: dirPath,
+      ref,
+    });
+    if (!Array.isArray(data)) return [];
+    return data
+      .filter((entry) => entry.type === "file" && entry.name.endsWith(".md"))
+      .map((entry) => entry.path);
+  } catch (error) {
+    if (isNotFoundError(error)) return [];
+    throw error;
+  }
+}
+
+// ai-forge自身のdocs同期(/api/documents/sync)がローカルfsから直接読むのに対し、
+// 接続済みの他リポジトリはGitHub API経由でしかファイルを取得できない
+// (docs/phase4-design.md「2. プロジェクト単位のドキュメント管理」参照)。
+// 対象はai-forge自身の同期と同じ範囲(ルートのREADME.md・docs/配下のMarkdown)に
+// 揃える。存在しないファイル・ディレクトリは404として無視する
+export async function fetchRepositoryMarkdownFiles(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  ref?: string,
+): Promise<{ sourcePath: string; content: string }[]> {
+  const files: { sourcePath: string; content: string }[] = [];
+
+  const readmeContent = await fetchFileContent(octokit, owner, repo, "README.md", ref);
+  if (readmeContent !== null) {
+    files.push({ sourcePath: "README.md", content: readmeContent });
+  }
+
+  const docsPaths = await listMarkdownFilePaths(octokit, owner, repo, "docs", ref);
+  for (const sourcePath of docsPaths) {
+    const content = await fetchFileContent(octokit, owner, repo, sourcePath, ref);
+    if (content !== null) {
+      files.push({ sourcePath, content });
+    }
+  }
+
+  return files;
+}
