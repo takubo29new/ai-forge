@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { auth } from "@/auth";
-import { syncMarkdownDocuments } from "@/lib/document-sync";
+import { prepareSyncFiles, writeSyncedDocuments } from "@/lib/document-sync";
+import { embedDocuments } from "@/lib/voyage";
 import { checkDocumentRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { voyageErrorResponse } from "@/lib/voyage-error-response";
 
@@ -54,17 +55,25 @@ export async function POST() {
   }
 
   const targets = await listTargetFiles();
-  const files = await Promise.all(
+  const targetContents = await Promise.all(
     targets.map(async (target) => ({
       sourcePath: target.sourcePath,
       content: await readFile(target.fullPath, "utf-8"),
     })),
   );
 
+  const { files, allChunkTexts } = prepareSyncFiles(targetContents);
+  if (allChunkTexts.length === 0) {
+    return NextResponse.json({ syncedDocuments: 0, syncedChunks: 0 });
+  }
+
+  let embeddings: number[][];
   try {
-    const result = await syncMarkdownDocuments(userId, null, files);
-    return NextResponse.json(result);
+    embeddings = await embedDocuments(allChunkTexts);
   } catch (error) {
     return voyageErrorResponse(error, { path: "/api/documents/sync", userId });
   }
+
+  const result = await writeSyncedDocuments(userId, null, files, embeddings);
+  return NextResponse.json(result);
 }

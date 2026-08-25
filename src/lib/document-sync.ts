@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma";
 import { chunkMarkdown } from "@/lib/document-chunks";
-import { embedDocuments } from "@/lib/voyage";
 import { setDocumentChunkEmbedding } from "@/lib/embeddings";
 
 // 本番環境ではDBがVercelのFunctionから地理的に離れている場合があり、
@@ -9,31 +8,32 @@ import { setDocumentChunkEmbedding } from "@/lib/embeddings";
 const SYNC_TRANSACTION_TIMEOUT_MS = 30_000;
 
 export type SyncTargetFile = { sourcePath: string; content: string };
+export type PreparedSyncFile = SyncTargetFile & { chunks: string[] };
 
 // ai-forge自身のdocs同期(/api/documents/sync)・接続済みリポジトリのdocs同期
-// (/api/repositories/:id/documents/sync)で共通の「Markdownファイル一覧を
-// チャンク分割・埋め込み生成してDocumentとして作り直す」処理。取得方法(ローカル
-// fs vs GitHub API)だけが呼び出し元ごとに異なる(docs/phase4-design.md参照)。
-// repositoryIdはai-forge自身の同期ではnull。
-export async function syncMarkdownDocuments(
-  userId: string,
-  repositoryId: string | null,
+// (/api/repositories/:id/documents/sync)で共通の「Markdownをチャンク分割する」処理。
+// embedDocuments()の呼び出しはあえてここに含めず呼び出し元に残す(voyageErrorResponse
+// でVoyage AI呼び出し失敗だけを判別してレスポンスを組み立てるため。writeSyncedDocuments
+// 側のDBエラーまで同じcatchで「埋め込みの生成に失敗しました」と誤表示しないようにする)。
+export function prepareSyncFiles(
   targets: SyncTargetFile[],
-): Promise<{ syncedDocuments: number; syncedChunks: number }> {
+): { files: PreparedSyncFile[]; allChunkTexts: string[] } {
   const files = targets
     .map((target) => ({ ...target, chunks: chunkMarkdown(target.content) }))
     .filter((file) => file.chunks.length > 0);
 
-  const allChunkTexts = files.flatMap((f) => f.chunks);
-  if (allChunkTexts.length === 0) {
-    return { syncedDocuments: 0, syncedChunks: 0 };
-  }
+  return { files, allChunkTexts: files.flatMap((f) => f.chunks) };
+}
 
-  // 埋め込み失敗時はDBへの書き込みを一切行わない(部分的な作り直しで
-  // 検索対象外の状態が残ることを避けるため)。呼び出し元でVoyageApiErrorを
-  // 捕捉してレスポンスを組み立てる想定であるため、ここでは投げっぱなしにする。
-  const embeddings = await embedDocuments(allChunkTexts);
-
+// 埋め込み生成後に呼ぶ。同じsourcePath(+repositoryId)のDocumentを丸ごと作り直す
+// (差分検出はせず全置き換え。docs/phase3-design.md参照)。repositoryIdはai-forge
+// 自身の同期ではnull。
+export async function writeSyncedDocuments(
+  userId: string,
+  repositoryId: string | null,
+  files: PreparedSyncFile[],
+  embeddings: number[][],
+): Promise<{ syncedDocuments: number; syncedChunks: number }> {
   let embeddingIndex = 0;
   const chunkIdsInOrder: string[] = [];
 
@@ -70,5 +70,8 @@ export async function syncMarkdownDocuments(
     chunkIdsInOrder.map((id) => setDocumentChunkEmbedding(id, embeddings[embeddingIndex++])),
   );
 
-  return { syncedDocuments: files.length, syncedChunks: allChunkTexts.length };
+  return {
+    syncedDocuments: files.length,
+    syncedChunks: files.reduce((sum, f) => sum + f.chunks.length, 0),
+  };
 }

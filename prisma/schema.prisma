@@ -336,6 +336,12 @@ model Document {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Postgresのユニークインデックスは複合キー中のNULLを区別可能として扱うため、この制約
+  // だけではrepositoryId IS NULL(ai-forge自身の同期)の重複を防げない。ai-forge自身の
+  // 同期のみを対象にした部分ユニークインデックス(userId, sourcePath) WHERE repositoryId
+  // IS NULLを、schema.prismaでは表現できないマイグレーションとして別途手動追加している
+  // (migrations/20260825223823_document_self_sync_unique_index。db-design.md「Unsupported
+  // 型の列を含むテーブルへの手動追加」と同じ、prisma migrate devの差分に頼れないケース)
   @@unique([userId, repositoryId, sourcePath])
   @@index([userId])
   @@index([repositoryId])

@@ -184,11 +184,19 @@ async function fetchFileContent(
   ref?: string,
 ): Promise<string | null> {
   try {
-    const { data } = await octokit.rest.repos.getContent({ owner, repo, path, ref });
-    // ディレクトリの場合はdataが配列になる。ファイルでもcontentが無い
-    // (例: 100MB超の外部LFSオブジェクト等)場合は取得対象外として扱う
-    if (Array.isArray(data) || data.type !== "file" || !data.content) return null;
-    return Buffer.from(data.content, "base64").toString("utf-8");
+    // mediaType: { format: "raw" } を指定するとdataはファイルの生テキストになる
+    // (Octokitの型定義上は通常のcontentオブジェクトのままなので実行時の型に
+    // あわせてキャストする。getPullRequestDiff()と同じパターン)。デフォルトの
+    // JSON形式(content: base64)は1MB超のファイルでcontentが空文字列になり
+    // 中身を取得できないため、raw形式を使うことでその制限を避ける
+    const { data } = await octokit.rest.repos.getContent({
+      owner,
+      repo,
+      path,
+      ref,
+      mediaType: { format: "raw" },
+    });
+    return data as unknown as string;
   } catch (error) {
     if (isNotFoundError(error)) return null;
     throw error;

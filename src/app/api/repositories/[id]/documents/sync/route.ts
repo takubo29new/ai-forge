@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getGitHubClient, fetchRepositoryMarkdownFiles } from "@/lib/github";
-import { syncMarkdownDocuments } from "@/lib/document-sync";
+import { prepareSyncFiles, writeSyncedDocuments } from "@/lib/document-sync";
+import { embedDocuments } from "@/lib/voyage";
 import { checkDocumentRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { voyageErrorResponse } from "@/lib/voyage-error-response";
 import { logError } from "@/lib/error-log";
@@ -47,9 +48,9 @@ export async function POST(
     );
   }
 
-  let files;
+  let targetContents;
   try {
-    files = await fetchRepositoryMarkdownFiles(
+    targetContents = await fetchRepositoryMarkdownFiles(
       octokit,
       repository.owner,
       repository.name,
@@ -70,13 +71,21 @@ export async function POST(
     );
   }
 
+  const { files, allChunkTexts } = prepareSyncFiles(targetContents);
+  if (allChunkTexts.length === 0) {
+    return NextResponse.json({ syncedDocuments: 0, syncedChunks: 0 });
+  }
+
+  let embeddings: number[][];
   try {
-    const result = await syncMarkdownDocuments(userId, repository.id, files);
-    return NextResponse.json(result);
+    embeddings = await embedDocuments(allChunkTexts);
   } catch (error) {
     return voyageErrorResponse(error, {
       path: `/api/repositories/${repository.id}/documents/sync`,
       userId,
     });
   }
+
+  const result = await writeSyncedDocuments(userId, repository.id, files, embeddings);
+  return NextResponse.json(result);
 }
