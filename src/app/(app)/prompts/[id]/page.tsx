@@ -5,7 +5,7 @@ import { requireUserId } from "@/lib/session";
 import { EditTab } from "./edit-tab";
 import { ExecuteTab } from "./execute-tab";
 import { ImprovementSuggestions } from "./improvement-suggestions";
-import { Markdown } from "@/components/markdown";
+import { ExecutionHistory } from "./execution-history";
 import { LIST_LIMIT, parsePageSize } from "@/lib/list-limits";
 import { PageSizeSelect } from "@/components/page-size-select";
 
@@ -176,55 +176,21 @@ export default async function PromptDetailPage({
       )}
 
       {tab === "history" && executions && (
-        <ul className="flex flex-col gap-2">
-          {executions.length === 0 && (
-            <li className="py-16 text-center text-sm text-zinc-500">
-              実行履歴がまだありません
-            </li>
-          )}
-          {executions.map((e) => (
-            <li
-              key={e.id}
-              className="rounded-lg border border-zinc-200 dark:border-zinc-800"
-            >
-              <details>
-                <summary className="cursor-pointer px-4 py-3 text-sm">
-                  <span className="text-zinc-500">
-                    {e.createdAt.toLocaleString("ja-JP")}
-                  </span>{" "}
-                  <span className="font-medium">
-                    v{e.promptVersion.versionNumber}
-                  </span>{" "}
-                  <span
-                    className={
-                      e.status === "SUCCESS"
-                        ? "text-emerald-600 dark:text-emerald-400"
-                        : "text-red-600 dark:text-red-400"
-                    }
-                  >
-                    {e.status}
-                  </span>{" "}
-                  <span className="text-zinc-500">{e.model}</span>
-                </summary>
-                <div className="border-t border-zinc-200 px-4 py-3 dark:border-zinc-800">
-                  {e.status === "SUCCESS" ? (
-                    <Markdown>{e.resultText ?? ""}</Markdown>
-                  ) : (
-                    <p className="text-xs text-red-600 dark:text-red-400">
-                      {e.errorMessage}
-                    </p>
-                  )}
-                  {e.status === "SUCCESS" && (
-                    <p className="mt-2 text-xs text-zinc-500">
-                      tokens: {e.promptTokens}+{e.completionTokens} /{" "}
-                      {e.durationMs}ms
-                    </p>
-                  )}
-                </div>
-              </details>
-            </li>
-          ))}
-        </ul>
+        <ExecutionHistory
+          promptId={id}
+          executions={executions.map((e) => ({
+            id: e.id,
+            createdAt: e.createdAt.toISOString(),
+            versionNumber: e.promptVersion.versionNumber,
+            status: e.status,
+            model: e.model,
+            resultText: e.resultText,
+            errorMessage: e.errorMessage,
+            promptTokens: e.promptTokens,
+            completionTokens: e.completionTokens,
+            durationMs: e.durationMs,
+          }))}
+        />
       )}
     </div>
   );
