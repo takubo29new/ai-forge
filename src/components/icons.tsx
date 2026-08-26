@@ -1,23 +1,10 @@
 type IconProps = { className?: string };
 
-// エラーログ: 三角に感嘆符(警告アイコン)
+// エラーログ: 三角に感嘆符(警告アイコン)。ジオメトリはAlertTriangleIconと
+// 共通(下部で定義。重要度WARNING・トーンCONCERNの警告アイコンと同じ形にし、
+// 同じ形を2箇所に重複定義しないため、デフォルトサイズだけ変えて再利用する)。
 export function ErrorLogIcon({ className = "h-5 w-5" }: IconProps) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      aria-hidden="true"
-    >
-      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
-      <line x1="12" y1="9" x2="12" y2="13" />
-      <line x1="12" y1="17" x2="12.01" y2="17" />
-    </svg>
-  );
+  return <AlertTriangleIcon className={className} />;
 }
 
 // 検索: 虫眼鏡
