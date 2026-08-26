@@ -77,6 +77,9 @@ export default async function HelpPage() {
             プロンプト一覧の「+ 新規作成」からタイトル・カテゴリ・本文を入力して作成します。作成後はプロンプト詳細画面の「編集」タブでいつでも本文を書き換えられます。
           </p>
           <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
+            新規作成画面の「テンプレートから始める」から、AI評価(画像・テキスト)を試しやすくする叩き台プロンプト(料理写真の評価・イラストの評価・歌詞の評価・文章の評価)を選ぶと、タイトル・本文が自動で入力されます。そのまま使うことも、自由に書き換えて自分用にアレンジすることもできます。
+          </p>
+          <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
             <strong>保存すると、既存の内容を上書きするのではなく新しいバージョンとして追加されます。</strong>
             過去の内容は消えないので、安心して書き換えを試せます。更新メモを添えておくと、あとで見返すときに何を変えたか分かりやすくなります。本文の入力欄にフォーカスした状態で
             <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">Ctrl</code>
