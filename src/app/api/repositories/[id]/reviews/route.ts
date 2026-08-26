@@ -65,6 +65,9 @@ export async function POST(
   const pullRequestNumber =
     typeof body.pullRequestNumber === "number" ? body.pullRequestNumber : null;
   const promptId = typeof body.promptId === "string" ? body.promptId : null;
+  // チャット経由の実行(Phase 4項目4)を履歴上で区別するためのトリガー元。
+  // "CHAT"以外の値・未指定はすべて既定のUI実行として扱う。
+  const triggeredVia = body.triggeredVia === "CHAT" ? "CHAT" : "UI";
 
   if (!pullRequestNumber || !promptId) {
     return NextResponse.json(
@@ -181,6 +184,7 @@ export async function POST(
           pullRequestUrl: pullRequest.url,
           headSha: pullRequest.headSha,
           status: "SUCCESS",
+          triggeredVia,
         },
       });
 
@@ -259,6 +263,7 @@ export async function POST(
       pullRequestUrl: pullRequest.url,
       headSha: pullRequest.headSha,
       status: "FAILED",
+      triggeredVia,
     },
   });
 

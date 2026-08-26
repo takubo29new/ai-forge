@@ -49,6 +49,11 @@ export default async function ReviewDetailPage({
         <span>status: {review.status}</span>
         <span>実行: {review.createdAt.toLocaleString("ja-JP")}</span>
         {review.execution && <span>{review.execution.model}</span>}
+        {review.triggeredVia === "CHAT" && (
+          <span className="rounded bg-accent/10 px-1.5 py-0.5 text-accent">
+            チャットから実行
+          </span>
+        )}
         {review.status === "SUCCESS" && (
           <span className="flex gap-3">
             <span className={SEVERITY_TEXT.CRITICAL}>

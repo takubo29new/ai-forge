@@ -243,6 +243,15 @@ enum ReviewStatus {
   FAILED
 }
 
+// レビューがどこから実行されたか(Phase 4項目4「チャットからの直接アクション実行」で
+// トリガー元を区別したいという要望に対応)。UIからの実行(/repositories/:idの
+// 「オープンなPR」タブ)がこれまでの唯一の経路だったためデフォルトはUIとし、
+// 既存データは移行なしにUI扱いのままで問題ない。
+enum ReviewTrigger {
+  UI
+  CHAT
+}
+
 // PRに対するAIレビューの実行単位。実際のAI呼び出しはExecutionに委譲し、
 // Reviewはその結果をどのリポジトリ・PRに対するものかという文脈に紐付ける。
 model Review {
@@ -269,7 +278,8 @@ model Review {
   pullRequestUrl    String
   headSha           String
 
-  status ReviewStatus @default(PENDING)
+  status       ReviewStatus  @default(PENDING)
+  triggeredVia ReviewTrigger @default(UI)
 
   comments ReviewComment[]
 

@@ -212,6 +212,11 @@ export default async function RepositoryDetailPage({
                 <p className="text-xs text-zinc-500">
                   {review.createdAt.toLocaleString("ja-JP")} · {review.status} ·{" "}
                   {review._count.comments}件の指摘
+                  {review.triggeredVia === "CHAT" && (
+                    <span className="ml-1.5 rounded bg-accent/10 px-1.5 py-0.5 text-accent">
+                      チャットから実行
+                    </span>
+                  )}
                 </p>
               </Link>
             </li>

@@ -100,6 +100,7 @@ export function ChatPanel({
         body: {
           pullRequestNumber: proposal.pullRequestNumber,
           promptId: proposal.promptId,
+          triggeredVia: "CHAT",
         },
       },
       "レビューの実行に失敗しました",
