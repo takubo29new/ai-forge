@@ -117,4 +117,4 @@ Phase 5(汎用AI評価ツール)は画像評価(`inputType: IMAGE`)・テキス�
 
 ### 積み残しの小さな改善
 
-- ルートレベルの統合テストが薄い箇所(categories/promptsのCRUD等)の拡充
+- ~~ルートレベルの統合テストが薄い箇所(categories/promptsのCRUD等)の拡充~~ → 対応済み。`/api/categories`・`/api/categories/:id`・`/api/prompts`・`/api/prompts/:id`(GET/DELETE。PATCHは既存)・`/api/prompts/:id/versions`・`/api/prompts/:id/executions`に統合テストを追加(認可404・バリデーション400・一意制約409・カスケード/SetNullの実DB確認を含む計36件)。ルートレベルの統合テストは全体で124件
