@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { Markdown } from "@/components/markdown";
 import { TONES, TONE_TEXT, TONE_LABEL, countByTone } from "@/lib/evaluation-tone";
 import { EvaluationOutputSchema } from "@/lib/evaluation-schema";
+import { INPUT_TYPE_LABEL } from "@/lib/evaluation-input-type";
 
 // ログイン不要の読み取り専用公開ページ。shareTokenが一致する評価のみを
 // 表示し、userIdでの所有者チェックは行わない(トークン自体が公開用の鍵)。
@@ -55,7 +56,7 @@ export default async function SharedEvaluationPage({
       <h1 className="mb-4 text-xl font-semibold">{evaluation.title}</h1>
 
       <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-zinc-500">
-        <span>入力形式: {evaluation.inputType === "IMAGE" ? "画像" : "テキスト"}</span>
+        <span>入力形式: {INPUT_TYPE_LABEL[evaluation.inputType]}</span>
         <span>実行: {evaluation.createdAt.toLocaleString("ja-JP")}</span>
         {evaluation.execution && <span>{evaluation.execution.model}</span>}
         <span className="flex gap-3">

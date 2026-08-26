@@ -37,6 +37,11 @@ function isImageMediaType(value: string): value is ImageMediaType {
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_IMAGE_BASE64_LENGTH = Math.ceil(MAX_IMAGE_BYTES / 3) * 4;
 
+// PDFはAnthropicのドキュメント入力(32MB/100ページ)よりアプリ側で小さめの
+// 上限に絞る(リクエストサイズ・レート制限あたりのコストを抑えるため)。
+const MAX_PDF_BYTES = 20 * 1024 * 1024;
+const MAX_PDF_BASE64_LENGTH = Math.ceil(MAX_PDF_BYTES / 3) * 4;
+
 // 通知の作成は評価結果そのものより重要度が低い副次的な処理のため、失敗しても
 // Evaluationのステータス確定には影響させないベストエフォートで行う
 // (src/app/api/repositories/[id]/reviews/route.tsの埋め込み生成と同じ方針)。
@@ -86,9 +91,14 @@ export async function POST(request: Request) {
   const body = await request.json();
   const title = typeof body.title === "string" ? body.title.trim() : "";
   const promptId = typeof body.promptId === "string" ? body.promptId : null;
-  // inputTypeは"TEXT"を明示した場合のみテキスト評価、それ以外(未指定含む)は
-  // 既存の画像評価として扱う(後方互換)。
-  const inputType = body.inputType === "TEXT" ? "TEXT" : "IMAGE";
+  // inputTypeは"TEXT"/"PDF"を明示した場合のみそれぞれの評価、それ以外
+  // (未指定含む)は既存の画像評価として扱う(後方互換)。
+  const inputType =
+    body.inputType === "TEXT"
+      ? "TEXT"
+      : body.inputType === "PDF"
+        ? "PDF"
+        : "IMAGE";
 
   if (!title || !promptId) {
     return NextResponse.json(
@@ -101,6 +111,7 @@ export async function POST(request: Request) {
     typeof body.imageBase64 === "string" ? body.imageBase64 : null;
   const imageMediaType =
     typeof body.imageMediaType === "string" ? body.imageMediaType : null;
+  const pdfBase64 = typeof body.pdfBase64 === "string" ? body.pdfBase64 : null;
   // テキスト評価は既存のプロンプト実行と同じ{{変数名}}展開を使う
   // (docs/phase5-design.md「対応する入力形式」参照)。
   const variables: Record<string, string> = {};
@@ -121,6 +132,19 @@ export async function POST(request: Request) {
     if (imageBase64.length > MAX_IMAGE_BASE64_LENGTH) {
       return NextResponse.json(
         { error: "画像サイズが大きすぎます(5MB以下にしてください)" },
+        { status: 400 },
+      );
+    }
+  } else if (inputType === "PDF") {
+    if (!pdfBase64) {
+      return NextResponse.json(
+        { error: "PDFファイルを指定してください" },
+        { status: 400 },
+      );
+    }
+    if (pdfBase64.length > MAX_PDF_BASE64_LENGTH) {
+      return NextResponse.json(
+        { error: "PDFサイズが大きすぎます(20MB以下にしてください)" },
         { status: 400 },
       );
     }
@@ -183,7 +207,19 @@ export async function POST(request: Request) {
                   },
                   { type: "text" as const, text: promptVersion.content },
                 ]
-              : renderTemplate(promptVersion.content, variables);
+              : inputType === "PDF"
+                ? [
+                    {
+                      type: "document" as const,
+                      source: {
+                        type: "base64" as const,
+                        media_type: "application/pdf" as const,
+                        data: pdfBase64!,
+                      },
+                    },
+                    { type: "text" as const, text: promptVersion.content },
+                  ]
+                : renderTemplate(promptVersion.content, variables);
 
           const response = await anthropic.messages.parse({
             model: DEFAULT_MODEL,

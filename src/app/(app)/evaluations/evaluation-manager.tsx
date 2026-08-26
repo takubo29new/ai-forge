@@ -10,9 +10,10 @@ import { useToast } from "@/components/toast-provider";
 import { usePendingEvaluations } from "@/components/pending-evaluations-context";
 import { extractVariableNames } from "@/lib/prompt-variables";
 import { submitOnModEnter } from "@/lib/keyboard-shortcuts";
+import { INPUT_TYPE_LABEL, type EvaluationInputType } from "@/lib/evaluation-input-type";
 
 type EvaluationStatus = "PENDING" | "SUCCESS" | "FAILED";
-type InputType = "IMAGE" | "TEXT";
+type InputType = EvaluationInputType;
 
 type Evaluation = {
   id: string;
@@ -23,11 +24,6 @@ type Evaluation = {
   createdAt: string;
 };
 
-const INPUT_TYPE_TEXT: Record<InputType, string> = {
-  IMAGE: "画像",
-  TEXT: "テキスト",
-};
-
 type Prompt = { id: string; title: string; content: string };
 
 const STATUS_TEXT: Record<EvaluationStatus, string> = {
@@ -36,9 +32,10 @@ const STATUS_TEXT: Record<EvaluationStatus, string> = {
   FAILED: "失敗",
 };
 
-// Claude Vision向けの簡易な事前チェック。厳密な上限はAPI側の判定に委ね、
-// ここでは明らかに大きすぎるファイルを早期に弾くだけに留める。
+// Claude Vision/ドキュメント入力向けの簡易な事前チェック。厳密な上限はAPI側の
+// 判定に委ね、ここでは明らかに大きすぎるファイルを早期に弾くだけに留める。
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_PDF_BYTES = 20 * 1024 * 1024;
 
 function readFileAsBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -46,14 +43,14 @@ function readFileAsBase64(file: File): Promise<string> {
     reader.onload = () => {
       const result = reader.result;
       if (typeof result !== "string") {
-        reject(new Error("画像の読み込みに失敗しました"));
+        reject(new Error("ファイルの読み込みに失敗しました"));
         return;
       }
       // data:image/png;base64,xxxx... のうちbase64本体だけを取り出す
       const commaIndex = result.indexOf(",");
       resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
     };
-    reader.onerror = () => reject(new Error("画像の読み込みに失敗しました"));
+    reader.onerror = () => reject(new Error("ファイルの読み込みに失敗しました"));
     reader.readAsDataURL(file);
   });
 }
@@ -96,22 +93,27 @@ export function EvaluationManager({
     if (busy) return;
 
     let data: { id: string } | null;
-    if (inputType === "IMAGE") {
+    if (inputType === "IMAGE" || inputType === "PDF") {
       if (!file) {
-        setError("画像を選択してください");
+        setError(inputType === "IMAGE" ? "画像を選択してください" : "PDFファイルを選択してください");
         return;
       }
-      if (file.size > MAX_IMAGE_BYTES) {
-        setError("画像サイズが大きすぎます(5MB以下にしてください)");
+      const maxBytes = inputType === "IMAGE" ? MAX_IMAGE_BYTES : MAX_PDF_BYTES;
+      if (file.size > maxBytes) {
+        setError(
+          inputType === "IMAGE"
+            ? "画像サイズが大きすぎます(5MB以下にしてください)"
+            : "PDFサイズが大きすぎます(20MB以下にしてください)",
+        );
         return;
       }
 
       setReading(true);
-      let imageBase64: string;
+      let base64: string;
       try {
-        imageBase64 = await readFileAsBase64(file);
+        base64 = await readFileAsBase64(file);
       } catch {
-        setError("画像の読み込みに失敗しました");
+        setError("ファイルの読み込みに失敗しました");
         setReading(false);
         return;
       }
@@ -121,13 +123,10 @@ export function EvaluationManager({
         "/api/evaluations",
         {
           method: "POST",
-          body: {
-            title,
-            promptId,
-            inputType: "IMAGE",
-            imageBase64,
-            imageMediaType: file.type,
-          },
+          body:
+            inputType === "IMAGE"
+              ? { title, promptId, inputType: "IMAGE", imageBase64: base64, imageMediaType: file.type }
+              : { title, promptId, inputType: "PDF", pdfBase64: base64 },
         },
         "評価の実行に失敗しました",
       );
@@ -147,6 +146,13 @@ export function EvaluationManager({
     // トースト通知する(docs/phase5-design.md「バックグラウンド処理」参照)。
     registerPending(data.id);
     router.push(`/evaluations/${data.id}`);
+  }
+
+  // 入力形式を切り替えるたびにfileをリセットする。選択済みのファイルを
+  // 保持したまま形式だけ変わると、別形式のファイルがそのまま送信されうるため。
+  function handleInputTypeChange(next: InputType) {
+    setInputType(next);
+    setFile(null);
   }
 
   async function handleDelete() {
@@ -211,7 +217,7 @@ export function EvaluationManager({
                   type="radio"
                   name="inputType"
                   checked={inputType === "IMAGE"}
-                  onChange={() => setInputType("IMAGE")}
+                  onChange={() => handleInputTypeChange("IMAGE")}
                 />
                 画像
               </label>
@@ -220,9 +226,18 @@ export function EvaluationManager({
                   type="radio"
                   name="inputType"
                   checked={inputType === "TEXT"}
-                  onChange={() => setInputType("TEXT")}
+                  onChange={() => handleInputTypeChange("TEXT")}
                 />
                 テキスト
+              </label>
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="radio"
+                  name="inputType"
+                  checked={inputType === "PDF"}
+                  onChange={() => handleInputTypeChange("PDF")}
+                />
+                PDF
               </label>
             </div>
           </div>
@@ -232,6 +247,17 @@ export function EvaluationManager({
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/gif,image/webp"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                required
+                className="w-full text-sm"
+              />
+            </div>
+          ) : inputType === "PDF" ? (
+            <div>
+              <label className="mb-1 block text-xs text-zinc-500">PDFファイル</label>
+              <input
+                type="file"
+                accept="application/pdf"
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                 required
                 className="w-full text-sm"
@@ -300,7 +326,7 @@ export function EvaluationManager({
                 </p>
                 <p className="text-xs text-zinc-500">
                   {new Date(evaluation.createdAt).toLocaleString("ja-JP")} ・{" "}
-                  {INPUT_TYPE_TEXT[evaluation.inputType]} ・{" "}
+                  {INPUT_TYPE_LABEL[evaluation.inputType]} ・{" "}
                   {STATUS_TEXT[evaluation.status]}
                   {evaluation.status === "SUCCESS" &&
                     ` ・ ${evaluation.findingCount}件のコメント`}
