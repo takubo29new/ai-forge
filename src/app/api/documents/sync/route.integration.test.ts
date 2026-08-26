@@ -99,4 +99,37 @@ describe("POST /api/documents/sync", () => {
     const documents = await prisma.document.findMany({ where: { userId } });
     expect(documents).toHaveLength(0);
   });
+
+  it("repositoryId無し(ai-forge自身)の同じsourcePathは重複登録できない(部分ユニークインデックス)", async () => {
+    // PostgresのユニークインデックスはNULLを区別可能として扱うため、
+    // [userId, repositoryId, sourcePath]の複合ユニーク制約だけではrepositoryId
+    // IS NULLの重複を防げない。それを補う部分インデックス
+    // (migrations/20260825223823_document_self_sync_unique_index)がDBレベルで
+    // 効いていることを直接確認する
+    await prisma.document.create({
+      data: {
+        title: "README.md",
+        content: "1つ目",
+        sourceType: "REPO_FILE",
+        sourcePath: "README.md",
+        userId,
+        repositoryId: null,
+        chunks: { create: [{ chunkIndex: 0, content: "1つ目" }] },
+      },
+    });
+
+    await expect(
+      prisma.document.create({
+        data: {
+          title: "README.md",
+          content: "2つ目",
+          sourceType: "REPO_FILE",
+          sourcePath: "README.md",
+          userId,
+          repositoryId: null,
+          chunks: { create: [{ chunkIndex: 0, content: "2つ目" }] },
+        },
+      }),
+    ).rejects.toThrow();
+  });
 });

@@ -1,24 +1,65 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type Dispatch, type SetStateAction } from "react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useApiMutation } from "@/lib/use-api-mutation";
 import { Spinner } from "@/components/spinner";
 import { useToast } from "@/components/toast-provider";
 import { PageSizeSelect } from "@/components/page-size-select";
 
+// review-comments/prompt-versions/executionsの埋め込みバックフィルで共通の
+// 「remaining: trueの間は処理件数を差し引きながら繰り返し呼び出す」ループ。
+// nullはエラー(呼び出し元のuseApiMutationのerror stateに既にセット済み)を表す。
+async function runBackfillLoop(
+  mutate: <T>(
+    url: string,
+    options: { method: "POST" },
+    fallbackErrorMessage?: string,
+  ) => Promise<T | null>,
+  url: string,
+  setCount: Dispatch<SetStateAction<number>>,
+): Promise<number | null> {
+  let totalProcessed = 0;
+  for (;;) {
+    const data = await mutate<{ processed: number; remaining: boolean }>(
+      url,
+      { method: "POST" },
+      "埋め込みの更新に失敗しました",
+    );
+    if (!data) return null;
+    totalProcessed += data.processed;
+    setCount((prev) => Math.max(0, prev - data.processed));
+    if (!data.remaining) break;
+  }
+  return totalProcessed;
+}
+
 type Document = {
   id: string;
   title: string;
   sourceType: "MANUAL" | "REPO_FILE";
+  repositoryLabel: string | null;
   chunkCount: number;
   createdAt: string;
+};
+
+type RepositoryOption = {
+  id: string;
+  label: string;
+  lastSyncedAt: string | null;
 };
 
 const SOURCE_TYPE_LABEL: Record<Document["sourceType"], string> = {
   MANUAL: "手動登録",
   REPO_FILE: "リポジトリ同期",
 };
+
+function documentSourceLabel(document: Document): string {
+  if (document.sourceType === "MANUAL") return SOURCE_TYPE_LABEL.MANUAL;
+  return document.repositoryLabel
+    ? `リポジトリ同期(${document.repositoryLabel})`
+    : "リポジトリ同期(ai-forge自身)";
+}
 
 function formatDateTime(iso: string | null): string {
   if (!iso) return "未実行";
@@ -28,12 +69,18 @@ function formatDateTime(iso: string | null): string {
 export function DocumentManager({
   initialDocuments,
   initialLastSyncedAt,
+  repositories,
   initialPendingEmbeddingCount,
+  initialPendingPromptVersionEmbeddingCount,
+  initialPendingExecutionEmbeddingCount,
   currentLimit,
 }: {
   initialDocuments: Document[];
   initialLastSyncedAt: string | null;
+  repositories: RepositoryOption[];
   initialPendingEmbeddingCount: number;
+  initialPendingPromptVersionEmbeddingCount: number;
+  initialPendingExecutionEmbeddingCount: number;
   currentLimit: number;
 }) {
   const [documents, setDocuments] = useState(initialDocuments);
@@ -43,13 +90,55 @@ export function DocumentManager({
   const { mutate, pending, error, setError } = useApiMutation();
   const { showToast } = useToast();
 
+  const [selectedRepositoryId, setSelectedRepositoryId] = useState(
+    repositories[0]?.id ?? "",
+  );
+  const [repoLastSyncedAt, setRepoLastSyncedAt] = useState<Record<string, string | null>>(
+    Object.fromEntries(repositories.map((r) => [r.id, r.lastSyncedAt])),
+  );
+  const repoSync = useApiMutation();
+
   const backfill = useApiMutation();
   const [pendingEmbeddingCount, setPendingEmbeddingCount] = useState(
     initialPendingEmbeddingCount,
   );
 
+  const promptVersionBackfill = useApiMutation();
+  const [pendingPromptVersionEmbeddingCount, setPendingPromptVersionEmbeddingCount] =
+    useState(initialPendingPromptVersionEmbeddingCount);
+
+  const executionBackfill = useApiMutation();
+  const [pendingExecutionEmbeddingCount, setPendingExecutionEmbeddingCount] = useState(
+    initialPendingExecutionEmbeddingCount,
+  );
+
   const sync = useApiMutation();
   const [lastSyncedAt, setLastSyncedAt] = useState(initialLastSyncedAt);
+
+  // 同期はサーバー側で複数のDocumentを一括作り直すため、個々の差分を
+  // クライアント側で組み立てるより一覧を取得し直す方が単純で確実。
+  async function refreshDocuments() {
+    const res = await fetch("/api/documents");
+    if (!res.ok) return;
+    const raw: {
+      id: string;
+      title: string;
+      sourceType: Document["sourceType"];
+      createdAt: string;
+      repository: { owner: string; name: string } | null;
+      _count: { chunks: number };
+    }[] = await res.json();
+    setDocuments(
+      raw.map((d) => ({
+        id: d.id,
+        title: d.title,
+        sourceType: d.sourceType,
+        repositoryLabel: d.repository ? `${d.repository.owner}/${d.repository.name}` : null,
+        chunkCount: d._count.chunks,
+        createdAt: d.createdAt,
+      })),
+    );
+  }
 
   async function handleSync() {
     const data = await sync.mutate<{ syncedDocuments: number; syncedChunks: number }>(
@@ -59,44 +148,57 @@ export function DocumentManager({
     );
     if (!data) return;
     setLastSyncedAt(new Date().toISOString());
-    // 同期はサーバー側で複数のDocumentを一括作り直すため、個々の差分を
-    // クライアント側で組み立てるより一覧を取得し直す方が単純で確実。
-    const res = await fetch("/api/documents");
-    if (res.ok) {
-      const raw: {
-        id: string;
-        title: string;
-        sourceType: Document["sourceType"];
-        createdAt: string;
-        _count: { chunks: number };
-      }[] = await res.json();
-      setDocuments(
-        raw.map((d) => ({
-          id: d.id,
-          title: d.title,
-          sourceType: d.sourceType,
-          chunkCount: d._count.chunks,
-          createdAt: d.createdAt,
-        })),
-      );
-    }
+    await refreshDocuments();
     showToast(`設計書を同期しました(${data.syncedDocuments}件)`);
   }
 
+  async function handleRepoSync() {
+    if (!selectedRepositoryId) return;
+    const repo = repositories.find((r) => r.id === selectedRepositoryId);
+    const data = await repoSync.mutate<{ syncedDocuments: number; syncedChunks: number }>(
+      `/api/repositories/${selectedRepositoryId}/documents/sync`,
+      { method: "POST" },
+      "同期に失敗しました",
+    );
+    if (!data) return;
+    setRepoLastSyncedAt((prev) => ({
+      ...prev,
+      [selectedRepositoryId]: new Date().toISOString(),
+    }));
+    await refreshDocuments();
+    showToast(
+      `${repo?.label ?? "リポジトリ"}の設計書を同期しました(${data.syncedDocuments}件)`,
+    );
+  }
+
   async function handleBackfill() {
-    let totalProcessed = 0;
-    for (;;) {
-      const data = await backfill.mutate<{ processed: number; remaining: boolean }>(
-        "/api/review-comments/backfill-embeddings",
-        { method: "POST" },
-        "埋め込みの更新に失敗しました",
-      );
-      if (!data) return;
-      totalProcessed += data.processed;
-      setPendingEmbeddingCount((prev) => Math.max(0, prev - data.processed));
-      if (!data.remaining) break;
-    }
+    const totalProcessed = await runBackfillLoop(
+      backfill.mutate,
+      "/api/review-comments/backfill-embeddings",
+      setPendingEmbeddingCount,
+    );
+    if (totalProcessed === null) return;
     showToast(`レビュー指摘の埋め込みを${totalProcessed}件取り込みました`);
+  }
+
+  async function handlePromptVersionBackfill() {
+    const totalProcessed = await runBackfillLoop(
+      promptVersionBackfill.mutate,
+      "/api/prompt-versions/backfill-embeddings",
+      setPendingPromptVersionEmbeddingCount,
+    );
+    if (totalProcessed === null) return;
+    showToast(`プロンプトの埋め込みを${totalProcessed}件取り込みました`);
+  }
+
+  async function handleExecutionBackfill() {
+    const totalProcessed = await runBackfillLoop(
+      executionBackfill.mutate,
+      "/api/executions/backfill-embeddings",
+      setPendingExecutionEmbeddingCount,
+    );
+    if (totalProcessed === null) return;
+    showToast(`実行結果の埋め込みを${totalProcessed}件取り込みました`);
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -112,6 +214,7 @@ export function DocumentManager({
         id: data.id,
         title: data.title,
         sourceType: "MANUAL",
+        repositoryLabel: null,
         chunkCount: data.chunkCount,
         createdAt: new Date().toISOString(),
       },
@@ -153,7 +256,7 @@ export function DocumentManager({
             <button
               onClick={handleSync}
               disabled={sync.pending}
-              className="inline-flex items-center gap-1.5 rounded border border-zinc-300 px-3 py-1.5 text-xs disabled:opacity-50 dark:border-zinc-700"
+              className="inline-flex items-center gap-1.5 rounded border border-zinc-300 px-3 py-1.5 text-xs hover:bg-zinc-100 disabled:opacity-50 disabled:hover:bg-transparent dark:border-zinc-700 dark:hover:bg-zinc-900"
             >
               {sync.pending && <Spinner className="h-3.5 w-3.5" />}
               {sync.pending ? "同期中..." : "設計書を同期"}
@@ -162,6 +265,51 @@ export function DocumentManager({
               <p className="mt-2 text-xs text-red-600 dark:text-red-400">
                 {sync.error}
               </p>
+            )}
+          </div>
+
+          <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+            <p className="mb-2 text-sm font-medium">接続済みリポジトリの設計書を同期</p>
+            <p className="mb-3 text-xs text-zinc-500">
+              「リポジトリ」ページで接続したGitHubリポジトリのdocs/配下のMarkdownファイル・README.mdをGitHub API経由で取り込みます。再度実行すると、同じファイルのドキュメントは最新の内容で作り直されます。
+            </p>
+            {repositories.length === 0 ? (
+              <p className="text-xs text-zinc-400">
+                接続済みのリポジトリがありません。「リポジトリ」ページから接続してください。
+              </p>
+            ) : (
+              <>
+                <div className="mb-3 flex gap-2">
+                  <select
+                    value={selectedRepositoryId}
+                    onChange={(e) => setSelectedRepositoryId(e.target.value)}
+                    className="flex-1 rounded border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-900"
+                  >
+                    {repositories.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <p className="mb-3 text-xs text-zinc-400">
+                  最終実行:{" "}
+                  {formatDateTime(repoLastSyncedAt[selectedRepositoryId] ?? null)}
+                </p>
+                <button
+                  onClick={handleRepoSync}
+                  disabled={repoSync.pending}
+                  className="inline-flex items-center gap-1.5 rounded border border-zinc-300 px-3 py-1.5 text-xs hover:bg-zinc-100 disabled:opacity-50 disabled:hover:bg-transparent dark:border-zinc-700 dark:hover:bg-zinc-900"
+                >
+                  {repoSync.pending && <Spinner className="h-3.5 w-3.5" />}
+                  {repoSync.pending ? "同期中..." : "設計書を同期"}
+                </button>
+                {repoSync.error && (
+                  <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+                    {repoSync.error}
+                  </p>
+                )}
+              </>
             )}
           </div>
 
@@ -178,7 +326,7 @@ export function DocumentManager({
             <button
               onClick={handleBackfill}
               disabled={backfill.pending || pendingEmbeddingCount === 0}
-              className="inline-flex items-center gap-1.5 rounded border border-zinc-300 px-3 py-1.5 text-xs disabled:opacity-50 dark:border-zinc-700"
+              className="inline-flex items-center gap-1.5 rounded border border-zinc-300 px-3 py-1.5 text-xs hover:bg-zinc-100 disabled:opacity-50 disabled:hover:bg-transparent dark:border-zinc-700 dark:hover:bg-zinc-900"
             >
               {backfill.pending && <Spinner className="h-3.5 w-3.5" />}
               {backfill.pending ? "処理中..." : "既存のレビュー指摘を取り込む"}
@@ -186,6 +334,58 @@ export function DocumentManager({
             {backfill.error && (
               <p className="mt-2 text-xs text-red-600 dark:text-red-400">
                 {backfill.error}
+              </p>
+            )}
+          </div>
+
+          <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+            <p className="mb-2 text-sm font-medium">プロンプトの埋め込み</p>
+            <p className="mb-3 text-xs text-zinc-500">
+              過去に保存したプロンプトの本文をRAG検索チャットの検索対象にします。新しく保存したバージョンは自動で対象になるため、既存分を取り込むためのボタンです。
+            </p>
+            <p className="mb-3 text-xs text-zinc-400">
+              {pendingPromptVersionEmbeddingCount > 0
+                ? `未処理のバージョンが${pendingPromptVersionEmbeddingCount}件あります`
+                : "未処理のバージョンはありません"}
+            </p>
+            <button
+              onClick={handlePromptVersionBackfill}
+              disabled={
+                promptVersionBackfill.pending || pendingPromptVersionEmbeddingCount === 0
+              }
+              className="inline-flex items-center gap-1.5 rounded border border-zinc-300 px-3 py-1.5 text-xs hover:bg-zinc-100 disabled:opacity-50 disabled:hover:bg-transparent dark:border-zinc-700 dark:hover:bg-zinc-900"
+            >
+              {promptVersionBackfill.pending && <Spinner className="h-3.5 w-3.5" />}
+              {promptVersionBackfill.pending ? "処理中..." : "既存のプロンプトを取り込む"}
+            </button>
+            {promptVersionBackfill.error && (
+              <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+                {promptVersionBackfill.error}
+              </p>
+            )}
+          </div>
+
+          <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+            <p className="mb-2 text-sm font-medium">実行結果の埋め込み</p>
+            <p className="mb-3 text-xs text-zinc-500">
+              過去のプロンプト実行結果をRAG検索チャットの検索対象にします(AIレビューの実行は対象外)。新しく成功した実行は自動で対象になるため、既存分を取り込むためのボタンです。
+            </p>
+            <p className="mb-3 text-xs text-zinc-400">
+              {pendingExecutionEmbeddingCount > 0
+                ? `未処理の実行結果が${pendingExecutionEmbeddingCount}件あります`
+                : "未処理の実行結果はありません"}
+            </p>
+            <button
+              onClick={handleExecutionBackfill}
+              disabled={executionBackfill.pending || pendingExecutionEmbeddingCount === 0}
+              className="inline-flex items-center gap-1.5 rounded border border-zinc-300 px-3 py-1.5 text-xs hover:bg-zinc-100 disabled:opacity-50 disabled:hover:bg-transparent dark:border-zinc-700 dark:hover:bg-zinc-900"
+            >
+              {executionBackfill.pending && <Spinner className="h-3.5 w-3.5" />}
+              {executionBackfill.pending ? "処理中..." : "既存の実行結果を取り込む"}
+            </button>
+            {executionBackfill.error && (
+              <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+                {executionBackfill.error}
               </p>
             )}
           </div>
@@ -243,7 +443,7 @@ export function DocumentManager({
         <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
           {documents.length === 0 && (
             <li className="px-4 py-6 text-center text-sm text-zinc-500">
-              ドキュメントがまだありません
+              ドキュメントがまだありません。上の「設計書を同期」で取り込むか、フォームから貼り付けて登録してください。
             </li>
           )}
           {documents.map((document) => (
@@ -254,14 +454,14 @@ export function DocumentManager({
               <div>
                 <p className="text-sm font-medium">{document.title}</p>
                 <p className="text-xs text-zinc-500">
-                  {SOURCE_TYPE_LABEL[document.sourceType]} ・{" "}
+                  {documentSourceLabel(document)} ・{" "}
                   {document.chunkCount}チャンク
                 </p>
               </div>
               <button
                 onClick={() => setDeleteTarget(document)}
                 disabled={pending}
-                className="shrink-0 rounded border border-red-300 px-3 py-1.5 text-xs text-red-600 disabled:opacity-50 dark:border-red-900 dark:text-red-400"
+                className="shrink-0 rounded border border-red-300 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:hover:bg-transparent dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
               >
                 削除
               </button>

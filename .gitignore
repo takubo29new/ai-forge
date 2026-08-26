@@ -49,3 +49,6 @@ Thumbs.db
 next-env.d.ts
 
 /src/generated/prisma
+
+# Claude Code git worktrees (transient; skills under .claude/skills ARE tracked)
+/.claude/worktrees/

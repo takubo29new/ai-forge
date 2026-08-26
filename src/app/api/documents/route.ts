@@ -16,7 +16,10 @@ export async function GET() {
 
   const documents = await prisma.document.findMany({
     where: { userId: session.user.id },
-    include: { _count: { select: { chunks: true } } },
+    include: {
+      _count: { select: { chunks: true } },
+      repository: { select: { owner: true, name: true } },
+    },
     orderBy: { createdAt: "desc" },
     take: LIST_LIMIT,
   });

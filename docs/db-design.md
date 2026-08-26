@@ -1,6 +1,6 @@
 # DB設計
 
-Phase 1(プロンプト管理ツール)・Phase 2(AIコードレビューツール)・Phase 3(RAG検索チャットボット、ドキュメント取り込みまで)に必要なテーブル構成。スキーマの実体は [`prisma/schema.prisma`](../prisma/schema.prisma)。ORMはPrisma。詳細は[`phase3-design.md`](./phase3-design.md)を参照。
+Phase 1(プロンプト管理ツール)・Phase 2(AIコードレビューツール)・Phase 3(RAG検索チャットボット、ドキュメント取り込みまで)・Phase 4項目1(RAG検索対象の拡張)・Phase 5(汎用AI評価ツール、画像評価プロトタイプ)に必要なテーブル構成。スキーマの実体は [`prisma/schema.prisma`](../prisma/schema.prisma)。ORMはPrisma。詳細は[`phase3-design.md`](./phase3-design.md)・[`phase4-design.md`](./phase4-design.md)・[`phase5-design.md`](./phase5-design.md)を参照。
 
 ## テーブル一覧
 
@@ -38,7 +38,29 @@ pgvector拡張(`vector`、0.8.6)をここで初めて有効化した。詳細は
 
 - `Document` — 取り込んだドキュメント本体(手動貼り付け、またはリポジトリファイル同期)
 - `DocumentChunk` — `Document`を見出し単位で分割した1チャンク。埋め込みベクトル(`vector(1024)`)を持つ
-- `ReviewCommentEmbedding` — `ReviewComment`に対する埋め込みを1:1で追加する別テーブル(未着手。既存指摘へのバックフィルが必要)
+- `ReviewCommentEmbedding` — `ReviewComment`に対する埋め込みを1:1で追加する別テーブル
+
+### RAG検索対象の拡張(Phase 4項目1)
+
+`Document`・`ReviewComment`に続き、Phase 1の資産(`PromptVersion`・`Execution`)もRAG検索チャット(`/chat`)の検索対象にする。詳細は[`phase4-design.md`](./phase4-design.md)を参照。
+
+### プロジェクト単位のドキュメント管理(Phase 4項目2)
+
+`Document`に`repositoryId String?`(FK、`onDelete: Cascade`)を追加し、接続済み`Repository`ごとにドキュメントを紐付けられるようにした。ユニーク制約も`[userId, sourcePath]`から`[userId, repositoryId, sourcePath]`に変更している(リポジトリをまたいだ同名ファイルを区別するため)。ただしPostgresのユニークインデックスは複合キー中のNULLを区別可能として扱うため、この制約だけではrepositoryId IS NULL(ai-forge自身の同期)同士の重複を防げない。そのため`(userId, sourcePath) WHERE repositoryId IS NULL`の部分ユニークインデックスを追加のマイグレーションで補っている(`schema.prisma`の`@@unique`では部分インデックスを表現できないため、`DocumentChunk`等のHNSWインデックスと同じく手動追加)。詳細は[`phase4-design.md`](./phase4-design.md)を参照。
+
+- `PromptVersionEmbedding` — `PromptVersion.content`に対する埋め込みを1:1で追加する別テーブル(`ReviewCommentEmbedding`と同じパターン)。新しいバージョンが保存されるたびに生成し、過去バージョンは差し替えない
+- `ExecutionEmbedding` — `Execution.resultText`に対する埋め込みを1:1で追加する別テーブル。`reviewId`が無い(Phase 2のレビュー実行ではない)`SUCCESS`な実行のみを対象とする。レビュー由来の`resultText`は既に`ReviewComment`として個別に埋め込み済みのため、重複を避けてあえて対象外にしている
+
+### チャットからの直接アクション実行(Phase 4項目4)
+
+`Review`に`triggeredVia ReviewTrigger`(`UI` | `CHAT`、デフォルト`UI`)を追加した。UIの「オープンなPR」タブからの実行とチャットからの実行はいずれも同じ`POST /api/repositories/:id/reviews`・同じ`Review`テーブルを使うため、履歴上でどちらから実行したかを区別する目的だけの列。既存データは移行なしにUI扱いのままで問題ない。詳細は[`phase4-design.md`](./phase4-design.md)を参照。
+
+### 汎用AI評価ドメイン(Phase 5)
+
+コードレビュー(`Review`)とは意図的に分離した並行の概念。詳細は[`phase5-design.md`](./phase5-design.md)を参照。
+
+- `Evaluation` — 1回のAI評価の実行単位。`Review`と同じ構造(`promptVersionId`は`onDelete: Restrict`、`executionId`は`onDelete: SetNull`)で、どのプロンプト・入力形式に対するものかを記録する
+- `EvaluationFinding` — AI評価が返した観点別コメント(ラベル・トーン・スコア・本文)。`ReviewComment`のコード非依存版
 
 ## 設計上の判断
 
@@ -73,6 +95,17 @@ pgvector拡張(`vector`、0.8.6)をここで初めて有効化した。詳細は
 - **RAG検索チャット(`/chat`)のAI呼び出しはExecutionを経由しない**: Phase 1・2のAI呼び出しは`Execution`(`promptVersionId`必須)を通すが、チャットの質問はユーザーが管理する`PromptVersion`ではなくシステム側が組み立てるプロンプトのため、この枠組みには馴染まない。無理に`Execution`へ合わせず、`src/app/api/chat/route.ts`で直接Claudeを呼び出す設計にした
 - **リポジトリファイル同期はユーザー入力のパスを受け付けない**: `POST /api/documents/sync`は`docs/*.md`・`README.md`・`ai-dev-tool-handoff.md`という固定の対象一覧のみを読み込む。任意のファイルパスをリクエストで受け取る設計にするとパストラバーサルの懸念があるため、あえて動的な指定を許可していない
 - **リポジトリファイル同期は差分検出をせず全置き換え**: 再同期のたびに、同じ`sourcePath`の`Document`を削除してから作り直す。差分(変更されたファイルだけを更新)を検出する実装は複雑さの割にメリットが薄いと判断した(単一ユーザーのポートフォリオ用途では、対象ファイルの総チャンク数がVoyage AIの1回のバッチ呼び出しに収まる規模のため)
+
+### Phase 4(項目1)の設計判断
+
+- **`PromptVersionEmbedding`/`ExecutionEmbedding`も`ReviewCommentEmbedding`と同じ1:1別テーブルパターンを踏襲**: 埋め込み対象が増えるたびに本体テーブルへ埋め込み列を追加していくのではなく、既存パターンを繰り返すことで「埋め込みは`Unsupported`型の別テーブル、読み書きは`$queryRaw`/`$executeRaw`」という設計を一貫させている
+- **`prisma migrate dev`で生成した差分をそのまま使わず手で修正した**: `Unsupported`型の列に手動追加したHNSWインデックス(`DocumentChunk`・`ReviewCommentEmbedding`)は`schema.prisma`上で宣言されていないため、Prismaのスキーマ差分検出はこれらを「消えたもの」と誤認識し、生成された`migration.sql`には既存インデックスへの`DROP INDEX`が含まれていた。これをそのまま適用すると本番の類似検索インデックスを消してしまうため、`DROP INDEX`を取り除き、新規2テーブル分の`CREATE INDEX ... USING hnsw`を`20260823224800_add_phase3_rag_schema`と同じ形で手動追加した。`Unsupported`型の列を含むテーブルに対して`prisma migrate dev`を実行するときは、生成された差分に想定外の`DROP INDEX`が無いか必ず確認する必要がある
+
+### Phase 5の設計判断
+
+- **`Evaluation`/`EvaluationFinding`は`Review`/`ReviewComment`を汎用化せず新設した**: `Review`はコード固有のフィールド(`filePath`・`line`)を持ち、既存のリポジトリ「傾向」タブ・RAG出典表示と深く統合されている。無理に汎用化して両方の呼び出し元を分岐だらけにするより、同じFKパターン(`promptVersionId`は`Restrict`、`executionId`は`SetNull`)を踏襲した並行モデルとして新設するほうが、既存機能への影響もレビューの負担も小さいと判断した。理由の詳細は[`phase5-design.md`](./phase5-design.md)を参照
+- **`Evaluation`に画像・PDFそのものを保持する列は無い**: いずれもリクエスト内でClaudeに渡すのみでDB/ストレージに永続化しない設計のため(理由は[`phase5-design.md`](./phase5-design.md)「画像の扱い: 保存しない方針」を参照)。結果のテキスト(`Evaluation.summary`・`EvaluationFinding.body`)のみを保存する
+- **評価結果(`Evaluation.summary`・`EvaluationFinding.body`)はAES-256-GCMで暗号化して保存する**: 評価対象がPDF(履歴書・契約書等)や写真など個人情報を含みうる入力に広がったため、GitHubトークンと同じ仕組み(`src/lib/token-crypto.ts`)を`src/lib/field-crypto.ts`経由で再利用した。`Execution.resultText`は複数の実行系で共有される列で暗号化が及ばないため、AI評価分はここに実際の内容を書かず固定のプレースホルダー文字列に留めている(実行履歴タブ・RAG埋め込みバックフィルなど、AI評価を想定していない箇所からの平文漏えいを防ぐため)。詳細は[`phase5-design.md`](./phase5-design.md)「評価結果の暗号化」を参照
 
 ## DB環境構築
 

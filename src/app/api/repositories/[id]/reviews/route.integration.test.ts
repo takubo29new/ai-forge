@@ -137,6 +137,7 @@ describe("POST /api/repositories/:id/reviews", () => {
       include: { comments: true },
     });
     expect(review?.status).toBe("SUCCESS");
+    expect(review?.triggeredVia).toBe("UI");
     expect(review?.comments).toHaveLength(1);
     expect(review?.comments[0].filePath).toBe("src/x.ts");
 
@@ -146,6 +147,55 @@ describe("POST /api/repositories/:id/reviews", () => {
       WHERE "reviewCommentId" = ${review!.comments[0].id}
     `;
     expect(embedded).toHaveLength(1);
+  });
+
+  it("triggeredVia: CHATを指定するとチャット実行として記録される(Phase 4項目4)", async () => {
+    mockGetDiff.mockResolvedValue({
+      diff: "diff --git a/x b/x",
+      truncated: false,
+    });
+    mockParse.mockResolvedValue({
+      parsed_output: { findings: [] },
+      usage: { input_tokens: 100, output_tokens: 10 },
+    } as never);
+
+    const res = await POST(
+      request({
+        pullRequestNumber: 42,
+        promptId: promptWithDiffId,
+        triggeredVia: "CHAT",
+      }),
+      ctx(repositoryId),
+    );
+    expect(res.status).toBe(201);
+    const { id: reviewId } = await res.json();
+
+    const review = await prisma.review.findUnique({ where: { id: reviewId } });
+    expect(review?.triggeredVia).toBe("CHAT");
+  });
+
+  it("triggeredViaに不正な値を指定してもUIとして扱われる", async () => {
+    mockGetDiff.mockResolvedValue({
+      diff: "diff --git a/x b/x",
+      truncated: false,
+    });
+    mockParse.mockResolvedValue({
+      parsed_output: { findings: [] },
+      usage: { input_tokens: 100, output_tokens: 10 },
+    } as never);
+
+    const res = await POST(
+      request({
+        pullRequestNumber: 42,
+        promptId: promptWithDiffId,
+        triggeredVia: "something-else",
+      }),
+      ctx(repositoryId),
+    );
+    const { id: reviewId } = await res.json();
+
+    const review = await prisma.review.findUnique({ where: { id: reviewId } });
+    expect(review?.triggeredVia).toBe("UI");
   });
 
   it("diffが切り詰められた場合はReviewCommentに警告を残す", async () => {

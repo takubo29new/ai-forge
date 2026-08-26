@@ -4,6 +4,7 @@ import { HelpToc } from "./help-toc";
 
 const SECTIONS = [
   { id: "login", label: "ログイン" },
+  { id: "search", label: "横断検索" },
   { id: "categories", label: "カテゴリ" },
   { id: "prompts", label: "プロンプトの作成・編集" },
   { id: "versions", label: "バージョン履歴" },
@@ -14,7 +15,9 @@ const SECTIONS = [
   { id: "trends", label: "レビュー履歴・傾向" },
   { id: "documents", label: "ドキュメント" },
   { id: "chat", label: "RAG検索チャット" },
+  { id: "evaluations", label: "AI評価" },
   { id: "dashboard", label: "ダッシュボード" },
+  { id: "usage", label: "利用状況" },
   { id: "appearance", label: "表示設定・エラーログ" },
   { id: "faq", label: "よくある質問" },
 ];
@@ -46,6 +49,21 @@ export default async function HelpPage() {
           </p>
         </section>
 
+        <section id="search" className="scroll-mt-6">
+          <h2 className="mb-2 text-lg font-semibold">横断検索</h2>
+          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+            ヘッダー右側の虫眼鏡アイコン、または
+            <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">Ctrl</code>
+            /
+            <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">⌘</code>
+            +
+            <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">K</code>
+            でどの画面からでもコマンドパレットを開けます(入力欄にフォーカスしていない状態なら
+            <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">/</code>
+            でも開けます)。プロンプト・カテゴリ・リポジトリ・ドキュメント・評価・レビュー(PRタイトル)を横断して名前の部分一致で検索し、選ぶとその画面に移動します。矢印キーで候補を選び、Enterで移動できます。
+          </p>
+        </section>
+
         <section id="categories" className="scroll-mt-6">
           <h2 className="mb-2 text-lg font-semibold">カテゴリ</h2>
           <p className="text-sm text-zinc-700 dark:text-zinc-300">
@@ -58,9 +76,21 @@ export default async function HelpPage() {
           <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
             プロンプト一覧の「+ 新規作成」からタイトル・カテゴリ・本文を入力して作成します。作成後はプロンプト詳細画面の「編集」タブでいつでも本文を書き換えられます。
           </p>
-          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+          <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
+            新規作成画面の「テンプレートから始める」から、AI評価(画像・テキスト・PDF)を試しやすくする叩き台プロンプトを選ぶと、タイトル・本文が自動で入力されます。そのまま使うことも、自由に書き換えて自分用にアレンジすることもできます。
+          </p>
+          <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
             <strong>保存すると、既存の内容を上書きするのではなく新しいバージョンとして追加されます。</strong>
-            過去の内容は消えないので、安心して書き換えを試せます。更新メモを添えておくと、あとで見返すときに何を変えたか分かりやすくなります。
+            過去の内容は消えないので、安心して書き換えを試せます。更新メモを添えておくと、あとで見返すときに何を変えたか分かりやすくなります。本文の入力欄にフォーカスした状態で
+            <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">Ctrl</code>
+            /
+            <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">⌘</code>
+            +
+            <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">Enter</code>
+            で保存できます。
+          </p>
+          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+            AIレビューで一度でも使ったプロンプトには、「編集」タブの下に「レビュー指摘からの改善提案」が表示されます。過去の指摘の中から繰り返し発生しているパターンをAIが分析し、プロンプト本文の改善案を提案します(結果は保存されず、押すたびに生成し直します)。
           </p>
         </section>
 
@@ -87,14 +117,23 @@ export default async function HelpPage() {
             実行タブに「topic」という入力欄が現れるので、そこに値(例:
             「TypeScript」)を入れて実行すると、変数部分が置き換えられた本文がClaudeに送信されます。値を入力しなかった変数は
             <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">{"{{topic}}"}</code>
-            のまま送信されます。
+            のまま送信されます。変数の入力欄にフォーカスした状態で
+            <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">Ctrl</code>
+            /
+            <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">⌘</code>
+            +
+            <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">Enter</code>
+            を押すと、ボタンを押さずに実行できます。
           </p>
         </section>
 
         <section id="history" className="scroll-mt-6">
           <h2 className="mb-2 text-lg font-semibold">実行履歴</h2>
-          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+          <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
             「実行履歴」タブで、これまでの実行結果を新しい順に確認できます。各行を開くと、結果本文(失敗した場合はエラー内容)、使用したバージョン、トークン数、実行時間が表示されます。
+          </p>
+          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+            各行のチェックボックスから2件選ぶと「比較する」ボタンが表示され、2つの実行結果を左右に並べて比較できます。プロンプトの異なるバージョン間で結果がどう変わったか確認したいときに使います。
           </p>
         </section>
 
@@ -118,6 +157,9 @@ export default async function HelpPage() {
             <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">{"{{diff}}"}</code>
             を含めてください。実行時にPRの差分がこの部分に展開されます。含まれていないプロンプトは実行前に警告が表示され、実行できません。
           </p>
+          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+            成功したレビューの詳細画面では「共有リンクを作成」から、ログイン不要で誰でも閲覧できる読み取り専用のURLを発行できます。作成前に確認ダイアログが表示されるので、非公開の情報が含まれていないか確認してください。「共有を解除」を押すと、それまでのリンクは使えなくなります。
+          </p>
         </section>
 
         <section id="trends" className="scroll-mt-6">
@@ -125,8 +167,11 @@ export default async function HelpPage() {
           <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
             リポジトリ詳細画面の「レビュー履歴」タブで、過去に実行したレビューを新しい順に確認できます。各行を開くと、ファイルごとの指摘事項と重要度(CRITICAL / WARNING / INFO)を確認できます。
           </p>
-          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+          <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
             「傾向」タブでは、そのリポジトリでの累計指摘件数(重要度別)、直近10件のレビューの重要度の内訳、指摘が多いファイルの上位を確認できます。レビューを重ねるほど、どのファイル・観点に問題が集中しているか把握しやすくなります。
+          </p>
+          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+            「レビュー履歴」の各行のチェックボックスから2件選ぶと「比較する」ボタンが表示され、2つのレビュー結果を左右に並べて比較できます。同じPRに複数回レビューを実行したとき、指摘内容の違いを確認したい場合に使います。
           </p>
         </section>
 
@@ -138,6 +183,9 @@ export default async function HelpPage() {
           <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
             「設計書を同期」を押すと、ai-forgeプロジェクト自身の設計書(docs/配下のMarkdownファイル・README.md・ai-dev-tool-handoff.md)をまとめて取り込めます(「リポジトリ連携」で接続した他のGitHubリポジトリではなく、今動いているこのアプリ自身のファイルが対象です)。再度押すと最新の内容で作り直されるため、設計書を更新した後は同期し直してください。
           </p>
+          <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
+            「接続済みリポジトリの設計書を同期」からは、「リポジトリ連携」で接続したGitHubリポジトリを選んで、そのリポジトリのdocs/配下・README.mdをGitHub API経由で取り込めます。プロジェクトごとに検索対象を分けたい場合に使います。接続を解除すると、そのリポジトリから取り込んだドキュメントも一緒に削除されます。
+          </p>
           <p className="text-sm text-zinc-700 dark:text-zinc-300">
             過去に実行したAIレビューの指摘は自動では検索対象になっていないため、「既存のレビュー指摘を取り込む」ボタンで一括して埋め込みを生成できます(新しく実行したレビューは自動で対象になります)。
           </p>
@@ -148,8 +196,46 @@ export default async function HelpPage() {
           <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
             「チャット」ページから、登録したドキュメントや過去のAIレビュー指摘について自然文で質問できます。質問に関連する内容をベクトル検索で探し、Claudeがその内容だけを根拠に回答します(文脈に無いことは推測で答えません)。回答の下に表示される出典から、元のレビュー詳細画面に遷移できます。
           </p>
+          <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
+            接続済みリポジトリがある場合、入力欄の上の「対象リポジトリ」から特定のリポジトリに絞り込んで質問できます(未選択時はすべてのドキュメント・レビュー指摘を横断して検索します)。
+          </p>
+          <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
+            接続済みリポジトリと保存済みプロンプトの両方がある場合、入力欄の上に「AIレビュー実行」の選択フォーム(リポジトリ・PR番号・プロンプトをそれぞれ選択)が表示されます。選んで「確認画面を表示」を押すと実行内容の確認画面が表示されます。「
+            <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">owner/repoのPR #12を「プロンプト名」でレビューして</code>
+            」のように、リポジトリ名・PR番号・プロンプト名を含めて自然文で依頼しても同じ確認画面が表示されます(リポジトリ名など特定できない情報がある依頼は実行の提案自体が行われません)。内容を確認して「実行」を押すと、そのままAIレビューが実行され、結果画面へのリンクが表示されます(「キャンセル」を押すか内容が違っていれば取り消せます)。それ以外の操作(リポジトリの接続解除やプロンプトの削除など)はチャットからは実行できません。
+          </p>
           <p className="text-sm text-zinc-700 dark:text-zinc-300">
             会話履歴はブラウザ上にのみ保持され、ページを離れると失われます。関連するドキュメント・レビュー指摘が見つからない場合は、その旨がそのまま返されます。
+          </p>
+        </section>
+
+        <section id="evaluations" className="scroll-mt-6">
+          <h2 className="mb-2 text-lg font-semibold">AI評価</h2>
+          <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
+            「評価」ページから、画像(料理の写真・自作の絵など)・テキスト(歌詞・文章など)・PDF(履歴書・契約書・論文など)のいずれかとプロンプトを選んで「評価を実行」を押すと、Claudeが観点別のコメント(良い点・提案・気になる点)と総評を返します。コードレビューと同じ「プロンプトを選んでClaudeに実行させる」仕組みを画像・テキスト・PDF入力向けに広げたものです。
+          </p>
+          <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
+            「PDF」を選ぶとファイル選択欄が表示されます(20MBまで)。契約書のように専門的な判断が必要な内容は、あくまで読み解きの補助として使い、最終判断は自分で行ってください。
+          </p>
+          <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
+            「テキスト」を選ぶと、選んだプロンプトの本文に含まれる
+            <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">{"{{変数名}}"}</code>
+            ごとに入力欄が表示されるので、評価したい内容を入力してください(プロンプト実行の変数展開と同じ仕組みです)。変数が含まれていないプロンプトはテキスト評価には使えません。入力欄にフォーカスした状態で
+            <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">Ctrl</code>
+            /
+            <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">⌘</code>
+            +
+            <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">Enter</code>
+            で実行できます。
+          </p>
+          <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
+            アップロードした画像・PDF自体はサーバーに保存されません。Claudeへのリクエストで使われるだけで、評価結果(テキスト)のみが記録されます。この評価結果はDB上で暗号化して保存されます(GitHubアクセストークンと同じ仕組み)。ただし共有リンクを作成すると、その評価結果は読み取り専用の公開URLで誰でも閲覧できるようになります。非公開にしておきたい内容(履歴書や契約書の評価など)は共有リンクを作成しないよう注意してください。
+          </p>
+          <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
+            評価の実行を押すと、Claudeの応答を待たずにすぐ「処理中」の状態で結果画面に移動します(裏側でバックグラウンド実行中)。完了すると、開いたままの結果画面は自動的に更新され、他の画面に移動していても画面下部に完了の通知が表示されます。トーストは数秒で消えて見逃すこともあるため、ヘッダーのベルアイコン(通知センター)にも同じ完了通知が残ります。未読件数がバッジで表示され、クリックすると一覧から結果画面に移動できます。
+          </p>
+          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+            成功した評価の詳細画面では、AIレビューと同じ「共有リンクを作成」からログイン不要の読み取り専用URLを発行できます(確認ダイアログ・解除の挙動もAIレビューと共通です)。
           </p>
         </section>
 
@@ -157,6 +243,16 @@ export default async function HelpPage() {
           <h2 className="mb-2 text-lg font-semibold">ダッシュボード</h2>
           <p className="text-sm text-zinc-700 dark:text-zinc-300">
             「ダッシュボード」ページで、プロンプト数・接続リポジトリ数・累計レビュー指摘件数(重要度別)・登録ドキュメント数をまとめて確認できます。「チャットで質問する」「ドキュメントを管理」から各画面にすぐ移動できます。
+          </p>
+        </section>
+
+        <section id="usage" className="scroll-mt-6">
+          <h2 className="mb-2 text-lg font-semibold">利用状況</h2>
+          <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
+            「利用状況」ページで、Claude(Anthropic)のトークン使用量(プロンプト実行・AIレビュー・AI評価の合計、モデル別内訳、直近14日の推移)と、Voyage AIの埋め込み件数を確認できます。
+          </p>
+          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+            モデルごとの正確な現行料金をアプリ側で把握できないため、金額換算(概算コスト)は表示していません。またRAG検索チャットの回答生成・チャットからのアクション解析・プロンプト改善提案はトークン数を記録していないため、Claudeの集計には含まれません。
           </p>
         </section>
 

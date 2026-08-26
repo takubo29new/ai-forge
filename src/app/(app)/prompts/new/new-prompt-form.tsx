@@ -4,6 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useApiMutation } from "@/lib/use-api-mutation";
 import { useToast } from "@/components/toast-provider";
+import { PROMPT_TEMPLATES } from "@/lib/prompt-templates";
+import { INPUT_TYPE_LABEL, INPUT_TYPE_ICON, type EvaluationInputType } from "@/lib/evaluation-input-type";
+
+const TEMPLATE_GROUPS: EvaluationInputType[] = ["IMAGE", "TEXT", "PDF"];
 
 type Category = { id: string; name: string };
 
@@ -27,8 +31,46 @@ export function NewPromptForm({ categories }: { categories: Category[] }) {
     showToast("プロンプトを作成しました");
   }
 
+  function applyTemplate(template: (typeof PROMPT_TEMPLATES)[number]) {
+    setTitle(template.title);
+    setContent(template.content);
+  }
+
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <div>
+        <label className="mb-1 block text-xs text-zinc-500">
+          テンプレートから始める(任意)
+        </label>
+        <p className="mb-2 text-xs text-zinc-500">
+          AI評価(画像・テキスト・PDF)を試しやすくする叩き台です。選ぶとタイトル・本文が置き換わります(あとから自由に編集できます)。
+        </p>
+        <div className="flex flex-col gap-2">
+          {TEMPLATE_GROUPS.map((group) => {
+            const templates = PROMPT_TEMPLATES.filter((t) => t.inputTypeHint === group);
+            if (templates.length === 0) return null;
+            const GroupIcon = INPUT_TYPE_ICON[group];
+            return (
+              <div key={group} className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1 text-xs text-zinc-400">
+                  <GroupIcon className="h-3.5 w-3.5" />
+                  {INPUT_TYPE_LABEL[group]}用:
+                </span>
+                {templates.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => applyTemplate(t)}
+                    className="rounded-full border border-zinc-300 px-3 py-1 text-xs hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900"
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      </div>
       <div>
         <label className="mb-1 block text-xs text-zinc-500">タイトル</label>
         <input

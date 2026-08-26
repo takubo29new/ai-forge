@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/session";
-import { SEVERITIES, SEVERITY_TEXT } from "@/lib/review-severity";
+import { SEVERITIES, SEVERITY_TEXT, SEVERITY_ICON } from "@/lib/review-severity";
 
 export default async function DashboardPage() {
   const userId = await requireUserId();
@@ -11,12 +11,14 @@ export default async function DashboardPage() {
     repositoryCount,
     documentCount,
     documentChunkCount,
+    evaluationCount,
     severityGroups,
   ] = await Promise.all([
     prisma.prompt.count({ where: { userId } }),
     prisma.repository.count({ where: { userId } }),
     prisma.document.count({ where: { userId } }),
     prisma.documentChunk.count({ where: { document: { userId } } }),
+    prisma.evaluation.count({ where: { userId } }),
     prisma.reviewComment.groupBy({
       by: ["severity"],
       where: { review: { userId } },
@@ -41,7 +43,7 @@ export default async function DashboardPage() {
         プロンプト・リポジトリ・レビュー・ドキュメントを横断したサマリです。
       </p>
 
-      <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-5">
         <Link
           href="/prompts"
           className="rounded-lg border border-zinc-200 p-4 transition-all hover:-translate-y-0.5 hover:border-accent hover:shadow-md dark:border-zinc-800"
@@ -69,6 +71,13 @@ export default async function DashboardPage() {
             登録ドキュメント({documentChunkCount}チャンク)
           </p>
         </Link>
+        <Link
+          href="/evaluations"
+          className="rounded-lg border border-zinc-200 p-4 transition-all hover:-translate-y-0.5 hover:border-accent hover:shadow-md dark:border-zinc-800"
+        >
+          <p className="text-2xl font-semibold">{evaluationCount}</p>
+          <p className="text-xs text-zinc-500">AI評価</p>
+        </Link>
       </div>
 
       {totalFindings > 0 && (
@@ -77,14 +86,20 @@ export default async function DashboardPage() {
             レビュー指摘の重要度内訳
           </p>
           <div className="flex gap-6">
-            {SEVERITIES.map((s) => (
-              <div key={s}>
-                <p className={`text-lg font-semibold ${SEVERITY_TEXT[s]}`}>
-                  {severityTotals[s]}
-                </p>
-                <p className="text-xs text-zinc-500">{s}</p>
-              </div>
-            ))}
+            {SEVERITIES.map((s) => {
+              const SevIcon = SEVERITY_ICON[s];
+              return (
+                <div key={s}>
+                  <p className={`text-lg font-semibold ${SEVERITY_TEXT[s]}`}>
+                    {severityTotals[s]}
+                  </p>
+                  <p className="inline-flex items-center gap-1 text-xs text-zinc-500">
+                    <SevIcon className="h-3.5 w-3.5" />
+                    {s}
+                  </p>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -98,7 +113,7 @@ export default async function DashboardPage() {
         </Link>
         <Link
           href="/documents"
-          className="rounded border border-zinc-300 px-4 py-2 text-sm dark:border-zinc-700"
+          className="rounded border border-zinc-300 px-4 py-2 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900"
         >
           ドキュメントを管理
         </Link>

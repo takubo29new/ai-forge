@@ -146,7 +146,7 @@ export function CategoryManager({
                   </button>
                   <button
                     onClick={() => setEditingId(null)}
-                    className="rounded border border-zinc-300 px-3 py-1.5 text-xs dark:border-zinc-700"
+                    className="rounded border border-zinc-300 px-3 py-1.5 text-xs hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900"
                   >
                     キャンセル
                   </button>
@@ -170,14 +170,14 @@ export function CategoryManager({
                 <div className="flex shrink-0 gap-2">
                   <button
                     onClick={() => startEdit(category)}
-                    className="rounded border border-zinc-300 px-3 py-1.5 text-xs dark:border-zinc-700"
+                    className="rounded border border-zinc-300 px-3 py-1.5 text-xs hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900"
                   >
                     編集
                   </button>
                   <button
                     onClick={() => setDeleteTarget(category)}
                     disabled={pending}
-                    className="rounded border border-red-300 px-3 py-1.5 text-xs text-red-600 disabled:opacity-50 dark:border-red-900 dark:text-red-400"
+                    className="rounded border border-red-300 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:hover:bg-transparent dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
                   >
                     削除
                   </button>

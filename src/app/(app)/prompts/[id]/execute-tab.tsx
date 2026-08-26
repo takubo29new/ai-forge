@@ -7,6 +7,8 @@ import { extractVariableNames } from "@/lib/prompt-variables";
 import { Markdown } from "@/components/markdown";
 import { useApiMutation } from "@/lib/use-api-mutation";
 import { Spinner } from "@/components/spinner";
+import { submitOnModEnter } from "@/lib/keyboard-shortcuts";
+import { STATUS_LABEL, STATUS_ICON, STATUS_TEXT } from "@/lib/execution-status";
 
 type Version = { id: string; versionNumber: number; content: string };
 
@@ -115,12 +117,15 @@ export function ExecuteTab({
                     [name]: e.target.value,
                   }))
                 }
+                onKeyDown={submitOnModEnter}
                 className="flex-1 rounded border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
               />
             </div>
           ))}
         </div>
       )}
+
+      <p className="text-xs text-zinc-500">Ctrl/⌘+Enterで実行できます</p>
 
       <button
         type="submit"
@@ -135,23 +140,28 @@ export function ExecuteTab({
         <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
       )}
 
-      {result && (
-        <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
-          <p className="mb-2 text-xs text-zinc-500">実行結果</p>
-          {result.status === "SUCCESS" ? (
-            <Markdown>{result.resultText ?? ""}</Markdown>
-          ) : (
-            <p className="text-sm text-red-600 dark:text-red-400">
-              {result.errorMessage}
+      {result && (() => {
+        const StatusIcon = STATUS_ICON[result.status];
+        return (
+          <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+            <p className="mb-2 text-xs text-zinc-500">実行結果</p>
+            {result.status === "SUCCESS" ? (
+              <Markdown>{result.resultText ?? ""}</Markdown>
+            ) : (
+              <p className="flex items-start gap-1.5 text-sm text-red-600 dark:text-red-400">
+                <StatusIcon className="mt-0.5 h-4 w-4 shrink-0" />
+                {result.errorMessage}
+              </p>
+            )}
+            <p className="mt-3 inline-flex items-center gap-1 text-xs text-zinc-500">
+              <StatusIcon className={`h-3.5 w-3.5 ${STATUS_TEXT[result.status]}`} />
+              <span className={STATUS_TEXT[result.status]}>{STATUS_LABEL[result.status]}</span>
+              {result.status === "SUCCESS" &&
+                ` / tokens: ${result.promptTokens}+${result.completionTokens} / ${result.durationMs}ms`}
             </p>
-          )}
-          <p className="mt-3 text-xs text-zinc-500">
-            status: {result.status}
-            {result.status === "SUCCESS" &&
-              ` / tokens: ${result.promptTokens}+${result.completionTokens} / ${result.durationMs}ms`}
-          </p>
-        </div>
-      )}
+          </div>
+        );
+      })()}
     </form>
   );
 }

@@ -72,5 +72,58 @@ Phase 3(RAG検索チャットボット)は実装完了。埋め込みモデル�
 
 これで統合AI開発支援ツールとして計画していたPhase 1〜3の主要機能はすべて実装完了。
 
+Phase 3完了後、ユーザーからの要望を受けてUI/UX改善(ナビゲーション再編・共通トースト通知・アクセシブルなモーダル・ブランドアクセントカラーの導入など十数項目)、セキュリティ対応(GitHubアクセストークンの暗号化保存とrefresh_tokenによる自動更新)を実施し、v1.0.0としてVercelに本番デプロイした。デプロイ後は実運用で判明した問題(DBトランザクションのタイムアウト、DBとVercel Functionのリージョン不一致による速度低下など)にも対応済み。詳細は[`docs/quality-improvements.md`](./docs/quality-improvements.md)の10〜12を参照。本番URLでの動作確認・GitHubログイン・AIレビュー・RAG検索チャットまで一通り確認できている。
+
+開発の記録(実働時間・従来開発との比較・スクリーンショット)はポートフォリオ用資料としてまとめている。
+
+Phase 4(統合基盤の強化)は4項目すべて実装完了。項目1「RAG検索対象の拡張」では`PromptVersion`(プロンプト本文)・`Execution`(レビュー由来を除くプロンプト実行結果)を`PromptVersionEmbedding`/`ExecutionEmbedding`として埋め込み、`/chat`の検索対象が`Document`・`ReviewComment`に加えてこの2つにも広がった(既存データのバックフィルAPI・`/documents`ページのボタンも実装済み)。項目2「プロジェクト単位のドキュメント管理」では`Document`に`repositoryId`(任意)を追加し、「リポジトリ」ページで接続したGitHubリポジトリごとにdocs/配下・README.mdをGitHub API経由で同期できるようになった(`/documents`の「接続済みリポジトリの設計書を同期」)。`/chat`にも対象リポジトリの絞り込みセレクトを追加し、指定時は`Document`・`ReviewComment`をそのリポジトリに限定する(`PromptVersion`・`Execution`はリポジトリに紐づかないため常に横断検索)。項目3「レビュー指摘蓄積からのプロンプト改善提案」では、プロンプト詳細画面(`/prompts/:id`)にボタンを追加し、過去の`ReviewComment`を分析してプロンプトの改善案をClaudeに構造化出力で生成させる。専用テーブルは持たず、押すたびに生成し直す(永続化しない)設計。項目4「チャットからの直接アクション実行」では、`/chat`でユーザーの発話をClaudeのtool use(低コストな`claude-haiku-4-5`を使用)で解析し、「保存済みプロンプトでのAIレビュー実行」の意図とパラメータ(リポジトリ・PR番号・プロンプト)を検出した場合のみ`ConfirmDialog`で確認内容を表示、ユーザーが確認した場合のみ既存の`POST /api/repositories/:id/reviews`を呼び出す(新規の実行用エンドポイントは追加していない)。詳細は[`docs/phase4-design.md`](./docs/phase4-design.md)を参照。
+
+Phase 5(汎用AI評価ツール)は画像評価(`inputType: IMAGE`)・テキスト評価(`inputType: TEXT`)・バックグラウンド処理を実装完了。`Evaluation`/`EvaluationFinding`をReviewとは独立したモデルとして追加し、`/evaluations`から画像またはテキスト+プロンプトを送るとClaudeが評価し観点別コメントを取得できる。画像評価はClaude Visionへ画像をBase64で渡し、DBに永続化しない設計。テキスト評価は既存のプロンプト実行と同じ`{{変数名}}`展開(`renderTemplate()`)を再利用し、選んだプロンプトの変数ごとに`<textarea>`を表示する。バックグラウンド処理では、`POST /api/evaluations`がバリデーション後すぐ`PENDING`な`Evaluation`を`202`で返し、実際のAI呼び出しはNext.jsの`after()`でレスポンス送出後に継続する(新規の常駐ワーカー・キューは追加していない)。`(app)/layout.tsx`に常駐する`PendingEvaluationsProvider`がポーリングし、完了をトースト通知する(離れた画面からでも通知される)。画像の永続化は個人情報リスクを理由に見送り済み(下記の追加機能アイデアの流れで共有リンク・通知センター・プロンプトテンプレート集・PDF評価・評価結果の暗号化も実装済み)。詳細は[`docs/phase5-design.md`](./docs/phase5-design.md)を参照。
+
 ## 次のステップ候補
-- Phase 3: 複数リポジトリの同期・プロジェクト単位のRAG検索チャット(Phase 2で接続済みのGitHubリポジトリごとにドキュメントを同期し、`/chat`で対象リポジトリを絞り込めるようにする。詳細は[`docs/phase3-design.md`](./docs/phase3-design.md)の「今後の拡張候補」参照)
+
+2026-08-25時点でユーザーと検討した今後の方向性をまとめる。優先順は上から。
+
+### Phase 4: 統合基盤の強化 — 完了
+
+4項目すべて実装完了(上記「進捗」参照)。詳細は[`docs/phase4-design.md`](./docs/phase4-design.md)を参照。
+
+### Phase 5: 汎用AI評価ツール — 完了
+
+画像・テキスト・PDF評価、バックグラウンド処理、共有リンク、通知センター、プロンプトテンプレート集、評価結果の暗号化まですべて実装完了(上記「進捗」参照)。「画像の永続化」(Vercel Blob等でアップロード画像を結果画面に表示する案)は、筋肉の写真や履歴書のスキャン画像など評価対象そのものに個人情報が写り得るため、評価結果の暗号化と同水準の対策が別途必要になり価値に見合わないと判断し、ユーザーと相談のうえ見送った(詳細は[`docs/phase5-design.md`](./docs/phase5-design.md)「見送った拡張候補」を参照)。
+
+### 追加機能アイデア
+
+横断検索(Cmd/Ctrl+K)は実装完了。`Ctrl`/`⌘`+`K`またはヘッダーの検索アイコンでコマンドパレットを開き、プロンプト・カテゴリ・リポジトリ・ドキュメント・評価・レビュー(PRタイトル)を横断して名前の部分一致(大文字小文字を区別しない)で検索できる。`GET /api/search`(グループごとに最大5件)、`src/components/command-palette.tsx`(状態管理・キーボード操作)、既存の`Modal`コンポーネントを再利用した実装で、新規UIライブラリは導入していない。矢印キーでの候補選択・Enterでの遷移に対応。
+
+実行結果の比較機能も実装完了。`/prompts/:id`の「実行履歴」タブ・`/repositories/:id`の「レビュー履歴」タブそれぞれにチェックボックスを追加し、2件選ぶと`/prompts/:id/compare`・`/repositories/:id/compare`へのリンクが表示され、左右2カラムで結果を並べて比較できる(プロンプトの異なるバージョン間の実行結果、同じPRへの複数回のレビュー結果のどちらも比較可能)。3件以上の同時比較はUIが複雑になるためスコープ外とし、常に直近選んだ2件に絞る設計にした。
+
+キーボードショートカットも実装完了。`src/lib/keyboard-shortcuts.ts`に`submitOnModEnter`(Cmd/Ctrl+Enterでフォーム送信。単一行inputは素のEnterで既にネイティブ送信されるが、textarea等の複数行入力向けに統一して適用)・`isEditableTarget`(テキスト入力中かどうかの判定)を切り出し、プロンプト編集(保存)・プロンプト実行・AI評価のテキスト入力に適用した。コマンドパレット(`Ctrl`/`⌘`+`K`)には、入力欄にフォーカスしていない場合のみ反応する`/`を検索フォーカス用の補助ショートカットとして追加した(GitHub等と同じパターン)。
+
+利用状況ダッシュボードも実装完了(`/usage`)。ただし「コスト」の金額換算は行っていない — モデルごとの正確な現行料金をこの場で確認できず、不確かな数値を事実として表示するリスクがあると判断し、ユーザーに相談のうえ「トークン数のみ表示」を選んだ経緯がある。Claude(Anthropic)は`Execution.promptTokens`/`completionTokens`(既存データ、プロンプト実行・AIレビュー・AI評価のみが対象。RAG検索チャットの回答生成・チャットのtool use解析・プロンプト改善提案は`Execution`を作らないため含まれない)を合計・モデル別・直近14日の日別で集計。Voyage AIはトークン数を記録していないため、`DocumentChunk`/`ReviewCommentEmbedding`/`PromptVersionEmbedding`/`ExecutionEmbedding`の件数のみを表示する。
+
+評価結果の共有リンクも実装完了。成功したAIレビュー(`Review`)・AI評価(`Evaluation`)を、ログイン不要の読み取り専用URL(`/share/reviews/:token`・`/share/evaluations/:token`)で共有できる。トークンは`crypto.randomBytes`で発行し(IDそのものは使わない)、共有解除で無効化・再共有で新しい値になる設計。作成前には「非公開情報が含まれていないか確認してください」という`ConfirmDialog`を挟み、意図しない情報公開を防ぐ。詳細は[`docs/phase5-design.md`](./docs/phase5-design.md)の「共有リンク」を参照。
+
+通知の強化も実装完了。トースト(`ToastProvider`)はその場でアプリを見ている間しか気づけず4秒で消えるため見逃しやすいという課題に対し、`Notification`モデルとヘッダー常駐の通知センター(ベルアイコン)を追加した。AI評価のバックグラウンド処理が完了した時点でサーバー側で`Notification`を作成し(埋め込み生成と同じベストエフォート方針)、ヘッダーが20秒間隔でポーリングして未読件数をバッジ表示する。クライアント側の監視状態(トースト用の`registerPending`)には依存しないため、他のタブ・別セッションで作成した評価の完了も拾える。詳細は[`docs/phase5-design.md`](./docs/phase5-design.md)の「通知センター」を参照。
+
+プロンプトテンプレート集も実装完了。専用のDBモデル・APIは追加せず、`src/lib/prompt-templates.ts`に静的なリストとして持たせ、`/prompts/new`の「テンプレートから始める」から選ぶとタイトル・本文欄が置き換わる(そのまま保存も自由な編集も可能)というシンプルな仕組みにした。これで「追加機能アイデア」として挙がっていた項目はすべて実装完了。
+
+ユーザーから「汎用評価の対象を増やしたい」「テンプレートも充実させたい」との要望を受け、PDF評価(`inputType: PDF`)を追加。画像評価と同じ「ファイルをBase64にしてClaudeへのメッセージに積む」パターンを踏襲し、content配列の要素を`image`ブロックから`document`ブロック(`{ type: "document", source: { type: "base64", media_type: "application/pdf", data } }`)に差し替えるだけで実現した(`Evaluation`/バックグラウンド実行・通知・共有リンクの仕組みは画像評価と完全共通)。履歴書・契約書・論文などのレビュー用途を想定し、画像と同じ「保存しない」方針を適用(20MBまで)。あわせてプロンプトテンプレートをIMAGE/TEXT/PDF計10種(写真の筋肉評価テンプレートを含む)に拡充し、入力形式のラベル表記を`src/lib/evaluation-input-type.ts`に集約して各画面(フォーム・一覧・詳細・共有ページ・テンプレート一覧)の表記揺れを防いだ。詳細は[`docs/phase5-design.md`](./docs/phase5-design.md)の「PDF評価」を参照。
+
+PDF評価の追加を受けて、ユーザーから「個人情報の扱いはどうなっているか」との質問。ai-forge自体はファイルの中身を保存しない旨、Anthropicへの送信はAnthropicのポリシーに準拠する旨、評価結果のテキストはDBに残り共有リンクで公開されうる旨を説明したところ、「共有リンク作成時に個人情報らしき内容をアラートできないか」「評価結果をDBに残したくない、暗号化できないか」と相談された。前者はAI誤検知・見逃しのリスクを理由に見送り、既存の汎用確認ダイアログのままとした。後者は実装: `src/lib/field-crypto.ts`でGitHubトークンと同じAES-256-GCMの仕組み(`token-crypto.ts`)を再利用し、`Evaluation.summary`(新設列)・`EvaluationFinding.body`を暗号化して保存するようにした。`Execution`はプロンプト実行・AIレビュー・AI評価で共有される列のため、AI評価分の`resultText`には実際の内容を書かずプレースホルダーに置き換え(実行履歴タブ・RAG埋め込みバックフィルなど、暗号化が及ばない共有経路からの平文漏えいを防ぐため)、これに伴い`POST /api/executions/backfill-embeddings`・`/documents`の未処理件数カウントもAI評価由来のExecutionを対象外にした。詳細は[`docs/phase5-design.md`](./docs/phase5-design.md)の「評価結果の暗号化」を参照。
+
+### UI/UX・デザインのブラッシュアップ — 完了
+
+以下5項目すべて対応済み。
+
+- **セカンダリボタンのホバー状態**: `border-zinc-300`系の枠線ボタン(キャンセル・編集・各種同期/バックフィルボタン等15箇所)に`hover:bg-zinc-100 dark:hover:bg-zinc-900`を、`border-red-300`系の削除ボタン(6箇所)に`hover:bg-red-50 dark:hover:bg-red-950/40`を追加し、`disabled:hover:bg-transparent`でdisabled時にホバー色が出ないようにした
+- **空状態(Empty State)の改善**: `/prompts`(フィルタ有無で「絞り込みを解除する」リンクと「+ 最初のプロンプトを作成」ボタンを出し分け)・`/documents`(取り込み手段への案内文を追加)を改善。他の一覧(カテゴリ・リポジトリ・評価等)は直上に作成フォーム/ボタンが常設されているため対応不要と判断
+- **レビュー「傾向」タブのグラフ強化**: 累計指摘件数に全体比率の積み上げバーを追加、「指摘の多いファイル」の各行に最大値比の背景バー(`bg-accent/10`)を追加。新規のチャートライブラリは導入せず、既存の積み上げバーと同じ手作りCSSのスタイルに揃えた
+- **モバイル対応**: `AppHeader`(ブランド・ナビ・アイコン・ユーザー名・ログアウトが一列で折り返し不可だった)に`flex-wrap`を追加し、区切り線とユーザー名を`sm:`未満で非表示に。`pull-request-list.tsx`のPRタイトル行に`min-w-0`+`truncate`を追加し、長いタイトルでボタンが画面外に押し出されないようにした
+- **ローディング表現の統一**: `src/app/(app)/loading.tsx`を新設。従来`(app)`配下のどのページにも`loading.tsx`が無く、Server Componentのデータ取得中は画面が白いままだったため、汎用スケルトン(`animate-pulse`)を追加した
+
+「画像の永続化」を見送った後、ユーザーから「アイコン等使って表示をわかりやすくできないか、画像部分に限らず検討してほしい」と依頼され、状態ラベルへのアイコン追加を実施。`src/components/icons.tsx`に10種のfeatherスタイルSVGアイコン(入力形式: 画像/テキスト/PDF、重要度: CRITICAL/WARNING/INFO、トーン: 良い点/提案/気になる点、ステータス: 処理中/成功/失敗)を追加し、`review-severity.ts`・`evaluation-tone.ts`・`evaluation-input-type.ts`にICON定数を、新設の`src/lib/execution-status.ts`にReview/Evaluation共通のステータスラベル・アイコン・配色を集約した。AI評価・AIレビューの一覧/詳細/比較/共有ページ、プロンプト実行の実行結果/実行履歴/比較ページ、ダッシュボードのKPI表示など、ラベルテキストが並ぶ箇所全般に適用し、あわせて`status: PENDING`のような未加工のenum値表示を日本語ラベルに置き換えた。新規アイコンライブラリは導入せず、既存の手書きSVGパターンを踏襲。
+
+### 積み残しの小さな改善
+
+- ~~ルートレベルの統合テストが薄い箇所(categories/promptsのCRUD等)の拡充~~ → 対応済み。`/api/categories`・`/api/categories/:id`・`/api/prompts`・`/api/prompts/:id`(GET/DELETE。PATCHは既存)・`/api/prompts/:id/versions`・`/api/prompts/:id/executions`に統合テストを追加(認可404・バリデーション400・一意制約409・カスケード/SetNullの実DB確認を含む計36件)。ルートレベルの統合テストは全体で124件

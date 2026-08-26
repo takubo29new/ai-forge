@@ -1,9 +1,23 @@
 import Link from "next/link";
+import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/session";
 import { ChatPanel } from "./chat-panel";
 
 export default async function ChatPage() {
-  await requireUserId();
+  const userId = await requireUserId();
+
+  const [repositories, prompts] = await Promise.all([
+    prisma.repository.findMany({
+      where: { userId },
+      orderBy: { connectedAt: "desc" },
+      select: { id: true, owner: true, name: true },
+    }),
+    prisma.prompt.findMany({
+      where: { userId },
+      orderBy: { updatedAt: "desc" },
+      select: { id: true, title: true },
+    }),
+  ]);
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col px-6 py-10">
@@ -17,7 +31,13 @@ export default async function ChatPage() {
       <p className="mb-6 text-sm text-zinc-600 dark:text-zinc-400">
         登録したドキュメントと、これまでのAIレビューの指摘から関連する内容を検索し、Claudeが根拠付きで回答します。会話履歴はこの画面を離れると失われます。
       </p>
-      <ChatPanel />
+      <ChatPanel
+        repositories={repositories.map((r) => ({
+          id: r.id,
+          label: `${r.owner}/${r.name}`,
+        }))}
+        prompts={prompts}
+      />
     </div>
   );
 }

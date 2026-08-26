@@ -1,13 +1,21 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
 import { anthropic } from "@/lib/anthropic";
 import { DEFAULT_MODEL } from "@/lib/models";
 import { embedQuery } from "@/lib/voyage";
-import { searchDocumentChunks, searchReviewComments } from "@/lib/embeddings";
+import {
+  searchDocumentChunks,
+  searchExecutions,
+  searchPromptVersions,
+  searchReviewComments,
+} from "@/lib/embeddings";
 import { buildChatContext, renderContextForPrompt } from "@/lib/chat-context";
 import { checkChatRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { voyageErrorResponse } from "@/lib/voyage-error-response";
 import { logError } from "@/lib/error-log";
+import { detectReviewActionIntent } from "@/lib/chat-action";
+import { LIST_LIMIT } from "@/lib/list-limits";
 
 const SEARCH_LIMIT_PER_SOURCE = 5;
 const CONTEXT_LIMIT = 5;
@@ -28,10 +36,69 @@ export async function POST(request: Request) {
   if (!question) {
     return NextResponse.json({ error: "質問を入力してください" }, { status: 400 });
   }
+  const repositoryId =
+    typeof body.repositoryId === "string" && body.repositoryId ? body.repositoryId : undefined;
+
+  // 絞り込み対象のリポジトリが本人の接続済みリポジトリかを確認する
+  // (他ユーザーのrepositoryIdを渡された場合はヒット0件になるだけで情報漏洩は
+  // しないが、意図しない挙動を早期に弾くため明示的にチェックする)。
+  if (repositoryId) {
+    const repository = await prisma.repository.findUnique({
+      where: { id: repositoryId },
+    });
+    if (!repository || repository.userId !== userId) {
+      return NextResponse.json(
+        { error: "リポジトリが見つかりません" },
+        { status: 400 },
+      );
+    }
+  }
 
   const rateLimit = await checkChatRateLimit(userId);
   if (!rateLimit.allowed) {
     return rateLimitResponse(rateLimit.limit);
+  }
+
+  // チャットからの直接アクション実行(Phase 4項目4)。リポジトリ・プロンプトの
+  // 両方を持つユーザーのみ対象とする(片方でも無ければ実行しようがなく、
+  // 意図解析の追加API呼び出し自体が無駄になるため)。アクションが提案された
+  // 場合はRAG検索・回答生成は行わず、確認用の提案だけを返す
+  // (docs/phase4-design.md「4. チャットからの直接アクション実行」参照)。
+  const [actionRepositories, actionPrompts] = await Promise.all([
+    prisma.repository.findMany({
+      where: { userId },
+      select: { id: true, owner: true, name: true },
+      take: LIST_LIMIT,
+    }),
+    prisma.prompt.findMany({
+      where: { userId },
+      select: { id: true, title: true },
+      take: LIST_LIMIT,
+    }),
+  ]);
+
+  if (actionRepositories.length > 0 && actionPrompts.length > 0) {
+    let actionProposal;
+    try {
+      actionProposal = await detectReviewActionIntent(
+        question,
+        actionRepositories,
+        actionPrompts,
+      );
+    } catch (error) {
+      await logError({
+        source: "SERVER",
+        message: `チャットのアクション意図解析に失敗しました: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        path: "/api/chat",
+        userId,
+      });
+      actionProposal = null;
+    }
+    if (actionProposal) {
+      return NextResponse.json({ actionProposal });
+    }
   }
 
   let queryEmbedding: number[];
@@ -41,12 +108,20 @@ export async function POST(request: Request) {
     return voyageErrorResponse(error, { path: "/api/chat", userId });
   }
 
-  const [docHits, reviewHits] = await Promise.all([
-    searchDocumentChunks(userId, queryEmbedding, SEARCH_LIMIT_PER_SOURCE),
-    searchReviewComments(userId, queryEmbedding, SEARCH_LIMIT_PER_SOURCE),
+  // PromptVersion・Executionはリポジトリに紐づく概念がないため、repositoryId
+  // 絞り込み時もDocument・ReviewCommentのみを絞り込み対象にする
+  // (docs/phase4-design.md「2. プロジェクト単位のドキュメント管理」参照)。
+  const [docHits, reviewHits, promptVersionHits, executionHits] = await Promise.all([
+    searchDocumentChunks(userId, queryEmbedding, SEARCH_LIMIT_PER_SOURCE, repositoryId),
+    searchReviewComments(userId, queryEmbedding, SEARCH_LIMIT_PER_SOURCE, repositoryId),
+    searchPromptVersions(userId, queryEmbedding, SEARCH_LIMIT_PER_SOURCE),
+    searchExecutions(userId, queryEmbedding, SEARCH_LIMIT_PER_SOURCE),
   ]);
 
-  const contextEntries = buildChatContext([...docHits, ...reviewHits], CONTEXT_LIMIT);
+  const contextEntries = buildChatContext(
+    [...docHits, ...reviewHits, ...promptVersionHits, ...executionHits],
+    CONTEXT_LIMIT,
+  );
 
   if (contextEntries.length === 0) {
     return NextResponse.json({

@@ -80,7 +80,33 @@ Phase 2完了後、経験豊富なWebエンジニアの視点であらためてm
 - **AI呼び出しロジックの共通化**: `POST /api/prompts/:id/execute`と`POST /api/repositories/:id/reviews`の両方で「Claudeを呼び出す→成否を`Execution`として記録する(成功時はresultText・トークン数、失敗時はerrorMessage)」というパターンが個別に実装されていた。`src/lib/run-ai-execution.ts`の`runAiExecution()`に共通化し、呼び出し元はAPI呼び出し本体(`call`)だけを渡す形にした。Phase 3のRAGチャットが3つ目の呼び出し元になる前に整理しておく狙い
 - **HTTPステータスの修正**: 上記の共通化とあわせて、AI実行が失敗(`status: FAILED`)した場合でもHTTP 201(Created)を返していた不整合を200に修正した。UIはレスポンスボディの`status`フィールドを見て正しく分岐していたため実害はなかったが、外部消費者や監視ツールを想定するとREST的に筋が悪かった
 
-対応を見送った指摘: GitHubアクセストークンの平文保存(NextAuth Prisma Adapterの標準仕様。実ユーザーを迎える段階でトークン暗号化を再検討)。ルートレベルの統合テストは、CI導入によりトレードオフの前提が変わったため、その後「1. 自動テスト整備」に追加した。
+対応を見送った指摘: GitHubアクセストークンの平文保存(NextAuth Prisma Adapterの標準仕様。実ユーザーを迎える段階でトークン暗号化を再検討) → 本番デプロイ前に対応済み(11参照)。ルートレベルの統合テストは、CI導入によりトレードオフの前提が変わったため、その後「1. 自動テスト整備」に追加した。
+
+## 10. UI/UXデザインシステム
+
+Phase 3完了後、ユーザーからの改善要望9項目とそれに続く追加提案3項目、さらにトレンドを踏まえたデザイン改善提案の合計十数項目を、6つのバッチに分けて対応した。
+
+- **ナビゲーション・情報設計**: ログイン後の遷移先を`/dashboard`に統一、プロンプト系とその他機能を視覚的に区切ったヘッダー再編、一覧の表示件数選択(`src/components/page-size-select.tsx`)、ヘッダーのエラーログ・ヘルプをアイコン化して右側へ移動
+- **フィードバック**: ローディング表示(`src/components/spinner.tsx`)、削除/解除ボタンの危険色統一、共通トースト通知(`src/components/toast-provider.tsx`。作成・更新・削除・接続・同期の成功時に一貫して表示。エラーは引き続きインライン表示)
+- **アクセシビリティ・操作性**: 確認ダイアログのモーダル化(フォーカストラップ・`inert`・`aria-modal`)、ヘルプページの左サイドバー固定+スクロールスパイ+`scroll-mt-6`によるアンカー位置調整、チャット入力のtextarea化(Enter送信/Shift+Enter改行)
+- **ブランドデザイン**: `next/font`で読み込んでいたGeist Sansが`body`のArial直書きにより未適用だったバグを修正。危険色(赤)・警告色(琥珀)と独立したアクセントカラー(インディゴ)をCSS変数として導入し、プライマリボタン・ナビのアクティブ状態・`:focus-visible`に適用。ダッシュボードのKPIタイルにホバー時の浮き上がり効果を追加
+
+## 11. GitHubトークンの暗号化保存・自動更新
+
+9で対応を見送っていた「GitHubアクセストークンの平文保存」と、実運用で新たに判明した「トークンが約8時間で失効する」問題への対応。
+
+- **自動更新**: GitHub Appのユーザートークンは既定で約8時間で失効する仕様だが、`refresh_token`による自動更新の仕組みが無かった。`src/lib/github.ts`の`getGitHubClient()`に`expires_at`ベースの失効判定と、GitHubの`/login/oauth/access_token`への`refresh_token` grantによる自動更新を実装
+- **暗号化保存**: `src/lib/token-crypto.ts`(AES-256-GCM、鍵は`TOKEN_ENCRYPTION_KEY`)を新設。初回ログイン連携時(`src/auth.ts`でPrismaAdapterの`linkAccount`をラップ)とトークン自動更新時の2箇所で暗号化してから保存する。暗号化前の平文データは読み取り時に検知して暗号化し直し、専用の移行スクリプトなしに自然移行させる設計
+- あわせて、GitHub API呼び出し失敗時に握りつぶされていた4箇所のcatchに`logError`を追加し、同種の問題を再現なしにErrorLogから調査できるようにした
+
+## 12. 本番デプロイ・運用
+
+v1.0.0としてVercelへ本番デプロイし、実際の運用で判明した問題に対応した。
+
+- **ビルド設定**: `vercel.json`で`buildCommand`を`prisma migrate deploy && next build`に設定し、デプロイのたびにマイグレーション(pgvector拡張の有効化含む)を自動適用。`ignoreCommand`で`main`以外のブランチへのpushではビルド自体をスキップ(Previewデプロイを作らない)
+- **トランザクションタイムアウト**: 「設計書を同期」がファイル数分のDB往復を1つのインタラクティブトランザクションで行っており、本番DBとの通信距離次第でPrismaの既定5秒タイムアウトを超過することがあった。`timeout: 30000`を指定し、あわせてVercel Function自体の実行時間上限(`maxDuration`)も引き上げた
+- **リージョン最適化**: DBのリージョン(東京・`ap-northeast-1`)とVercel Functionの実行リージョン(既定は米国東部・`iad1`)が一致しておらず、すべてのDBアクセスが地球規模の往復になっていた。`vercel.json`の`regions`をDBと同じ東京(`hnd1`)に設定して解消
+- デプロイ手順・環境変数一覧・つまずきやすいポイント(Sensitive環境変数はビルド時に渡されない、`@prisma/adapter-pg`利用のため直接接続文字列が必須、等)は[README](../README.md#本番デプロイvercel)にまとめた
 
 ## 関連PR
 

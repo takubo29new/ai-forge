@@ -13,25 +13,65 @@ export default async function DocumentsPage({
   const { limit: limitParam } = await searchParams;
   const limit = parsePageSize(limitParam);
 
-  const [documents, lastSyncedDocument, pendingEmbeddingCount] = await Promise.all([
+  const [
+    documents,
+    lastSyncedDocument,
+    repositories,
+    repoLastSynced,
+    pendingEmbeddingCount,
+    pendingPromptVersionEmbeddingCount,
+    pendingExecutionEmbeddingCount,
+  ] = await Promise.all([
     prisma.document.findMany({
       where: { userId },
-      include: { _count: { select: { chunks: true } } },
+      include: {
+        _count: { select: { chunks: true } },
+        repository: { select: { owner: true, name: true } },
+      },
       orderBy: { createdAt: "desc" },
       take: limit,
     }),
-    // 「設計書を同期」の最終実行日時。再同期のたびにDocumentを作り直す
-    // (updatedAt = createdAt = 実行時刻になる)ため、REPO_FILE Documentの
-    // 最新updatedAtがそのまま最終同期日時になる。
+    // 「ai-forgeの設計書を同期」(repositoryId: null)の最終実行日時。再同期のたびに
+    // Documentを作り直す(updatedAt = createdAt = 実行時刻になる)ため、該当する
+    // REPO_FILE Documentの最新updatedAtがそのまま最終同期日時になる。
     prisma.document.findFirst({
-      where: { userId, sourceType: "REPO_FILE" },
+      where: { userId, sourceType: "REPO_FILE", repositoryId: null },
       orderBy: { updatedAt: "desc" },
       select: { updatedAt: true },
+    }),
+    prisma.repository.findMany({
+      where: { userId },
+      orderBy: { connectedAt: "desc" },
+      select: { id: true, owner: true, name: true },
+    }),
+    // 接続済みリポジトリごとの最終同期日時(上と同じ考え方)。
+    prisma.document.groupBy({
+      by: ["repositoryId"],
+      where: { userId, sourceType: "REPO_FILE", repositoryId: { not: null } },
+      _max: { updatedAt: true },
     }),
     // 埋め込み未生成のレビュー指摘数。バックフィルボタンを押す必要が
     // あるかどうかを、実行日時よりも直接的に示す指標として使う。
     prisma.reviewComment.count({
       where: { review: { userId }, embedding: null },
+    }),
+    // 埋め込み未生成のプロンプトバージョン数(Phase 4)。
+    prisma.promptVersion.count({
+      where: { prompt: { userId }, embedding: null },
+    }),
+    // 埋め込み未生成の実行結果数(Phase 4)。対象はreviewIdが無い・evaluationIdが無い
+    // SUCCESSな実行のみ(レビュー由来のresultTextはReviewCommentとして既に埋め込み済み、
+    // AI評価由来のresultTextは平文プレースホルダーのため、いずれも対象外。
+    // src/app/api/executions/backfill-embeddings/route.tsと同じ条件)。
+    prisma.execution.count({
+      where: {
+        userId,
+        status: "SUCCESS",
+        resultText: { not: null },
+        review: null,
+        evaluation: null,
+        embedding: null,
+      },
     }),
   ]);
 
@@ -54,11 +94,22 @@ export default async function DocumentsPage({
           id: d.id,
           title: d.title,
           sourceType: d.sourceType,
+          repositoryLabel: d.repository ? `${d.repository.owner}/${d.repository.name}` : null,
           chunkCount: d._count.chunks,
           createdAt: d.createdAt.toISOString(),
         }))}
         initialLastSyncedAt={lastSyncedDocument?.updatedAt.toISOString() ?? null}
+        repositories={repositories.map((r) => {
+          const lastSynced = repoLastSynced.find((g) => g.repositoryId === r.id);
+          return {
+            id: r.id,
+            label: `${r.owner}/${r.name}`,
+            lastSyncedAt: lastSynced?._max.updatedAt?.toISOString() ?? null,
+          };
+        })}
         initialPendingEmbeddingCount={pendingEmbeddingCount}
+        initialPendingPromptVersionEmbeddingCount={pendingPromptVersionEmbeddingCount}
+        initialPendingExecutionEmbeddingCount={pendingExecutionEmbeddingCount}
         currentLimit={limit}
       />
     </div>
