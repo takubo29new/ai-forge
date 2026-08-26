@@ -119,3 +119,5 @@ flowchart TD
 1. ~~GitHub連携の実装~~ → 完了。`repo`スコープの追加、`octokit`によるリポジトリ接続・PR取得API、`/repositories`・`/repositories/:id`画面
 2. ~~AIレビュー機能の実装~~ → 完了。`POST /api/repositories/:id/reviews`でPRのdiffを`{{diff}}`変数に展開し、構造化出力でレビュー結果を取得。`/repositories/:id`の「レビューを実行」・`/reviews/:id`画面
 3. ~~レビュー結果の蓄積・可視化~~ → 完了(リポジトリ単位)。`/repositories/:id`に「傾向」タブを追加し、累計指摘件数(重要度別)・直近10件のレビューの重要度内訳・指摘の多いファイルTOP8を表示。リポジトリ横断のダッシュボードはPhase 3で扱う
+
+Phase 2完了後、`Review`は以下の横断機能の対象にもなった(いずれもPhase 2固有ではなく複数ドメインにまたがる機能のため、設計の詳細は追加先のドキュメントを参照): レビュー結果の比較機能(追加機能アイデア、[`ai-dev-tool-handoff.md`](../ai-dev-tool-handoff.md)参照)、チャットからの直接アクション実行に伴う`triggeredVia`列([`phase4-design.md`](./phase4-design.md)項目4)、共有リンク([`phase5-design.md`](./phase5-design.md)「共有リンク」)。

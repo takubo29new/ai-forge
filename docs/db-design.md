@@ -1,6 +1,6 @@
 # DB設計
 
-Phase 1(プロンプト管理ツール)・Phase 2(AIコードレビューツール)・Phase 3(RAG検索チャットボット、ドキュメント取り込みまで)・Phase 4項目1(RAG検索対象の拡張)・Phase 5(汎用AI評価ツール、画像評価プロトタイプ)に必要なテーブル構成。スキーマの実体は [`prisma/schema.prisma`](../prisma/schema.prisma)。ORMはPrisma。詳細は[`phase3-design.md`](./phase3-design.md)・[`phase4-design.md`](./phase4-design.md)・[`phase5-design.md`](./phase5-design.md)を参照。
+Phase 1(プロンプト管理ツール)・Phase 2(AIコードレビューツール)・Phase 3(RAG検索チャットボット)・Phase 4(統合基盤の強化)・Phase 5(汎用AI評価ツール)に必要なテーブル構成。スキーマの実体は [`prisma/schema.prisma`](../prisma/schema.prisma)。ORMはPrisma。詳細は[`phase3-design.md`](./phase3-design.md)・[`phase4-design.md`](./phase4-design.md)・[`phase5-design.md`](./phase5-design.md)を参照。
 
 ## テーブル一覧
 
@@ -49,7 +49,7 @@ pgvector拡張(`vector`、0.8.6)をここで初めて有効化した。詳細は
 `Document`に`repositoryId String?`(FK、`onDelete: Cascade`)を追加し、接続済み`Repository`ごとにドキュメントを紐付けられるようにした。ユニーク制約も`[userId, sourcePath]`から`[userId, repositoryId, sourcePath]`に変更している(リポジトリをまたいだ同名ファイルを区別するため)。ただしPostgresのユニークインデックスは複合キー中のNULLを区別可能として扱うため、この制約だけではrepositoryId IS NULL(ai-forge自身の同期)同士の重複を防げない。そのため`(userId, sourcePath) WHERE repositoryId IS NULL`の部分ユニークインデックスを追加のマイグレーションで補っている(`schema.prisma`の`@@unique`では部分インデックスを表現できないため、`DocumentChunk`等のHNSWインデックスと同じく手動追加)。詳細は[`phase4-design.md`](./phase4-design.md)を参照。
 
 - `PromptVersionEmbedding` — `PromptVersion.content`に対する埋め込みを1:1で追加する別テーブル(`ReviewCommentEmbedding`と同じパターン)。新しいバージョンが保存されるたびに生成し、過去バージョンは差し替えない
-- `ExecutionEmbedding` — `Execution.resultText`に対する埋め込みを1:1で追加する別テーブル。`reviewId`が無い(Phase 2のレビュー実行ではない)`SUCCESS`な実行のみを対象とする。レビュー由来の`resultText`は既に`ReviewComment`として個別に埋め込み済みのため、重複を避けてあえて対象外にしている
+- `ExecutionEmbedding` — `Execution.resultText`に対する埋め込みを1:1で追加する別テーブル。`Review`・`Evaluation`のいずれも紐づかない(Phase 1のプロンプト実行由来の)`SUCCESS`な実行のみを対象とする。レビュー由来の`resultText`は既に`ReviewComment`として個別に埋め込み済み、AI評価(Phase 5)由来の`resultText`は暗号化のため固定のプレースホルダー文字列でしかなく、いずれも重複・無意味を避けてあえて対象外にしている
 
 ### チャットからの直接アクション実行(Phase 4項目4)
 
@@ -61,6 +61,14 @@ pgvector拡張(`vector`、0.8.6)をここで初めて有効化した。詳細は
 
 - `Evaluation` — 1回のAI評価の実行単位。`Review`と同じ構造(`promptVersionId`は`onDelete: Restrict`、`executionId`は`onDelete: SetNull`)で、どのプロンプト・入力形式に対するものかを記録する
 - `EvaluationFinding` — AI評価が返した観点別コメント(ラベル・トーン・スコア・本文)。`ReviewComment`のコード非依存版
+
+### 共有リンク(Phase 2・5共通)
+
+`Review`・`Evaluation`それぞれに`shareToken String? @unique`・`sharedAt DateTime?`を追加した。値が`null`なら未共有。トークンは`crypto.randomBytes`で発行する専用の値で、IDそのものは使わない(共有解除で`null`に戻すことで旧リンクを無効化する)。詳細は[`phase5-design.md`](./phase5-design.md)「共有リンク」を参照。
+
+### 通知(Phase 5関連)
+
+- `Notification` — バックグラウンド処理(現状はAI評価のみ)の完了通知。`userId`・`message`・`link`(任意の遷移先)・`read`(既読フラグ)を持つ、他のドメインに依存しない独立したテーブル。詳細は[`phase5-design.md`](./phase5-design.md)「通知センター」を参照
 
 ## 設計上の判断
 

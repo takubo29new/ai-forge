@@ -98,6 +98,7 @@ Phase 3完了後、ユーザーからの改善要望9項目とそれに続く追
 - **自動更新**: GitHub Appのユーザートークンは既定で約8時間で失効する仕様だが、`refresh_token`による自動更新の仕組みが無かった。`src/lib/github.ts`の`getGitHubClient()`に`expires_at`ベースの失効判定と、GitHubの`/login/oauth/access_token`への`refresh_token` grantによる自動更新を実装
 - **暗号化保存**: `src/lib/token-crypto.ts`(AES-256-GCM、鍵は`TOKEN_ENCRYPTION_KEY`)を新設。初回ログイン連携時(`src/auth.ts`でPrismaAdapterの`linkAccount`をラップ)とトークン自動更新時の2箇所で暗号化してから保存する。暗号化前の平文データは読み取り時に検知して暗号化し直し、専用の移行スクリプトなしに自然移行させる設計
 - あわせて、GitHub API呼び出し失敗時に握りつぶされていた4箇所のcatchに`logError`を追加し、同種の問題を再現なしにErrorLogから調査できるようにした
+- **他ドメインへの再利用**: Phase 5でPDF評価(履歴書・契約書等)が個人情報を含みうる入力に対応したことを受け、同じAES-256-GCMの仕組みを`src/lib/field-crypto.ts`経由でAI評価結果(`Evaluation.summary`・`EvaluationFinding.body`)の暗号化にも再利用した。GitHubトークン専用ではなく、DB上の機微なテキスト全般に使える暗号化ユーティリティとして育っている。詳細は[`phase5-design.md`](./phase5-design.md)「評価結果の暗号化」を参照
 
 ## 12. 本番デプロイ・運用
 

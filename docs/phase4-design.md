@@ -11,7 +11,7 @@
 3. レビュー指摘蓄積からのプロンプト改善提案(1に依存)
 4. チャットからの直接アクション実行(1に依存)
 
-## 1. RAG検索対象の拡張
+## 1. RAG検索対象の拡張(実装済み)
 
 ### DB設計(案)
 
@@ -33,7 +33,7 @@ erDiagram
 ```
 
 - **`PromptVersionEmbedding`** — `PromptVersion.content`をそのまま1つの埋め込みにする(`DocumentChunk`のような見出し単位の分割はしない。プロンプト本文はドキュメントほど長くならない想定のため)。新しいバージョンが保存されるたびに、そのバージョンの分だけ生成する(過去バージョンは差し替えない。バージョンごとに検索できた方が「このバージョンの頃はこう書いていた」を追える)
-- **`ExecutionEmbedding`** — `Execution.resultText`の埋め込み。**`Execution.reviewId`が無い(＝Phase 2のレビュー実行ではない、Phase 1のプロンプト実行由来の)`SUCCESS`な実行のみを対象とする**。レビュー由来のExecutionは、その中身が`ReviewComment`として既に個別に埋め込み済みであり、resultText全体(JSON形式の構造化出力)をそのまま埋め込むと内容が重複するため
+- **`ExecutionEmbedding`** — `Execution.resultText`の埋め込み。**`Execution`に紐づく`Review`・`Evaluation`が無い(＝Phase 1のプロンプト実行由来の)`SUCCESS`な実行のみを対象とする**。レビュー由来のExecutionは、その中身が`ReviewComment`として既に個別に埋め込み済みであり、resultText全体(JSON形式の構造化出力)をそのまま埋め込むと内容が重複するため。AI評価(Phase 5)由来のExecutionも同様の理由に加え、`resultText`が固定のプレースホルダー文字列(評価結果の暗号化、詳細は[`phase5-design.md`](./phase5-design.md)参照)でしかなく埋め込んでも検索の役に立たないため、v1.1.0で対象外に追加した
 
 ### 検索・埋め込み生成
 
