@@ -164,6 +164,17 @@ Phase 5(AI評価)を試しやすくするための叩き台プロンプトを用
 - テンプレートは通常のプロンプト作成フローに乗るだけで、`Prompt`/`PromptVersion`の扱いは既存のものと変わらない(テンプレート自体を追跡する仕組みは持たない)
 - 入力形式のラベル(画像/テキスト/PDF)は`src/lib/evaluation-input-type.ts`に集約し、`/evaluations`のフォーム・一覧・詳細画面・共有ページ・テンプレート一覧の間で表記が揺れないようにした
 
+## 評価結果の暗号化(実装済み)
+
+履歴書・契約書などPDF評価の対象が広がったことで、評価結果のテキストに個人情報が含まれうるようになった。ユーザーから「DBにも残したくない」と相談を受け、GitHubトークンで既に使っている仕組み(`src/lib/token-crypto.ts`、AES-256-GCM)を再利用してAI評価結果を暗号化して保存する対応を行った(完全に保存しない、という選択肢も検討したが、`/evaluations`一覧・詳細で過去の結果を見返す機能自体が成立しなくなるため見送った)。
+
+- `src/lib/field-crypto.ts`で`token-crypto.ts`のAES-256-GCM実装を`encryptField`/`decryptField`として再エクスポートし、評価結果側からは用途に合った名前で使えるようにした。判別プレフィックス(`isEncryptedToken`)による後方互換の挙動もそのまま引き継ぐため、この対応より前に作成された`EvaluationFinding.body`(平文)も復号時にそのまま読める
+- `Evaluation`に`summary`列(暗号化して保存)を新設した。以前は総評を`Execution.resultText`(構造化出力全体のJSON)から都度再構築していたが、この列を追加後は不要になった。`summary`が無い(この対応より前に作成された)評価のみ、従来どおり`Execution.resultText`からの再構築にフォールバックする(`src/lib/evaluation-summary.ts`)
+- **`Execution.resultText`には実際の内容を書かない**: `Execution`はプロンプト実行・AIレビュー・AI評価で共有される1つのテーブルであり、AI評価の総評・コメントをそのまま`resultText`に平文で複製すると、暗号化が及ばないその共有列経由で(実行履歴タブ・実行結果比較・RAG埋め込みバックフィルなど、AI評価を想定していない箇所から)個人情報が読めてしまう。そのためAI評価の`resultText`は固定のプレースホルダー文字列に置き換え、実際の内容は暗号化された`Evaluation.summary`/`EvaluationFinding.body`にのみ持たせるようにした
+- 上記に伴い、`POST /api/executions/backfill-embeddings`・`/documents`の未処理件数カウントから、AI評価由来(`evaluation`が紐づく)の`Execution`を対象外にした(プレースホルダー文字列を埋め込んでもRAG検索の役に立たないため)
+
+**共有リンク作成時の個人情報アラートは見送り**: 内容を自動判定して警告を出す案(Claudeに評価結果を判定させる)も検討したが、誤検知・見逃しのリスクがあり、既存の汎用的な確認ダイアログ(`ShareControl`)で十分と判断した。
+
 ## 今後の拡張候補
 
 - **画像の永続化**: Vercel Blob等を導入し、アップロードした画像を結果画面に表示できるようにする

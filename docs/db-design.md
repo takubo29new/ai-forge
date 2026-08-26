@@ -104,7 +104,8 @@ pgvector拡張(`vector`、0.8.6)をここで初めて有効化した。詳細は
 ### Phase 5の設計判断
 
 - **`Evaluation`/`EvaluationFinding`は`Review`/`ReviewComment`を汎用化せず新設した**: `Review`はコード固有のフィールド(`filePath`・`line`)を持ち、既存のリポジトリ「傾向」タブ・RAG出典表示と深く統合されている。無理に汎用化して両方の呼び出し元を分岐だらけにするより、同じFKパターン(`promptVersionId`は`Restrict`、`executionId`は`SetNull`)を踏襲した並行モデルとして新設するほうが、既存機能への影響もレビューの負担も小さいと判断した。理由の詳細は[`phase5-design.md`](./phase5-design.md)を参照
-- **`Evaluation`に画像そのものを保持する列は無い**: 画像はリクエスト内でClaudeに渡すのみでDB/ストレージに永続化しない設計のため(理由は[`phase5-design.md`](./phase5-design.md)「画像の扱い: 保存しない方針」を参照)。結果のテキスト(`EvaluationFinding`・`Execution.resultText`)のみを保存する
+- **`Evaluation`に画像・PDFそのものを保持する列は無い**: いずれもリクエスト内でClaudeに渡すのみでDB/ストレージに永続化しない設計のため(理由は[`phase5-design.md`](./phase5-design.md)「画像の扱い: 保存しない方針」を参照)。結果のテキスト(`Evaluation.summary`・`EvaluationFinding.body`)のみを保存する
+- **評価結果(`Evaluation.summary`・`EvaluationFinding.body`)はAES-256-GCMで暗号化して保存する**: 評価対象がPDF(履歴書・契約書等)や写真など個人情報を含みうる入力に広がったため、GitHubトークンと同じ仕組み(`src/lib/token-crypto.ts`)を`src/lib/field-crypto.ts`経由で再利用した。`Execution.resultText`は複数の実行系で共有される列で暗号化が及ばないため、AI評価分はここに実際の内容を書かず固定のプレースホルダー文字列に留めている(実行履歴タブ・RAG埋め込みバックフィルなど、AI評価を想定していない箇所からの平文漏えいを防ぐため)。詳細は[`phase5-design.md`](./phase5-design.md)「評価結果の暗号化」を参照
 
 ## DB環境構築
 

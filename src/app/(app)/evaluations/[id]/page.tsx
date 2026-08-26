@@ -4,10 +4,11 @@ import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/session";
 import { Markdown } from "@/components/markdown";
 import { TONES, TONE_TEXT, TONE_LABEL, countByTone } from "@/lib/evaluation-tone";
-import { EvaluationOutputSchema } from "@/lib/evaluation-schema";
 import { PendingRefresher } from "./pending-refresher";
 import { ShareControl } from "@/components/share-control";
 import { INPUT_TYPE_LABEL } from "@/lib/evaluation-input-type";
+import { resolveEvaluationSummary } from "@/lib/evaluation-summary";
+import { decryptField } from "@/lib/field-crypto";
 
 export default async function EvaluationDetailPage({
   params,
@@ -29,22 +30,8 @@ export default async function EvaluationDetailPage({
     notFound();
   }
 
-  // 総評(summary)はEvaluationFindingのような専用カラムを持たないため、
-  // Execution.resultText(構造化出力全体をJSON.stringifyしたもの)から都度取り出す。
-  let summary: string | null = null;
-  if (evaluation.status === "SUCCESS" && evaluation.execution?.resultText) {
-    try {
-      const parsed = EvaluationOutputSchema.safeParse(
-        JSON.parse(evaluation.execution.resultText),
-      );
-      if (parsed.success) {
-        summary = parsed.data.summary;
-      }
-    } catch {
-      // resultTextが想定外の形式でも詳細画面自体は表示する(総評のみ省略し、
-      // 下のコメント一覧はEvaluationFindingから通常どおり表示する)。
-    }
-  }
+  const summary =
+    evaluation.status === "SUCCESS" ? resolveEvaluationSummary(evaluation) : null;
 
   const counts = countByTone(evaluation.findings);
 
@@ -129,7 +116,7 @@ export default async function EvaluationDetailPage({
                 )}
               </p>
               <div className="mt-1">
-                <Markdown>{f.body}</Markdown>
+                <Markdown>{decryptField(f.body)}</Markdown>
               </div>
             </li>
           ))}

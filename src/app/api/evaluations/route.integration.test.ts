@@ -8,6 +8,7 @@ vi.mock("@/lib/anthropic", () => ({
 import { auth } from "@/auth";
 import { anthropic } from "@/lib/anthropic";
 import { prisma } from "@/lib/prisma";
+import { decryptField, isEncryptedToken } from "@/lib/field-crypto";
 import { GET, POST } from "./route";
 import {
   cleanupTestUser,
@@ -141,6 +142,20 @@ describe("POST /api/evaluations", () => {
     expect(evaluation?.inputType).toBe("IMAGE");
     expect(evaluation?.findings).toHaveLength(2);
     expect(evaluation?.findings[0].label).toBe("彩り");
+
+    // 総評・観点別コメントは暗号化して保存され、復号すると元の値に戻る。
+    expect(evaluation?.summary).not.toBeNull();
+    expect(isEncryptedToken(evaluation!.summary!)).toBe(true);
+    expect(decryptField(evaluation!.summary!)).toBe("彩り豊かで美味しそうです");
+    expect(isEncryptedToken(evaluation!.findings[0].body)).toBe(true);
+    expect(decryptField(evaluation!.findings[0].body)).toBe("...");
+
+    // Execution.resultTextには実際の総評・コメントの平文を残さない
+    // (共有列のため暗号化が及ばない箇所からの情報漏えいを避けるため)。
+    const execution = await prisma.execution.findUnique({
+      where: { id: evaluation!.executionId! },
+    });
+    expect(execution?.resultText).not.toContain("彩り豊かで美味しそうです");
 
     const notification = await prisma.notification.findFirst({
       where: { userId, link: `/evaluations/${body.id}` },

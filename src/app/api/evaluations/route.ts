@@ -10,6 +10,7 @@ import { renderTemplate } from "@/lib/prompt-variables";
 import { runAiExecution } from "@/lib/run-ai-execution";
 import { scheduleBackground } from "@/lib/schedule-background";
 import { createEvaluationNotification } from "@/lib/notifications";
+import { encryptField } from "@/lib/field-crypto";
 import { logError } from "@/lib/error-log";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 
@@ -41,6 +42,15 @@ const MAX_IMAGE_BASE64_LENGTH = Math.ceil(MAX_IMAGE_BYTES / 3) * 4;
 // 上限に絞る(リクエストサイズ・レート制限あたりのコストを抑えるため)。
 const MAX_PDF_BYTES = 20 * 1024 * 1024;
 const MAX_PDF_BASE64_LENGTH = Math.ceil(MAX_PDF_BYTES / 3) * 4;
+
+// Execution.resultTextは複数の実行系(プロンプト実行・AIレビュー・AI評価)で
+// 共有される列だが、AI評価の総評・観点別コメントはEvaluation.summary/
+// EvaluationFinding.bodyとして暗号化して個別に保存する(下記)。resultTextに
+// 同じ内容を平文で複製すると、そちらは共有列ゆえに暗号化が及ばず(実行履歴タブ・
+// RAG埋め込みバックフィル等、AI評価を想定していない箇所からも読めてしまう)
+// 個人情報が漏れる経路になるため、AI評価分のresultTextはプレースホルダーに留める。
+const EVALUATION_RESULT_PLACEHOLDER =
+  "(AI評価の結果は暗号化してEvaluationに個別保存されています。詳細は評価結果画面を参照してください)";
 
 // 通知の作成は評価結果そのものより重要度が低い副次的な処理のため、失敗しても
 // Evaluationのステータス確定には影響させないベストエフォートで行う
@@ -233,7 +243,7 @@ export async function POST(request: Request) {
           }
 
           return {
-            resultText: JSON.stringify(response.parsed_output),
+            resultText: EVALUATION_RESULT_PLACEHOLDER,
             promptTokens: response.usage.input_tokens,
             completionTokens: response.usage.output_tokens,
             result: response.parsed_output,
@@ -242,11 +252,15 @@ export async function POST(request: Request) {
       });
 
       if (outcome.status === "SUCCESS") {
-        const { findings } = outcome.result;
+        const { summary, findings } = outcome.result;
         await prisma.$transaction(async (tx) => {
           await tx.evaluation.update({
             where: { id: evaluation.id },
-            data: { status: "SUCCESS", executionId: outcome.execution.id },
+            data: {
+              status: "SUCCESS",
+              executionId: outcome.execution.id,
+              summary: encryptField(summary),
+            },
           });
           if (findings.length > 0) {
             await tx.evaluationFinding.createMany({
@@ -255,7 +269,7 @@ export async function POST(request: Request) {
                 label: f.label,
                 tone: f.tone,
                 score: f.score,
-                body: f.body,
+                body: encryptField(f.body),
               })),
             });
           }

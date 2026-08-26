@@ -112,6 +112,8 @@ Phase 5(汎用AI評価ツール)は画像評価(`inputType: IMAGE`)・テキス�
 
 ユーザーから「汎用評価の対象を増やしたい」「テンプレートも充実させたい」との要望を受け、PDF評価(`inputType: PDF`)を追加。画像評価と同じ「ファイルをBase64にしてClaudeへのメッセージに積む」パターンを踏襲し、content配列の要素を`image`ブロックから`document`ブロック(`{ type: "document", source: { type: "base64", media_type: "application/pdf", data } }`)に差し替えるだけで実現した(`Evaluation`/バックグラウンド実行・通知・共有リンクの仕組みは画像評価と完全共通)。履歴書・契約書・論文などのレビュー用途を想定し、画像と同じ「保存しない」方針を適用(20MBまで)。あわせてプロンプトテンプレートをIMAGE/TEXT/PDF計10種(写真の筋肉評価テンプレートを含む)に拡充し、入力形式のラベル表記を`src/lib/evaluation-input-type.ts`に集約して各画面(フォーム・一覧・詳細・共有ページ・テンプレート一覧)の表記揺れを防いだ。詳細は[`docs/phase5-design.md`](./docs/phase5-design.md)の「PDF評価」を参照。
 
+PDF評価の追加を受けて、ユーザーから「個人情報の扱いはどうなっているか」との質問。ai-forge自体はファイルの中身を保存しない旨、Anthropicへの送信はAnthropicのポリシーに準拠する旨、評価結果のテキストはDBに残り共有リンクで公開されうる旨を説明したところ、「共有リンク作成時に個人情報らしき内容をアラートできないか」「評価結果をDBに残したくない、暗号化できないか」と相談された。前者はAI誤検知・見逃しのリスクを理由に見送り、既存の汎用確認ダイアログのままとした。後者は実装: `src/lib/field-crypto.ts`でGitHubトークンと同じAES-256-GCMの仕組み(`token-crypto.ts`)を再利用し、`Evaluation.summary`(新設列)・`EvaluationFinding.body`を暗号化して保存するようにした。`Execution`はプロンプト実行・AIレビュー・AI評価で共有される列のため、AI評価分の`resultText`には実際の内容を書かずプレースホルダーに置き換え(実行履歴タブ・RAG埋め込みバックフィルなど、暗号化が及ばない共有経路からの平文漏えいを防ぐため)、これに伴い`POST /api/executions/backfill-embeddings`・`/documents`の未処理件数カウントもAI評価由来のExecutionを対象外にした。詳細は[`docs/phase5-design.md`](./docs/phase5-design.md)の「評価結果の暗号化」を参照。
+
 ### UI/UX・デザインのブラッシュアップ — 完了
 
 以下5項目すべて対応済み。
