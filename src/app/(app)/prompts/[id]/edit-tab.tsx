@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useApiMutation } from "@/lib/use-api-mutation";
 import { useToast } from "@/components/toast-provider";
+import { submitOnModEnter } from "@/lib/keyboard-shortcuts";
 
 type Category = { id: string; name: string };
 
@@ -111,10 +112,12 @@ export function EditTab({
       <textarea
         value={content}
         onChange={(e) => setContent(e.target.value)}
+        onKeyDown={submitOnModEnter}
         required
         rows={14}
         className="w-full rounded border border-zinc-300 px-3 py-2 font-mono text-sm dark:border-zinc-700 dark:bg-zinc-900"
       />
+      <p className="-mt-2 text-xs text-zinc-500">Ctrl/⌘+Enterで保存できます</p>
 
       <div>
         <label className="mb-1 block text-xs text-zinc-500">

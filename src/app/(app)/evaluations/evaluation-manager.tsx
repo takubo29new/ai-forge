@@ -9,6 +9,7 @@ import { Spinner } from "@/components/spinner";
 import { useToast } from "@/components/toast-provider";
 import { usePendingEvaluations } from "@/components/pending-evaluations-context";
 import { extractVariableNames } from "@/lib/prompt-variables";
+import { submitOnModEnter } from "@/lib/keyboard-shortcuts";
 
 type EvaluationStatus = "PENDING" | "SUCCESS" | "FAILED";
 type InputType = "IMAGE" | "TEXT";
@@ -239,7 +240,7 @@ export function EvaluationManager({
           ) : variableNames.length > 0 ? (
             <div className="flex flex-col gap-2">
               <p className="text-xs text-zinc-500">
-                評価対象のテキスト(プロンプト本文の{"{{変数名}}"}に埋め込まれます)
+                評価対象のテキスト(プロンプト本文の{"{{変数名}}"}に埋め込まれます、Ctrl/⌘+Enterで実行できます)
               </p>
               {variableNames.map((name) => (
                 <div key={name}>
@@ -252,6 +253,7 @@ export function EvaluationManager({
                         [name]: e.target.value,
                       }))
                     }
+                    onKeyDown={submitOnModEnter}
                     rows={4}
                     className="w-full rounded border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
                   />

@@ -57,7 +57,9 @@ export default async function HelpPage() {
             <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">⌘</code>
             +
             <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">K</code>
-            でどの画面からでもコマンドパレットを開けます。プロンプト・カテゴリ・リポジトリ・ドキュメント・評価・レビュー(PRタイトル)を横断して名前の部分一致で検索し、選ぶとその画面に移動します。矢印キーで候補を選び、Enterで移動できます。
+            でどの画面からでもコマンドパレットを開けます(入力欄にフォーカスしていない状態なら
+            <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">/</code>
+            でも開けます)。プロンプト・カテゴリ・リポジトリ・ドキュメント・評価・レビュー(PRタイトル)を横断して名前の部分一致で検索し、選ぶとその画面に移動します。矢印キーで候補を選び、Enterで移動できます。
           </p>
         </section>
 
@@ -75,7 +77,13 @@ export default async function HelpPage() {
           </p>
           <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
             <strong>保存すると、既存の内容を上書きするのではなく新しいバージョンとして追加されます。</strong>
-            過去の内容は消えないので、安心して書き換えを試せます。更新メモを添えておくと、あとで見返すときに何を変えたか分かりやすくなります。
+            過去の内容は消えないので、安心して書き換えを試せます。更新メモを添えておくと、あとで見返すときに何を変えたか分かりやすくなります。本文の入力欄にフォーカスした状態で
+            <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">Ctrl</code>
+            /
+            <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">⌘</code>
+            +
+            <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">Enter</code>
+            で保存できます。
           </p>
           <p className="text-sm text-zinc-700 dark:text-zinc-300">
             AIレビューで一度でも使ったプロンプトには、「編集」タブの下に「レビュー指摘からの改善提案」が表示されます。過去の指摘の中から繰り返し発生しているパターンをAIが分析し、プロンプト本文の改善案を提案します(結果は保存されず、押すたびに生成し直します)。
@@ -105,7 +113,13 @@ export default async function HelpPage() {
             実行タブに「topic」という入力欄が現れるので、そこに値(例:
             「TypeScript」)を入れて実行すると、変数部分が置き換えられた本文がClaudeに送信されます。値を入力しなかった変数は
             <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">{"{{topic}}"}</code>
-            のまま送信されます。
+            のまま送信されます。変数の入力欄にフォーカスした状態で
+            <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">Ctrl</code>
+            /
+            <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">⌘</code>
+            +
+            <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">Enter</code>
+            を押すと、ボタンを押さずに実行できます。
           </p>
         </section>
 
@@ -196,7 +210,13 @@ export default async function HelpPage() {
           <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
             「テキスト」を選ぶと、選んだプロンプトの本文に含まれる
             <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">{"{{変数名}}"}</code>
-            ごとに入力欄が表示されるので、評価したい内容を入力してください(プロンプト実行の変数展開と同じ仕組みです)。変数が含まれていないプロンプトはテキスト評価には使えません。
+            ごとに入力欄が表示されるので、評価したい内容を入力してください(プロンプト実行の変数展開と同じ仕組みです)。変数が含まれていないプロンプトはテキスト評価には使えません。入力欄にフォーカスした状態で
+            <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">Ctrl</code>
+            /
+            <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">⌘</code>
+            +
+            <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">Enter</code>
+            で実行できます。
           </p>
           <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
             アップロードした画像自体はサーバーに保存されません。Claudeへのリクエストで使われるだけで、評価結果(テキスト)のみが記録されます。

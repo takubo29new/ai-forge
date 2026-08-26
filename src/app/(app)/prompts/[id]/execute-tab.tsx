@@ -7,6 +7,7 @@ import { extractVariableNames } from "@/lib/prompt-variables";
 import { Markdown } from "@/components/markdown";
 import { useApiMutation } from "@/lib/use-api-mutation";
 import { Spinner } from "@/components/spinner";
+import { submitOnModEnter } from "@/lib/keyboard-shortcuts";
 
 type Version = { id: string; versionNumber: number; content: string };
 
@@ -115,12 +116,15 @@ export function ExecuteTab({
                     [name]: e.target.value,
                   }))
                 }
+                onKeyDown={submitOnModEnter}
                 className="flex-1 rounded border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
               />
             </div>
           ))}
         </div>
       )}
+
+      <p className="text-xs text-zinc-500">Ctrl/⌘+Enterで実行できます</p>
 
       <button
         type="submit"

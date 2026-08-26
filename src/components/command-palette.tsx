@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { Modal } from "./modal";
 import { Spinner } from "./spinner";
 import { SearchIcon } from "./icons";
+import { isEditableTarget } from "@/lib/keyboard-shortcuts";
 
 type ResultRow = { id: string; label: string };
 type SearchResults = {
@@ -92,6 +93,14 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setIsOpen((prev) => !prev);
+        return;
+      }
+      // "/"は他の一般的なWebサービス(GitHub等)と同じ、検索フォーカス用の
+      // 補助ショートカット。通常のテキスト入力中に横取りしないよう、入力欄に
+      // フォーカスが無い場合のみ反応する。
+      if (e.key === "/" && !isEditableTarget(e.target)) {
+        e.preventDefault();
+        setIsOpen(true);
       }
     }
     document.addEventListener("keydown", handleKeyDown);
