@@ -7,7 +7,14 @@ import { EvaluationOutputSchema } from "@/lib/evaluation-schema";
 import { checkEvaluationRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { LIST_LIMIT } from "@/lib/list-limits";
 import { runAiExecution } from "@/lib/run-ai-execution";
+import { scheduleBackground } from "@/lib/schedule-background";
+import { logError } from "@/lib/error-log";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+
+// Claude Visionの呼び出しはレイテンシが大きいため、バックグラウンド実行
+// (after())を使う。afterのコールバックもルート自体のmaxDurationの範囲内で
+// しか実行されないため、既存のdocuments/syncルートと同じく引き上げておく。
+export const maxDuration = 60;
 
 // Claude Vision(base64画像入力)が対応する画像形式。それ以外は事前に弾く。
 const ALLOWED_IMAGE_MEDIA_TYPES = [
@@ -94,92 +101,108 @@ export async function POST(request: Request) {
     return rateLimitResponse(rateLimit.limit);
   }
 
-  const outcome = await runAiExecution({
-    promptVersionId: promptVersion.id,
-    userId,
-    model: DEFAULT_MODEL,
-    // 画像評価に{{変数名}}展開は使わないため空のまま記録する
-    // (プロンプト実行・AIレビューと同じExecution.variablesカラムを流用するための形合わせ)。
-    variables: {},
-    call: async () => {
-      const response = await anthropic.messages.parse({
-        model: DEFAULT_MODEL,
-        max_tokens: 16000,
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "image",
-                source: {
-                  type: "base64",
-                  media_type: imageMediaType,
-                  data: imageBase64,
-                },
-              },
-              { type: "text", text: promptVersion.content },
-            ],
-          },
-        ],
-        output_config: { format: zodOutputFormat(EvaluationOutputSchema) },
-      });
-
-      if (!response.parsed_output) {
-        throw new Error("構造化出力の解析に失敗しました");
-      }
-
-      return {
-        resultText: JSON.stringify(response.parsed_output),
-        promptTokens: response.usage.input_tokens,
-        completionTokens: response.usage.output_tokens,
-        result: response.parsed_output,
-      };
-    },
-  });
-
-  if (outcome.status === "SUCCESS") {
-    const { findings } = outcome.result;
-
-    const evaluation = await prisma.$transaction(async (tx) => {
-      const created = await tx.evaluation.create({
-        data: {
-          userId,
-          promptVersionId: promptVersion.id,
-          executionId: outcome.execution.id,
-          inputType: "IMAGE",
-          title,
-          status: "SUCCESS",
-        },
-      });
-
-      if (findings.length > 0) {
-        await tx.evaluationFinding.createMany({
-          data: findings.map((f) => ({
-            evaluationId: created.id,
-            label: f.label,
-            tone: f.tone,
-            score: f.score,
-            body: f.body,
-          })),
-        });
-      }
-
-      return created;
-    });
-
-    return NextResponse.json({ id: evaluation.id }, { status: 201 });
-  }
-
+  // Claude Vision呼び出しはレイテンシが大きいため、先にPENDINGなEvaluationを
+  // 作って即座に返し、実際のAI呼び出し・結果の書き込みはバックグラウンドで行う
+  // (Phase 5「バックグラウンド処理」、docs/phase5-design.md参照)。
   const evaluation = await prisma.evaluation.create({
     data: {
       userId,
       promptVersionId: promptVersion.id,
-      executionId: outcome.execution.id,
       inputType: "IMAGE",
       title,
-      status: "FAILED",
+      status: "PENDING",
     },
   });
 
-  return NextResponse.json({ id: evaluation.id }, { status: 200 });
+  await scheduleBackground(async () => {
+    try {
+      const outcome = await runAiExecution({
+        promptVersionId: promptVersion.id,
+        userId,
+        model: DEFAULT_MODEL,
+        // 画像評価に{{変数名}}展開は使わないため空のまま記録する
+        // (プロンプト実行・AIレビューと同じExecution.variablesカラムを流用するための形合わせ)。
+        variables: {},
+        call: async () => {
+          const response = await anthropic.messages.parse({
+            model: DEFAULT_MODEL,
+            max_tokens: 16000,
+            messages: [
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "image",
+                    source: {
+                      type: "base64",
+                      media_type: imageMediaType,
+                      data: imageBase64,
+                    },
+                  },
+                  { type: "text", text: promptVersion.content },
+                ],
+              },
+            ],
+            output_config: { format: zodOutputFormat(EvaluationOutputSchema) },
+          });
+
+          if (!response.parsed_output) {
+            throw new Error("構造化出力の解析に失敗しました");
+          }
+
+          return {
+            resultText: JSON.stringify(response.parsed_output),
+            promptTokens: response.usage.input_tokens,
+            completionTokens: response.usage.output_tokens,
+            result: response.parsed_output,
+          };
+        },
+      });
+
+      if (outcome.status === "SUCCESS") {
+        const { findings } = outcome.result;
+        await prisma.$transaction(async (tx) => {
+          await tx.evaluation.update({
+            where: { id: evaluation.id },
+            data: { status: "SUCCESS", executionId: outcome.execution.id },
+          });
+          if (findings.length > 0) {
+            await tx.evaluationFinding.createMany({
+              data: findings.map((f) => ({
+                evaluationId: evaluation.id,
+                label: f.label,
+                tone: f.tone,
+                score: f.score,
+                body: f.body,
+              })),
+            });
+          }
+        });
+        return;
+      }
+
+      await prisma.evaluation.update({
+        where: { id: evaluation.id },
+        data: { status: "FAILED", executionId: outcome.execution.id },
+      });
+    } catch (error) {
+      // runAiExecution自体は失敗時も例外を投げないが、その後のDB書き込みが
+      // 失敗した場合にEvaluationがPENDINGのまま残り続けるのを防ぐため、
+      // ここで確実にFAILEDへ倒す(ベストエフォート。これ自体が失敗しても
+      // ErrorLogには記録済みなので調査はできる)。
+      await logError({
+        source: "SERVER",
+        message: `評価のバックグラウンド実行に失敗しました: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        path: "/api/evaluations",
+        userId,
+      });
+      await prisma.evaluation
+        .update({ where: { id: evaluation.id }, data: { status: "FAILED" } })
+        .catch(() => {});
+    }
+  });
+
+  return NextResponse.json({ id: evaluation.id, status: "PENDING" }, { status: 202 });
 }

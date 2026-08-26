@@ -5,6 +5,7 @@ import { requireUserId } from "@/lib/session";
 import { Markdown } from "@/components/markdown";
 import { TONES, TONE_TEXT, TONE_LABEL, countByTone } from "@/lib/evaluation-tone";
 import { EvaluationOutputSchema } from "@/lib/evaluation-schema";
+import { PendingRefresher } from "./pending-refresher";
 
 export default async function EvaluationDetailPage({
   params,
@@ -71,9 +72,12 @@ export default async function EvaluationDetailPage({
       </div>
 
       {evaluation.status === "PENDING" && (
-        <p className="rounded-lg border border-zinc-200 px-4 py-3 text-sm text-zinc-500 dark:border-zinc-800">
-          処理中です。しばらくしてから再度確認してください。
-        </p>
+        <>
+          <p className="rounded-lg border border-zinc-200 px-4 py-3 text-sm text-zinc-500 dark:border-zinc-800">
+            処理中です。完了すると自動的にこの画面が更新されます(離れても完了時に通知します)。
+          </p>
+          <PendingRefresher />
+        </>
       )}
 
       {evaluation.status === "FAILED" && (
