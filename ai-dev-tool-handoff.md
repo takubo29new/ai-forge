@@ -103,8 +103,9 @@ Phase 5(汎用AI評価ツール)は画像評価(`inputType: IMAGE`)・テキス�
 
 キーボードショートカットも実装完了。`src/lib/keyboard-shortcuts.ts`に`submitOnModEnter`(Cmd/Ctrl+Enterでフォーム送信。単一行inputは素のEnterで既にネイティブ送信されるが、textarea等の複数行入力向けに統一して適用)・`isEditableTarget`(テキスト入力中かどうかの判定)を切り出し、プロンプト編集(保存)・プロンプト実行・AI評価のテキスト入力に適用した。コマンドパレット(`Ctrl`/`⌘`+`K`)には、入力欄にフォーカスしていない場合のみ反応する`/`を検索フォーカス用の補助ショートカットとして追加した(GitHub等と同じパターン)。
 
+利用状況ダッシュボードも実装完了(`/usage`)。ただし「コスト」の金額換算は行っていない — モデルごとの正確な現行料金をこの場で確認できず、不確かな数値を事実として表示するリスクがあると判断し、ユーザーに相談のうえ「トークン数のみ表示」を選んだ経緯がある。Claude(Anthropic)は`Execution.promptTokens`/`completionTokens`(既存データ、プロンプト実行・AIレビュー・AI評価のみが対象。RAG検索チャットの回答生成・チャットのtool use解析・プロンプト改善提案は`Execution`を作らないため含まれない)を合計・モデル別・直近14日の日別で集計。Voyage AIはトークン数を記録していないため、`DocumentChunk`/`ReviewCommentEmbedding`/`PromptVersionEmbedding`/`ExecutionEmbedding`の件数のみを表示する。
+
 - 通知の強化(Phase 5のバックグラウンド処理と合わせて、トースト以外の通知手段も検討)
-- 利用状況・コストダッシュボード(Anthropic/Voyage AIの実際のAPI利用量・概算コストを可視化)
 - 評価結果の共有リンク(AIレビュー・評価結果を読み取り専用の公開URLで共有。Phase 5との相性が良い)
 - プロンプトテンプレート集(Phase 5を試しやすくするための叩き台プロンプト)
 

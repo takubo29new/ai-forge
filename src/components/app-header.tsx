@@ -20,6 +20,7 @@ const OTHER_NAV_LINKS = [
   { href: "/documents", label: "ドキュメント" },
   { href: "/chat", label: "チャット" },
   { href: "/evaluations", label: "評価" },
+  { href: "/usage", label: "利用状況" },
 ];
 
 export async function AppHeader() {
