@@ -283,5 +283,5 @@ REST風のAPI Routes。認証は`auth()`(NextAuth.js)によるセッション確
 | Phase 4 | [`phase4-design.md`](./phases/phase4-design.md) |
 | Phase 5 | [`phase5-design.md`](./phases/phase5-design.md) |
 | 品質・運用対応全般 | [`quality-improvements.md`](./quality-improvements.md) |
-| 自動テストの仕様 | [`test-specification.md`](./test-specification.md) |
+| 自動テストの仕様 | [`test-specification.md`](./test-specification.md)(詳細は[`tests/unit-tests.md`](./tests/unit-tests.md)・[`tests/integration-tests.md`](./tests/integration-tests.md)) |
 | 手動テストチェックリスト | [`manual-test-checklist.md`](./manual-test-checklist.md) |
