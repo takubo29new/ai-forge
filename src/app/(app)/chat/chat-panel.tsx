@@ -271,96 +271,100 @@ export function ChatPanel({
         )}
       </div>
 
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {/* 会話が伸びても入力欄を探してスクロールしなくて済むよう、質問フォーム
+          (とその直上のAIレビュー実行フォーム・エラー表示)は画面下部に固定する。 */}
+      <div className="sticky bottom-0 flex flex-col gap-3 border-t border-zinc-200 bg-background pt-3 pb-4 dark:border-zinc-800">
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
-      {canRunAction && (
-        <div className="flex flex-col gap-2 rounded-lg border border-dashed border-zinc-300 bg-zinc-50 px-3 py-2.5 text-xs dark:border-zinc-700 dark:bg-zinc-900/50">
-          <p className="text-zinc-600 dark:text-zinc-400">
-            リポジトリ・PR番号・プロンプトを選んで、AIレビュー実行の確認画面を直接表示できます(下の質問欄に自然文で依頼することもできます)。
-          </p>
-          <form
-            onSubmit={handleFormSubmit}
-            className="flex flex-wrap items-center gap-2"
+        {canRunAction && (
+          <div className="flex flex-col gap-2 rounded-lg border border-dashed border-zinc-300 bg-zinc-50 px-3 py-2.5 text-xs dark:border-zinc-700 dark:bg-zinc-900/50">
+            <p className="text-zinc-600 dark:text-zinc-400">
+              リポジトリ・PR番号・プロンプトを選んで、AIレビュー実行の確認画面を直接表示できます(下の質問欄に自然文で依頼することもできます)。
+            </p>
+            <form
+              onSubmit={handleFormSubmit}
+              className="flex flex-wrap items-center gap-2"
+            >
+              <select
+                value={formRepositoryId}
+                onChange={(e) => setFormRepositoryId(e.target.value)}
+                required
+                aria-label="レビュー対象のリポジトリ"
+                className="rounded border border-zinc-300 px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
+              >
+                <option value="" disabled>
+                  リポジトリを選択
+                </option>
+                {repositories.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+              <span aria-hidden="true" className="text-zinc-500">
+                PR #
+              </span>
+              <input
+                type="number"
+                min={1}
+                step={1}
+                value={formPullRequestNumber}
+                onChange={(e) => setFormPullRequestNumber(e.target.value)}
+                required
+                placeholder="12"
+                aria-label="PR番号"
+                className="w-16 rounded border border-zinc-300 px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
+              />
+              <select
+                value={formPromptId}
+                onChange={(e) => setFormPromptId(e.target.value)}
+                required
+                aria-label="使用するプロンプト"
+                className="rounded border border-zinc-300 px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
+              >
+                <option value="" disabled>
+                  プロンプトを選択
+                </option>
+                {prompts.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.title}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="submit"
+                className="rounded border border-zinc-300 px-2 py-1 font-medium hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900"
+              >
+                確認画面を表示
+              </button>
+            </form>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="flex items-end gap-2">
+          <textarea
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            onKeyDown={handleKeyDown}
+            required
+            rows={2}
+            placeholder={
+              canRunAction
+                ? "質問を入力、またはAIレビューの実行を依頼(Enterで送信、Shift+Enterで改行)"
+                : "質問を入力(Enterで送信、Shift+Enterで改行)"
+            }
+            className="flex-1 resize-none rounded border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          />
+          <button
+            type="submit"
+            disabled={pending}
+            className="inline-flex items-center gap-1.5 self-stretch rounded bg-accent transition-opacity hover:opacity-90 px-4 text-sm font-medium text-white disabled:opacity-50"
           >
-            <select
-              value={formRepositoryId}
-              onChange={(e) => setFormRepositoryId(e.target.value)}
-              required
-              aria-label="レビュー対象のリポジトリ"
-              className="rounded border border-zinc-300 px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
-            >
-              <option value="" disabled>
-                リポジトリを選択
-              </option>
-              {repositories.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.label}
-                </option>
-              ))}
-            </select>
-            <span aria-hidden="true" className="text-zinc-500">
-              PR #
-            </span>
-            <input
-              type="number"
-              min={1}
-              step={1}
-              value={formPullRequestNumber}
-              onChange={(e) => setFormPullRequestNumber(e.target.value)}
-              required
-              placeholder="12"
-              aria-label="PR番号"
-              className="w-16 rounded border border-zinc-300 px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
-            />
-            <select
-              value={formPromptId}
-              onChange={(e) => setFormPromptId(e.target.value)}
-              required
-              aria-label="使用するプロンプト"
-              className="rounded border border-zinc-300 px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
-            >
-              <option value="" disabled>
-                プロンプトを選択
-              </option>
-              {prompts.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.title}
-                </option>
-              ))}
-            </select>
-            <button
-              type="submit"
-              className="rounded border border-zinc-300 px-2 py-1 font-medium hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900"
-            >
-              確認画面を表示
-            </button>
-          </form>
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="flex items-end gap-2">
-        <textarea
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-          onKeyDown={handleKeyDown}
-          required
-          rows={2}
-          placeholder={
-            canRunAction
-              ? "質問を入力、またはAIレビューの実行を依頼(Enterで送信、Shift+Enterで改行)"
-              : "質問を入力(Enterで送信、Shift+Enterで改行)"
-          }
-          className="flex-1 resize-none rounded border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-        />
-        <button
-          type="submit"
-          disabled={pending}
-          className="inline-flex items-center gap-1.5 self-stretch rounded bg-accent transition-opacity hover:opacity-90 px-4 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {pending && <Spinner className="h-4 w-4" />}
-          {pending ? "考え中..." : "送信"}
-        </button>
-      </form>
+            {pending && <Spinner className="h-4 w-4" />}
+            {pending ? "考え中..." : "送信"}
+          </button>
+        </form>
+      </div>
 
       {pendingAction?.kind === "action" && (
         <ConfirmDialog
