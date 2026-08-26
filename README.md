@@ -182,6 +182,14 @@ Vercelへのデプロイを想定した構成になっている(実際にv1.0.0�
 
 基本フロー: `feature/xxx` / `bugfix/xxx` を `dev` から切って作業し、`dev` にマージ。検証後、`dev` を `main` にマージしてリリースする。緊急の本番障害対応のみ `hotfix/xxx` を `main` から直接切り、修正後に `main` と `dev` の両方へマージする。
 
+## リリース履歴
+
+バージョンタグ(`vX.Y.Z`)を作成するたびに、その版で何が新しくなったかをまとめたポートフォリオ用プレゼン資料(Artifact)を新規発行している。過去の版の資料は上書きせず残す。
+
+| バージョン | 日付 | 資料 |
+| --- | --- | --- |
+| v1.0.0 | 2026-08-24 | [ai-forge Build Log](https://claude.ai/code/artifact/e576878d-7b47-4222-b507-0cdd8a970fe6) |
+
 ## 参考リンク
 
 - [Next.js Documentation](https://nextjs.org/docs)
