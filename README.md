@@ -195,6 +195,7 @@ Vercelへのデプロイを想定した構成になっている(実際にv1.0.0�
 | バージョン | 日付 | 資料 |
 | --- | --- | --- |
 | v1.0.0 | 2026-08-24 | [ai-forge Build Log](https://claude.ai/code/artifact/e576878d-7b47-4222-b507-0cdd8a970fe6) |
+| v1.1.0 | 2026-08-26 | [ai-forge v1.1.0](https://claude.ai/code/artifact/7379d812-9d19-4b52-b36c-126b2980d501) |
 
 ## 参考リンク
 
