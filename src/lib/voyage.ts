@@ -23,7 +23,7 @@ export class VoyageApiError extends Error {
 
 // ドキュメント側はinput_type: "document"、質問側はinput_type: "query"を指定する。
 // Voyage APIが非対称検索用に用意しているパラメータで、それぞれに最適化した
-// 埋め込みが得られる(docs/phase3-design.md参照)。
+// 埋め込みが得られる(docs/phases/phase3-design.md参照)。
 async function embed(
   texts: string[],
   inputType: VoyageInputType,

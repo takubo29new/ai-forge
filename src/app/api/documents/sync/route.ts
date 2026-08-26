@@ -39,9 +39,9 @@ async function listTargetFiles() {
 }
 
 // 再同期時は同じsourcePathのDocumentを丸ごと作り直す(差分検出はせず全置き換え。
-// docs/phase3-design.md参照)。repositoryIdはnull(ai-forge自身の同期であることを
+// docs/phases/phase3-design.md参照)。repositoryIdはnull(ai-forge自身の同期であることを
 // 表す)で、接続済みリポジトリの同期は/api/repositories/:id/documents/syncが担う
-// (docs/phase4-design.md「2. プロジェクト単位のドキュメント管理」参照)。
+// (docs/phases/phase4-design.md「2. プロジェクト単位のドキュメント管理」参照)。
 export async function POST() {
   const session = await auth();
   if (!session?.user?.id) {

@@ -18,7 +18,7 @@ type Result = {
 
 // レビュー指摘蓄積からのプロンプト改善提案(Phase 4項目3)。専用テーブルを持たず、
 // クリックのたびにPOST /api/prompts/:id/improvement-suggestionsを呼び直して
-// その場で結果を表示するだけの機能(docs/phase4-design.md参照)。
+// その場で結果を表示するだけの機能(docs/phases/phase4-design.md参照)。
 export function ImprovementSuggestions({
   promptId,
   commentCount,

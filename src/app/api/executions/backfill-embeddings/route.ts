@@ -4,7 +4,7 @@ import { LIST_LIMIT } from "@/lib/list-limits";
 import { handleBackfillEmbeddings } from "@/lib/backfill-embeddings";
 
 // Phase 4より前に蓄積された既存のExecutionにはExecutionEmbeddingが無いため、
-// RAG検索チャットの検索対象にするための一括埋め込み生成(docs/phase4-design.md参照)。
+// RAG検索チャットの検索対象にするための一括埋め込み生成(docs/phases/phase4-design.md参照)。
 // 新規に成功したExecutionはPOST /api/prompts/:id/executeの中で都度埋め込みを作るため、
 // このAPIは主に既存分のバックフィル用。対象はreviewIdが無い(Phase 2のレビュー実行ではない)・
 // evaluationIdが無い(Phase 5のAI評価実行ではない)SUCCESSなExecutionのみ。レビュー由来の

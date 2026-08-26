@@ -229,7 +229,7 @@ async function listMarkdownFilePaths(
 
 // ai-forge自身のdocs同期(/api/documents/sync)がローカルfsから直接読むのに対し、
 // 接続済みの他リポジトリはGitHub API経由でしかファイルを取得できない
-// (docs/phase4-design.md「2. プロジェクト単位のドキュメント管理」参照)。
+// (docs/phases/phase4-design.md「2. プロジェクト単位のドキュメント管理」参照)。
 // 対象はai-forge自身の同期と同じ範囲(ルートのREADME.md・docs/配下のMarkdown)に
 // 揃える。存在しないファイル・ディレクトリは404として無視する
 export async function fetchRepositoryMarkdownFiles(

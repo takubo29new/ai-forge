@@ -18,7 +18,7 @@ const COMMENT_LIMIT = 50;
 // 理由: (1) /prompts/:idの「実行履歴」タブに、プロンプト本文を実行したわけではない
 // メタ分析結果が紛れ込むと紛らわしい、(2) POST /api/executions/backfill-embeddings は
 // review:null のSUCCESS Executionを無差別に埋め込み対象にするため、放置すると
-// メタ分析結果がRAG検索の対象として紛れ込む。詳細はdocs/phase4-design.md参照。
+// メタ分析結果がRAG検索の対象として紛れ込む。詳細はdocs/phases/phase4-design.md参照。
 export async function POST(
   _request: Request,
   ctx: RouteContext<"/api/prompts/[id]/improvement-suggestions">,

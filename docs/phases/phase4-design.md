@@ -1,6 +1,6 @@
 # Phase 4 基本設計書(統合基盤の強化)
 
-対象: Phase 1〜3を「別々の機能」から「データを掛け合わせて初めて作れる機能」へ発展させる。アーキテクチャ・認証は [`phase1-design.md`](./phase1-design.md) を、DB設計の全体像は [`db-design.md`](./db-design.md) を参照。**4項目すべて実装済み。**
+対象: Phase 1〜3を「別々の機能」から「データを掛け合わせて初めて作れる機能」へ発展させる。アーキテクチャ・認証は [`phase1-design.md`](./phase1-design.md) を、DB設計の全体像は [`db-design.md`](../db-design.md) を参照。**4項目すべて実装済み。**
 
 ## 概要
 
@@ -11,7 +11,7 @@
 3. レビュー指摘蓄積からのプロンプト改善提案(1に依存)
 4. チャットからの直接アクション実行(1に依存)
 
-## 1. RAG検索対象の拡張
+## 1. RAG検索対象の拡張(実装済み)
 
 ### DB設計(案)
 
@@ -33,7 +33,7 @@ erDiagram
 ```
 
 - **`PromptVersionEmbedding`** — `PromptVersion.content`をそのまま1つの埋め込みにする(`DocumentChunk`のような見出し単位の分割はしない。プロンプト本文はドキュメントほど長くならない想定のため)。新しいバージョンが保存されるたびに、そのバージョンの分だけ生成する(過去バージョンは差し替えない。バージョンごとに検索できた方が「このバージョンの頃はこう書いていた」を追える)
-- **`ExecutionEmbedding`** — `Execution.resultText`の埋め込み。**`Execution.reviewId`が無い(＝Phase 2のレビュー実行ではない、Phase 1のプロンプト実行由来の)`SUCCESS`な実行のみを対象とする**。レビュー由来のExecutionは、その中身が`ReviewComment`として既に個別に埋め込み済みであり、resultText全体(JSON形式の構造化出力)をそのまま埋め込むと内容が重複するため
+- **`ExecutionEmbedding`** — `Execution.resultText`の埋め込み。**`Execution`に紐づく`Review`・`Evaluation`が無い(＝Phase 1のプロンプト実行由来の)`SUCCESS`な実行のみを対象とする**。レビュー由来のExecutionは、その中身が`ReviewComment`として既に個別に埋め込み済みであり、resultText全体(JSON形式の構造化出力)をそのまま埋め込むと内容が重複するため。AI評価(Phase 5)由来のExecutionも同様の理由に加え、`resultText`が固定のプレースホルダー文字列(評価結果の暗号化、詳細は[`phase5-design.md`](./phase5-design.md)参照)でしかなく埋め込んでも検索の役に立たないため、v1.1.0で対象外に追加した
 
 ### 検索・埋め込み生成
 
@@ -52,7 +52,7 @@ erDiagram
 
 `docs/phase3-design.md`の「今後の拡張候補」で既に構想済みの内容を、Phase 4として実装した。
 
-- **DB**: `Document`に`repositoryId String?`(FK、`onDelete: Cascade`)を追加。既存の`Repository`解除時に紐づく`Review`が全削除される設計([`db-design.md`](./db-design.md)参照)と同じ考え方を踏襲し、リポジトリ接続を解除したら同期済みドキュメントも一緒に消える。ユニーク制約は`[userId, sourcePath]`から`[userId, repositoryId, sourcePath]`に変更(リポジトリをまたいで同じファイル名(例: `README.md`)が存在しうるため)
+- **DB**: `Document`に`repositoryId String?`(FK、`onDelete: Cascade`)を追加。既存の`Repository`解除時に紐づく`Review`が全削除される設計([`db-design.md`](../db-design.md)参照)と同じ考え方を踏襲し、リポジトリ接続を解除したら同期済みドキュメントも一緒に消える。ユニーク制約は`[userId, sourcePath]`から`[userId, repositoryId, sourcePath]`に変更(リポジトリをまたいで同じファイル名(例: `README.md`)が存在しうるため)
 - **同期方式の違い**: ai-forge自身の同期(`POST /api/documents/sync`)はローカルの`fs`から直接読むが、接続済みリポジトリの同期(`POST /api/repositories/:id/documents/sync`)はGitHub API経由(`octokit`の`repos.getContent`)で取得する。対象範囲は両者で揃え、ルートの`README.md`・`docs/`配下のMarkdownファイルのみとした(ai-forge自身の`ai-dev-tool-handoff.md`のような追加のルートファイルは他リポジトリでは前提にできないため対象外)。共通する「チャンク分割→埋め込み生成→Documentを作り直す」処理は`src/lib/document-sync.ts`の`syncMarkdownDocuments()`に切り出し、取得方法の違い(fs vs GitHub API)だけを呼び出し元で吸収している
 - **画面**: `/documents`に「接続済みリポジトリの設計書を同期」カードを追加(ai-forge自身の同期カードとは別立て。対象リポジトリをセレクトボックスで選ぶ)。`/chat`にも対象リポジトリの絞り込みセレクトを追加(未指定時は全件横断のまま)
 - **`/chat`の絞り込み範囲**: `Document`(このリポジトリに同期されたもの)に加えて、`ReviewComment`も`Review.repositoryId`で同じリポジトリに絞り込む(Reviewはリポジトリに紐づく概念のため)。一方`PromptVersion`・`Execution`はどのリポジトリにも紐づかない(プロンプトは複数リポジトリで使い回される)ため、絞り込み時も対象外にせず常に横断検索する

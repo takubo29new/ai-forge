@@ -1,6 +1,6 @@
 # DB設計
 
-Phase 1(プロンプト管理ツール)・Phase 2(AIコードレビューツール)・Phase 3(RAG検索チャットボット、ドキュメント取り込みまで)・Phase 4項目1(RAG検索対象の拡張)・Phase 5(汎用AI評価ツール、画像評価プロトタイプ)に必要なテーブル構成。スキーマの実体は [`prisma/schema.prisma`](../prisma/schema.prisma)。ORMはPrisma。詳細は[`phase3-design.md`](./phase3-design.md)・[`phase4-design.md`](./phase4-design.md)・[`phase5-design.md`](./phase5-design.md)を参照。
+Phase 1(プロンプト管理ツール)・Phase 2(AIコードレビューツール)・Phase 3(RAG検索チャットボット)・Phase 4(統合基盤の強化)・Phase 5(汎用AI評価ツール)に必要なテーブル構成。スキーマの実体は [`prisma/schema.prisma`](../prisma/schema.prisma)。ORMはPrisma。詳細は[`phase3-design.md`](./phases/phase3-design.md)・[`phase4-design.md`](./phases/phase4-design.md)・[`phase5-design.md`](./phases/phase5-design.md)を参照。
 
 ## テーブル一覧
 
@@ -34,7 +34,7 @@ GitHub OAuthのアクセストークンは、Phase 1の認証ですでに`Accoun
 
 ### RAG検索チャットボットドメイン(Phase 3)
 
-pgvector拡張(`vector`、0.8.6)をここで初めて有効化した。詳細は[`phase3-design.md`](./phase3-design.md)を参照。
+pgvector拡張(`vector`、0.8.6)をここで初めて有効化した。詳細は[`phase3-design.md`](./phases/phase3-design.md)を参照。
 
 - `Document` — 取り込んだドキュメント本体(手動貼り付け、またはリポジトリファイル同期)
 - `DocumentChunk` — `Document`を見出し単位で分割した1チャンク。埋め込みベクトル(`vector(1024)`)を持つ
@@ -42,25 +42,33 @@ pgvector拡張(`vector`、0.8.6)をここで初めて有効化した。詳細は
 
 ### RAG検索対象の拡張(Phase 4項目1)
 
-`Document`・`ReviewComment`に続き、Phase 1の資産(`PromptVersion`・`Execution`)もRAG検索チャット(`/chat`)の検索対象にする。詳細は[`phase4-design.md`](./phase4-design.md)を参照。
+`Document`・`ReviewComment`に続き、Phase 1の資産(`PromptVersion`・`Execution`)もRAG検索チャット(`/chat`)の検索対象にする。詳細は[`phase4-design.md`](./phases/phase4-design.md)を参照。
 
 ### プロジェクト単位のドキュメント管理(Phase 4項目2)
 
-`Document`に`repositoryId String?`(FK、`onDelete: Cascade`)を追加し、接続済み`Repository`ごとにドキュメントを紐付けられるようにした。ユニーク制約も`[userId, sourcePath]`から`[userId, repositoryId, sourcePath]`に変更している(リポジトリをまたいだ同名ファイルを区別するため)。ただしPostgresのユニークインデックスは複合キー中のNULLを区別可能として扱うため、この制約だけではrepositoryId IS NULL(ai-forge自身の同期)同士の重複を防げない。そのため`(userId, sourcePath) WHERE repositoryId IS NULL`の部分ユニークインデックスを追加のマイグレーションで補っている(`schema.prisma`の`@@unique`では部分インデックスを表現できないため、`DocumentChunk`等のHNSWインデックスと同じく手動追加)。詳細は[`phase4-design.md`](./phase4-design.md)を参照。
+`Document`に`repositoryId String?`(FK、`onDelete: Cascade`)を追加し、接続済み`Repository`ごとにドキュメントを紐付けられるようにした。ユニーク制約も`[userId, sourcePath]`から`[userId, repositoryId, sourcePath]`に変更している(リポジトリをまたいだ同名ファイルを区別するため)。ただしPostgresのユニークインデックスは複合キー中のNULLを区別可能として扱うため、この制約だけではrepositoryId IS NULL(ai-forge自身の同期)同士の重複を防げない。そのため`(userId, sourcePath) WHERE repositoryId IS NULL`の部分ユニークインデックスを追加のマイグレーションで補っている(`schema.prisma`の`@@unique`では部分インデックスを表現できないため、`DocumentChunk`等のHNSWインデックスと同じく手動追加)。詳細は[`phase4-design.md`](./phases/phase4-design.md)を参照。
 
 - `PromptVersionEmbedding` — `PromptVersion.content`に対する埋め込みを1:1で追加する別テーブル(`ReviewCommentEmbedding`と同じパターン)。新しいバージョンが保存されるたびに生成し、過去バージョンは差し替えない
-- `ExecutionEmbedding` — `Execution.resultText`に対する埋め込みを1:1で追加する別テーブル。`reviewId`が無い(Phase 2のレビュー実行ではない)`SUCCESS`な実行のみを対象とする。レビュー由来の`resultText`は既に`ReviewComment`として個別に埋め込み済みのため、重複を避けてあえて対象外にしている
+- `ExecutionEmbedding` — `Execution.resultText`に対する埋め込みを1:1で追加する別テーブル。`Review`・`Evaluation`のいずれも紐づかない(Phase 1のプロンプト実行由来の)`SUCCESS`な実行のみを対象とする。レビュー由来の`resultText`は既に`ReviewComment`として個別に埋め込み済み、AI評価(Phase 5)由来の`resultText`は暗号化のため固定のプレースホルダー文字列でしかなく、いずれも重複・無意味を避けてあえて対象外にしている
 
 ### チャットからの直接アクション実行(Phase 4項目4)
 
-`Review`に`triggeredVia ReviewTrigger`(`UI` | `CHAT`、デフォルト`UI`)を追加した。UIの「オープンなPR」タブからの実行とチャットからの実行はいずれも同じ`POST /api/repositories/:id/reviews`・同じ`Review`テーブルを使うため、履歴上でどちらから実行したかを区別する目的だけの列。既存データは移行なしにUI扱いのままで問題ない。詳細は[`phase4-design.md`](./phase4-design.md)を参照。
+`Review`に`triggeredVia ReviewTrigger`(`UI` | `CHAT`、デフォルト`UI`)を追加した。UIの「オープンなPR」タブからの実行とチャットからの実行はいずれも同じ`POST /api/repositories/:id/reviews`・同じ`Review`テーブルを使うため、履歴上でどちらから実行したかを区別する目的だけの列。既存データは移行なしにUI扱いのままで問題ない。詳細は[`phase4-design.md`](./phases/phase4-design.md)を参照。
 
 ### 汎用AI評価ドメイン(Phase 5)
 
-コードレビュー(`Review`)とは意図的に分離した並行の概念。詳細は[`phase5-design.md`](./phase5-design.md)を参照。
+コードレビュー(`Review`)とは意図的に分離した並行の概念。詳細は[`phase5-design.md`](./phases/phase5-design.md)を参照。
 
 - `Evaluation` — 1回のAI評価の実行単位。`Review`と同じ構造(`promptVersionId`は`onDelete: Restrict`、`executionId`は`onDelete: SetNull`)で、どのプロンプト・入力形式に対するものかを記録する
 - `EvaluationFinding` — AI評価が返した観点別コメント(ラベル・トーン・スコア・本文)。`ReviewComment`のコード非依存版
+
+### 共有リンク(Phase 2・5共通)
+
+`Review`・`Evaluation`それぞれに`shareToken String? @unique`・`sharedAt DateTime?`を追加した。値が`null`なら未共有。トークンは`crypto.randomBytes`で発行する専用の値で、IDそのものは使わない(共有解除で`null`に戻すことで旧リンクを無効化する)。詳細は[`phase5-design.md`](./phases/phase5-design.md)「共有リンク」を参照。
+
+### 通知(Phase 5関連)
+
+- `Notification` — バックグラウンド処理(現状はAI評価のみ)の完了通知。`userId`・`message`・`link`(任意の遷移先)・`read`(既読フラグ)を持つ、他のドメインに依存しない独立したテーブル。詳細は[`phase5-design.md`](./phases/phase5-design.md)「通知センター」を参照
 
 ## 設計上の判断
 
@@ -88,7 +96,7 @@ pgvector拡張(`vector`、0.8.6)をここで初めて有効化した。詳細は
 
 - **埋め込みベクトル列はPrismaの`Unsupported("vector(1024)")`として宣言する**: pgvectorの`vector`型はPrismaが標準サポートしていない。`Unsupported`型のフィールドはPrisma Clientの通常のSELECT/INSERTに含められないという制約があるため、埋め込みの読み書き・コサイン類似検索は`$queryRaw`/`$executeRaw`で行う(`src/lib/embeddings.ts`の`setDocumentChunkEmbedding()`)。`DocumentChunk`は先にPrisma経由でembeddingなしの行を作り、直後に`$executeRaw`でembedding列をUPDATEする2段階の書き込みになる
 - **`ReviewComment`への埋め込みは別テーブル(`ReviewCommentEmbedding`)に分離する**: `ReviewComment`本体に埋め込み列を追加することもできたが、「AIレビューの指摘」という既存の単一責務・既存クエリへの影響を避けるため、1:1の別テーブルにした
-- **埋め込みモデルはVoyage AI(`voyage-3`)**: AnthropicがRAG用途で公式に推奨しているため。詳細・DB設計の全体像は[`phase3-design.md`](./phase3-design.md)を参照
+- **埋め込みモデルはVoyage AI(`voyage-3`)**: AnthropicがRAG用途で公式に推奨しているため。詳細・DB設計の全体像は[`phase3-design.md`](./phases/phase3-design.md)を参照
 - **Voyage AI呼び出し失敗時はDocument自体を削除する**: `POST /api/documents`で埋め込み生成(`embedDocuments()`)が失敗した場合、chunkだけ作ってembeddingが無いDocumentを残すと「検索対象に見えるが実際はヒットしない」という気づきにくい不整合になる。Reviewの`status: FAILED`のように失敗を記録として残す設計とは異なり、ここでは作り直せる状態(そもそも存在しない)に戻すことを優先した(Phase 1のExecution・Phase 2のReviewとは意図的に異なる判断)
 - **pgvectorの類似検索インデックスはHNSW**: `ivfflat`は事前にある程度のデータ件数が無いとクラスタリングの精度が出ない(トレーニングデータ依存)のに対し、HNSWはデータが増えるたびに逐次構築されるため、件数が少ない状態から始まるポートフォリオ運用に向いている
 - **`ReviewComment`の埋め込み生成は失敗してもReview自体をロールバックしない**: `Document`とは逆に、`POST /api/repositories/:id/reviews`ではReviewCommentの埋め込み生成(Voyage AI呼び出し)が失敗しても、既に作成済みのReview・ReviewCommentは残す。理由は、AIレビューという主目的の処理は既に成功しており、埋め込みはRAG検索チャットの検索対象を増やすための副次的な処理に過ぎないため。失敗はErrorLogに記録し、埋め込みが無い指摘は`POST /api/review-comments/backfill-embeddings`で後から埋められる
@@ -103,9 +111,9 @@ pgvector拡張(`vector`、0.8.6)をここで初めて有効化した。詳細は
 
 ### Phase 5の設計判断
 
-- **`Evaluation`/`EvaluationFinding`は`Review`/`ReviewComment`を汎用化せず新設した**: `Review`はコード固有のフィールド(`filePath`・`line`)を持ち、既存のリポジトリ「傾向」タブ・RAG出典表示と深く統合されている。無理に汎用化して両方の呼び出し元を分岐だらけにするより、同じFKパターン(`promptVersionId`は`Restrict`、`executionId`は`SetNull`)を踏襲した並行モデルとして新設するほうが、既存機能への影響もレビューの負担も小さいと判断した。理由の詳細は[`phase5-design.md`](./phase5-design.md)を参照
-- **`Evaluation`に画像・PDFそのものを保持する列は無い**: いずれもリクエスト内でClaudeに渡すのみでDB/ストレージに永続化しない設計のため(理由は[`phase5-design.md`](./phase5-design.md)「画像の扱い: 保存しない方針」を参照)。結果のテキスト(`Evaluation.summary`・`EvaluationFinding.body`)のみを保存する
-- **評価結果(`Evaluation.summary`・`EvaluationFinding.body`)はAES-256-GCMで暗号化して保存する**: 評価対象がPDF(履歴書・契約書等)や写真など個人情報を含みうる入力に広がったため、GitHubトークンと同じ仕組み(`src/lib/token-crypto.ts`)を`src/lib/field-crypto.ts`経由で再利用した。`Execution.resultText`は複数の実行系で共有される列で暗号化が及ばないため、AI評価分はここに実際の内容を書かず固定のプレースホルダー文字列に留めている(実行履歴タブ・RAG埋め込みバックフィルなど、AI評価を想定していない箇所からの平文漏えいを防ぐため)。詳細は[`phase5-design.md`](./phase5-design.md)「評価結果の暗号化」を参照
+- **`Evaluation`/`EvaluationFinding`は`Review`/`ReviewComment`を汎用化せず新設した**: `Review`はコード固有のフィールド(`filePath`・`line`)を持ち、既存のリポジトリ「傾向」タブ・RAG出典表示と深く統合されている。無理に汎用化して両方の呼び出し元を分岐だらけにするより、同じFKパターン(`promptVersionId`は`Restrict`、`executionId`は`SetNull`)を踏襲した並行モデルとして新設するほうが、既存機能への影響もレビューの負担も小さいと判断した。理由の詳細は[`phase5-design.md`](./phases/phase5-design.md)を参照
+- **`Evaluation`に画像・PDFそのものを保持する列は無い**: いずれもリクエスト内でClaudeに渡すのみでDB/ストレージに永続化しない設計のため(理由は[`phase5-design.md`](./phases/phase5-design.md)「画像の扱い: 保存しない方針」を参照)。結果のテキスト(`Evaluation.summary`・`EvaluationFinding.body`)のみを保存する
+- **評価結果(`Evaluation.summary`・`EvaluationFinding.body`)はAES-256-GCMで暗号化して保存する**: 評価対象がPDF(履歴書・契約書等)や写真など個人情報を含みうる入力に広がったため、GitHubトークンと同じ仕組み(`src/lib/token-crypto.ts`)を`src/lib/field-crypto.ts`経由で再利用した。`Execution.resultText`は複数の実行系で共有される列で暗号化が及ばないため、AI評価分はここに実際の内容を書かず固定のプレースホルダー文字列に留めている(実行履歴タブ・RAG埋め込みバックフィルなど、AI評価を想定していない箇所からの平文漏えいを防ぐため)。詳細は[`phase5-design.md`](./phases/phase5-design.md)「評価結果の暗号化」を参照
 
 ## DB環境構築
 

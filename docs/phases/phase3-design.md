@@ -1,6 +1,6 @@
 # Phase 3 基本設計書(RAG検索チャットボット)
 
-対象: RAG検索チャットボット(Phase 3)。アーキテクチャ・認証は [`phase1-design.md`](./phase1-design.md) を、DB設計の全体像は [`db-design.md`](./db-design.md) を参照。本ドキュメントはPhase 3で新規に追加するDB・画面・APIをまとめる。**実装完了。**詳細は「実装状況」を参照。
+対象: RAG検索チャットボット(Phase 3)。アーキテクチャ・認証は [`phase1-design.md`](./phase1-design.md) を、DB設計の全体像は [`db-design.md`](../db-design.md) を参照。本ドキュメントはPhase 3で新規に追加するDB・画面・APIをまとめる。**実装完了。**詳細は「実装状況」を参照。
 
 ## 概要
 

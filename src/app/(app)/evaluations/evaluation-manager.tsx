@@ -77,7 +77,7 @@ export function EvaluationManager({
 
   const selectedPrompt = prompts.find((p) => p.id === promptId);
   // テキスト評価は既存のプロンプト実行(execute-tab.tsx)と同じ{{変数名}}展開を
-  // 使う(docs/phase5-design.md「対応する入力形式」参照)。歌詞・楽譜のテキスト化
+  // 使う(docs/phases/phase5-design.md「対応する入力形式」参照)。歌詞・楽譜のテキスト化
   // した楽曲・文章など、内容が長くなりうるためtextareaで受け付ける。
   const variableNames = useMemo(
     () => (selectedPrompt ? extractVariableNames(selectedPrompt.content) : []),
@@ -139,7 +139,7 @@ export function EvaluationManager({
     if (!data) return;
     // 実際のAI呼び出しはバックグラウンドで進むため、ここではまだPENDING。
     // 完了はレイアウトに常駐するPendingEvaluationsProviderがポーリングして
-    // トースト通知する(docs/phase5-design.md「バックグラウンド処理」参照)。
+    // トースト通知する(docs/phases/phase5-design.md「バックグラウンド処理」参照)。
     registerPending(data.id);
     router.push(`/evaluations/${data.id}`);
   }

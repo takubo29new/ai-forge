@@ -3,7 +3,7 @@
 対象: プロンプト管理ツール(統合AI開発支援プラットフォームの土台)
 更新日: 2026-08-23 / ステータス: Phase 1完了。mainにマージ済み
 
-プロダクト全体のコンセプトとロードマップは [`ai-dev-tool-handoff.md`](../ai-dev-tool-handoff.md)、DB設計の詳細な判断理由は [`docs/db-design.md`](./db-design.md) を参照。本ドキュメントはPhase 1のアーキテクチャ・認証・DB・画面・APIを一つにまとめた全体像。
+プロダクト全体のコンセプトとロードマップは [`ai-dev-tool-handoff.md`](../../ai-dev-tool-handoff.md)、DB設計の詳細な判断理由は [`docs/db-design.md`](../db-design.md) を参照。本ドキュメントはPhase 1のアーキテクチャ・認証・DB・画面・APIを一つにまとめた全体像。
 
 ## 概要
 
@@ -64,7 +64,7 @@ Phase 2でGitHubリポジトリのPR/差分を取得する際も、同じGitHub 
 
 ## DB設計サマリ
 
-詳細な設計判断(なぜPromptに本文を持たせずPromptVersionに持たせたか等)は [`docs/db-design.md`](./db-design.md) を参照。ここでは全体のER関係のみ示す。
+詳細な設計判断(なぜPromptに本文を持たせずPromptVersionに持たせたか等)は [`docs/db-design.md`](../db-design.md) を参照。ここでは全体のER関係のみ示す。
 
 ```mermaid
 erDiagram
@@ -108,7 +108,7 @@ erDiagram
     }
 ```
 
-Promptへの参照は`promptVersionId`経由のみで、`Execution`に`promptId`は持たせていない(実行対象バージョンと記録上のPromptが食い違う不整合を構造上防ぐため)。詳細な設計判断は [`docs/db-design.md`](./db-design.md) を参照。
+Promptへの参照は`promptVersionId`経由のみで、`Execution`に`promptId`は持たせていない(実行対象バージョンと記録上のPromptが食い違う不整合を構造上防ぐため)。詳細な設計判断は [`docs/db-design.md`](../db-design.md) を参照。
 
 ## 画面構成
 
@@ -151,8 +151,8 @@ Phase 1のスコープ(プロンプトCRUD・AI実行・履歴/バージョン�
 | プロンプト・バージョンCRUD | `GET/POST /api/prompts`・`GET/PATCH/DELETE /api/prompts/:id`・`GET /api/prompts/:id/versions`、`/prompts`(カテゴリ絞り込み・検索)、`/prompts/new`、`/prompts/:id`(編集・バージョン履歴タブ)。保存は常に新規`PromptVersion`を追加(versionNumberはmax+1) |
 | Claude実行機能・実行履歴 | `POST /api/prompts/:id/execute`(`@anthropic-ai/sdk`でClaudeを呼び出し、成功時は`resultText`・トークン数・実行時間を、失敗時は`errorMessage`を`Execution`として記録)・`GET /api/prompts/:id/executions`、`/prompts/:id`の実行・実行履歴タブ。本文中の`{{変数名}}`をUIで自動検出しフォーム化。モデルはClaude Opus 5/Sonnet 5/Haiku 4.5から選択可(デフォルトOpus 5) |
 
-Phase 1完了後、共通ナビゲーション・実行系APIのレート制限・確認ダイアログのアクセシビリティ対応など、プロフェッショナルなWeb開発の観点からの品質・UX改善タスクも実施した。設計判断の詳細は [`docs/quality-improvements.md`](./quality-improvements.md) を参照。
+Phase 1完了後、共通ナビゲーション・実行系APIのレート制限・確認ダイアログのアクセシビリティ対応など、プロフェッショナルなWeb開発の観点からの品質・UX改善タスクも実施した。設計判断の詳細は [`docs/quality-improvements.md`](../quality-improvements.md) を参照。
 
 ## 次のフェーズ
 
-Phase 2(AIコードレビューツール)。詳細は [`ai-dev-tool-handoff.md`](../ai-dev-tool-handoff.md)・[`docs/phase2-design.md`](./phase2-design.md) を参照。
+Phase 2(AIコードレビューツール)。詳細は [`ai-dev-tool-handoff.md`](../../ai-dev-tool-handoff.md)・[`docs/phase2-design.md`](./phase2-design.md) を参照。
