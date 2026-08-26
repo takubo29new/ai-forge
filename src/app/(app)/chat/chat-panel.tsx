@@ -25,14 +25,14 @@ type ChatResponse =
   | { actionProposal: ChatActionProposal };
 
 type RepositoryOption = { id: string; label: string };
-type ActionExample = { repositoryLabel: string; promptTitle: string };
+type PromptOption = { id: string; title: string };
 
 export function ChatPanel({
   repositories,
-  actionExample,
+  prompts,
 }: {
   repositories: RepositoryOption[];
-  actionExample: ActionExample | null;
+  prompts: PromptOption[];
 }) {
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [question, setQuestion] = useState("");
@@ -48,6 +48,41 @@ export function ChatPanel({
     error: actionError,
     setError: setActionError,
   } = useApiMutation();
+
+  // AIレビュー実行フォーム(Phase 4項目4)の選択状態。自然文でも同じ提案を
+  // 作れるが、リポジトリ名・PR番号・プロンプト名を毎回文章で書くのは分かり
+  // にくいというフィードバックを受け、選択式のフォームを別途用意した。
+  const canRunAction = repositories.length > 0 && prompts.length > 0;
+  const [formRepositoryId, setFormRepositoryId] = useState("");
+  const [formPullRequestNumber, setFormPullRequestNumber] = useState("");
+  const [formPromptId, setFormPromptId] = useState("");
+
+  function pushActionProposal(question: string, proposal: ChatActionProposal) {
+    setTurns((prev) => {
+      setPendingActionIndex(prev.length);
+      return [...prev, { kind: "action", question, proposal, status: "pending" }];
+    });
+  }
+
+  function handleFormSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const repository = repositories.find((r) => r.id === formRepositoryId);
+    const prompt = prompts.find((p) => p.id === formPromptId);
+    const pullRequestNumber = Number(formPullRequestNumber);
+    if (!repository || !prompt || !Number.isInteger(pullRequestNumber) || pullRequestNumber <= 0) {
+      return;
+    }
+    pushActionProposal(
+      `${repository.label}のPR #${pullRequestNumber}を「${prompt.title}」でレビューして`,
+      {
+        repositoryId: repository.id,
+        repositoryLabel: repository.label,
+        pullRequestNumber,
+        promptId: prompt.id,
+        promptLabel: prompt.title,
+      },
+    );
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -67,18 +102,7 @@ export function ChatPanel({
     );
     if (!data) return;
     if ("actionProposal" in data) {
-      setTurns((prev) => {
-        setPendingActionIndex(prev.length);
-        return [
-          ...prev,
-          {
-            kind: "action",
-            question: submitted,
-            proposal: data.actionProposal,
-            status: "pending",
-          },
-        ];
-      });
+      pushActionProposal(submitted, data.actionProposal);
       return;
     }
     setTurns((prev) => [
@@ -115,6 +139,7 @@ export function ChatPanel({
       ),
     );
     setPendingActionIndex(null);
+    setFormPullRequestNumber("");
   }
 
   function handleCancelAction() {
@@ -239,26 +264,63 @@ export function ChatPanel({
 
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
-      {actionExample && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-dashed border-zinc-300 bg-zinc-50 px-3 py-2 text-xs text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900/50 dark:text-zinc-400">
-          <p>
-            質問の代わりに「
-            <span className="font-medium text-zinc-800 dark:text-zinc-200">
-              {actionExample.repositoryLabel}のPR #12を「{actionExample.promptTitle}」でレビューして
-            </span>
-            」のように送ると、AIレビュー実行の確認画面が表示されます(リポジトリ名・PR番号・プロンプト名を含めてください)。
+      {canRunAction && (
+        <div className="flex flex-col gap-2 rounded-lg border border-dashed border-zinc-300 bg-zinc-50 px-3 py-2.5 text-xs dark:border-zinc-700 dark:bg-zinc-900/50">
+          <p className="text-zinc-600 dark:text-zinc-400">
+            リポジトリ・PR番号・プロンプトを選んで、AIレビュー実行の確認画面を直接表示できます(下の質問欄に自然文で依頼することもできます)。
           </p>
-          <button
-            type="button"
-            onClick={() =>
-              setQuestion(
-                `${actionExample.repositoryLabel}のPR #12を「${actionExample.promptTitle}」でレビューして`,
-              )
-            }
-            className="shrink-0 rounded border border-zinc-300 px-2 py-1 font-medium hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+          <form
+            onSubmit={handleFormSubmit}
+            className="flex flex-wrap items-center gap-2"
           >
-            この例文を入力欄にセット
-          </button>
+            <select
+              value={formRepositoryId}
+              onChange={(e) => setFormRepositoryId(e.target.value)}
+              required
+              className="rounded border border-zinc-300 px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
+            >
+              <option value="" disabled>
+                リポジトリを選択
+              </option>
+              {repositories.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+            <span className="text-zinc-500">PR #</span>
+            <input
+              type="number"
+              min={1}
+              step={1}
+              value={formPullRequestNumber}
+              onChange={(e) => setFormPullRequestNumber(e.target.value)}
+              required
+              placeholder="12"
+              className="w-16 rounded border border-zinc-300 px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
+            />
+            <select
+              value={formPromptId}
+              onChange={(e) => setFormPromptId(e.target.value)}
+              required
+              className="rounded border border-zinc-300 px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
+            >
+              <option value="" disabled>
+                プロンプトを選択
+              </option>
+              {prompts.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.title}
+                </option>
+              ))}
+            </select>
+            <button
+              type="submit"
+              className="rounded border border-zinc-300 px-2 py-1 font-medium hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+            >
+              確認画面を表示
+            </button>
+          </form>
         </div>
       )}
 
@@ -270,7 +332,7 @@ export function ChatPanel({
           required
           rows={2}
           placeholder={
-            actionExample
+            canRunAction
               ? "質問を入力、またはAIレビューの実行を依頼(Enterで送信、Shift+Enterで改行)"
               : "質問を入力(Enterで送信、Shift+Enterで改行)"
           }
