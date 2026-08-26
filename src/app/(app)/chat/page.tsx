@@ -6,11 +6,29 @@ import { ChatPanel } from "./chat-panel";
 export default async function ChatPage() {
   const userId = await requireUserId();
 
-  const repositories = await prisma.repository.findMany({
-    where: { userId },
-    orderBy: { connectedAt: "desc" },
-    select: { id: true, owner: true, name: true },
-  });
+  const [repositories, examplePrompt] = await Promise.all([
+    prisma.repository.findMany({
+      where: { userId },
+      orderBy: { connectedAt: "desc" },
+      select: { id: true, owner: true, name: true },
+    }),
+    prisma.prompt.findFirst({
+      where: { userId },
+      orderBy: { updatedAt: "desc" },
+      select: { title: true },
+    }),
+  ]);
+
+  // チャットからのAIレビュー実行(Phase 4項目4)は、リポジトリ・プロンプトの
+  // 両方が揃って初めて使えるため、UI上の案内もこの条件を満たす場合のみ表示する
+  // (docs/phase4-design.md「4. チャットからの直接アクション実行」参照)。
+  const actionExample =
+    repositories.length > 0 && examplePrompt
+      ? {
+          repositoryLabel: `${repositories[0].owner}/${repositories[0].name}`,
+          promptTitle: examplePrompt.title,
+        }
+      : null;
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col px-6 py-10">
@@ -29,6 +47,7 @@ export default async function ChatPage() {
           id: r.id,
           label: `${r.owner}/${r.name}`,
         }))}
+        actionExample={actionExample}
       />
     </div>
   );

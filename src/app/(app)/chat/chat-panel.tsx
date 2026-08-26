@@ -25,8 +25,15 @@ type ChatResponse =
   | { actionProposal: ChatActionProposal };
 
 type RepositoryOption = { id: string; label: string };
+type ActionExample = { repositoryLabel: string; promptTitle: string };
 
-export function ChatPanel({ repositories }: { repositories: RepositoryOption[] }) {
+export function ChatPanel({
+  repositories,
+  actionExample,
+}: {
+  repositories: RepositoryOption[];
+  actionExample: ActionExample | null;
+}) {
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [question, setQuestion] = useState("");
   // 送信中に表示する質問文。inputはすぐ空にしたいので、表示用に別途保持する。
@@ -231,6 +238,29 @@ export function ChatPanel({ repositories }: { repositories: RepositoryOption[] }
 
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
+      {actionExample && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-dashed border-zinc-300 bg-zinc-50 px-3 py-2 text-xs text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900/50 dark:text-zinc-400">
+          <p>
+            質問の代わりに「
+            <span className="font-medium text-zinc-800 dark:text-zinc-200">
+              {actionExample.repositoryLabel}のPR #12を「{actionExample.promptTitle}」でレビューして
+            </span>
+            」のように送ると、AIレビュー実行の確認画面が表示されます(リポジトリ名・PR番号・プロンプト名を含めてください)。
+          </p>
+          <button
+            type="button"
+            onClick={() =>
+              setQuestion(
+                `${actionExample.repositoryLabel}のPR #12を「${actionExample.promptTitle}」でレビューして`,
+              )
+            }
+            className="shrink-0 rounded border border-zinc-300 px-2 py-1 font-medium hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+          >
+            この例文を入力欄にセット
+          </button>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="flex items-end gap-2">
         <textarea
           value={question}
@@ -238,7 +268,11 @@ export function ChatPanel({ repositories }: { repositories: RepositoryOption[] }
           onKeyDown={handleKeyDown}
           required
           rows={2}
-          placeholder="質問を入力(Enterで送信、Shift+Enterで改行)"
+          placeholder={
+            actionExample
+              ? "質問を入力、またはAIレビューの実行を依頼(Enterで送信、Shift+Enterで改行)"
+              : "質問を入力(Enterで送信、Shift+Enterで改行)"
+          }
           className="flex-1 resize-none rounded border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
         />
         <button
