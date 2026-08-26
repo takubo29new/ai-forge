@@ -10,6 +10,7 @@ import {
   countBySeverity,
 } from "@/lib/review-severity";
 import { PullRequestList } from "./pull-request-list";
+import { ReviewHistory } from "./review-history";
 import { parsePageSize } from "@/lib/list-limits";
 import { PageSizeSelect } from "@/components/page-size-select";
 
@@ -198,34 +199,18 @@ export default async function RepositoryDetailPage({
           <div className="mb-3 flex justify-end">
             <PageSizeSelect current={limit} />
           </div>
-          <ul className="flex flex-col gap-2">
-          {reviews.length === 0 && (
-            <li className="py-16 text-center text-sm text-zinc-500">
-              レビュー履歴はまだありません
-            </li>
-          )}
-          {reviews.map((review) => (
-            <li key={review.id}>
-              <Link
-                href={`/reviews/${review.id}`}
-                className="block rounded-lg border border-zinc-200 px-4 py-3 hover:border-zinc-400 dark:border-zinc-800 dark:hover:border-zinc-600"
-              >
-                <p className="text-sm font-medium">
-                  #{review.pullRequestNumber} {review.pullRequestTitle}
-                </p>
-                <p className="text-xs text-zinc-500">
-                  {review.createdAt.toLocaleString("ja-JP")} · {review.status} ·{" "}
-                  {review._count.comments}件の指摘
-                  {review.triggeredVia === "CHAT" && (
-                    <span className="ml-1.5 rounded bg-accent/10 px-1.5 py-0.5 text-accent">
-                      チャットから実行
-                    </span>
-                  )}
-                </p>
-              </Link>
-            </li>
-          ))}
-          </ul>
+          <ReviewHistory
+            repositoryId={id}
+            reviews={reviews.map((review) => ({
+              id: review.id,
+              pullRequestNumber: review.pullRequestNumber,
+              pullRequestTitle: review.pullRequestTitle,
+              createdAt: review.createdAt.toISOString(),
+              status: review.status,
+              commentCount: review._count.comments,
+              triggeredVia: review.triggeredVia,
+            }))}
+          />
         </>
       )}
 

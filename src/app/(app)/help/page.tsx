@@ -111,8 +111,11 @@ export default async function HelpPage() {
 
         <section id="history" className="scroll-mt-6">
           <h2 className="mb-2 text-lg font-semibold">実行履歴</h2>
-          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+          <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
             「実行履歴」タブで、これまでの実行結果を新しい順に確認できます。各行を開くと、結果本文(失敗した場合はエラー内容)、使用したバージョン、トークン数、実行時間が表示されます。
+          </p>
+          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+            各行のチェックボックスから2件選ぶと「比較する」ボタンが表示され、2つの実行結果を左右に並べて比較できます。プロンプトの異なるバージョン間で結果がどう変わったか確認したいときに使います。
           </p>
         </section>
 
@@ -143,8 +146,11 @@ export default async function HelpPage() {
           <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
             リポジトリ詳細画面の「レビュー履歴」タブで、過去に実行したレビューを新しい順に確認できます。各行を開くと、ファイルごとの指摘事項と重要度(CRITICAL / WARNING / INFO)を確認できます。
           </p>
-          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+          <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
             「傾向」タブでは、そのリポジトリでの累計指摘件数(重要度別)、直近10件のレビューの重要度の内訳、指摘が多いファイルの上位を確認できます。レビューを重ねるほど、どのファイル・観点に問題が集中しているか把握しやすくなります。
+          </p>
+          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+            「レビュー履歴」の各行のチェックボックスから2件選ぶと「比較する」ボタンが表示され、2つのレビュー結果を左右に並べて比較できます。同じPRに複数回レビューを実行したとき、指摘内容の違いを確認したい場合に使います。
           </p>
         </section>
 
