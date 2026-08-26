@@ -448,6 +448,8 @@
 - **GitHub Appユーザートークンの実際の失効・自動更新**: `refresh_token`によるトークン自動更新ロジック(`src/lib/github.ts`)自体の単体テストは無く、本番での実際の失効・更新は運用中に確認されている。
 - **並行リクエストによるレート制限のレース条件**: `RateLimitBucket`のアトミックな`upsert`方式は導入時に手動での並行リクエスト検証で確認されており(WORKLOG.md 2026-08-23分)、自動テストとしては再現していない。
 
+上記5分類を具体的な確認項目・手順・実施状況まで落とし込んだチェックリストは[手動テストチェックリスト](./manual-test-checklist.md)を参照。
+
 ---
 
-参照: [要件定義書](./requirements-definition.md)「5.4 運用・保守性要件」、[基本設計書](./basic-design.md)「1.2 技術スタック」。
+参照: [要件定義書](./requirements-definition.md)「5.4 運用・保守性要件」、[基本設計書](./basic-design.md)「1.2 技術スタック」、[手動テストチェックリスト](./manual-test-checklist.md)。
