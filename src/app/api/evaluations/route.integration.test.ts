@@ -171,6 +171,65 @@ describe("POST /api/evaluations", () => {
     expect(evaluation?.status).toBe("FAILED");
   });
 
+  it("inputType: TEXTを指定すると{{変数名}}を展開してテキストとしてClaudeに渡す", async () => {
+    const textPrompt = await createTestPrompt(
+      userId,
+      "この歌詞を評価してください: {{lyrics}}",
+    );
+
+    mockParse.mockResolvedValue({
+      parsed_output: {
+        summary: "情感豊かな歌詞です",
+        findings: [{ label: "情感", tone: "POSITIVE", score: 85, body: "..." }],
+      },
+      usage: { input_tokens: 50, output_tokens: 30 },
+    } as never);
+
+    const res = await POST(
+      request({
+        title: "自作曲",
+        promptId: textPrompt.id,
+        inputType: "TEXT",
+        variables: { lyrics: "夜空に願いを込めて" },
+      }),
+    );
+    expect(res.status).toBe(202);
+    const { id: evaluationId } = await res.json();
+
+    const evaluation = await prisma.evaluation.findUnique({
+      where: { id: evaluationId },
+      include: { findings: true },
+    });
+    expect(evaluation?.status).toBe("SUCCESS");
+    expect(evaluation?.inputType).toBe("TEXT");
+    expect(evaluation?.findings).toHaveLength(1);
+
+    // {{lyrics}}が実際の値に展開された文字列がそのままClaudeに渡っている
+    // (画像評価と異なりcontent配列ではなく文字列のまま)
+    const call = mockParse.mock.calls[0][0];
+    expect(call.messages[0].content).toBe(
+      "この歌詞を評価してください: 夜空に願いを込めて",
+    );
+  });
+
+  it("inputType: TEXTでは画像を指定しなくても400にならない", async () => {
+    const textPrompt = await createTestPrompt(userId, "この文章を評価してください: {{text}}");
+    mockParse.mockResolvedValue({
+      parsed_output: { summary: "ok", findings: [] },
+      usage: { input_tokens: 1, output_tokens: 1 },
+    } as never);
+
+    const res = await POST(
+      request({
+        title: "エッセイ",
+        promptId: textPrompt.id,
+        inputType: "TEXT",
+        variables: { text: "今日は良い天気でした" },
+      }),
+    );
+    expect(res.status).toBe(202);
+  });
+
   it("評価系レート制限の上限に達すると429を返す", async () => {
     mockParse.mockResolvedValue({
       parsed_output: { summary: "ok", findings: [] },

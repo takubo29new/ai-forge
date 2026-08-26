@@ -6,6 +6,7 @@ import { DEFAULT_MODEL } from "@/lib/models";
 import { EvaluationOutputSchema } from "@/lib/evaluation-schema";
 import { checkEvaluationRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { LIST_LIMIT } from "@/lib/list-limits";
+import { renderTemplate } from "@/lib/prompt-variables";
 import { runAiExecution } from "@/lib/run-ai-execution";
 import { scheduleBackground } from "@/lib/schedule-background";
 import { logError } from "@/lib/error-log";
@@ -61,28 +62,51 @@ export async function POST(request: Request) {
   const body = await request.json();
   const title = typeof body.title === "string" ? body.title.trim() : "";
   const promptId = typeof body.promptId === "string" ? body.promptId : null;
+  // inputTypeは"TEXT"を明示した場合のみテキスト評価、それ以外(未指定含む)は
+  // 既存の画像評価として扱う(後方互換)。
+  const inputType = body.inputType === "TEXT" ? "TEXT" : "IMAGE";
+
+  if (!title || !promptId) {
+    return NextResponse.json(
+      { error: "タイトル・プロンプトを指定してください" },
+      { status: 400 },
+    );
+  }
+
   const imageBase64 =
     typeof body.imageBase64 === "string" ? body.imageBase64 : null;
   const imageMediaType =
     typeof body.imageMediaType === "string" ? body.imageMediaType : null;
+  // テキスト評価は既存のプロンプト実行と同じ{{変数名}}展開を使う
+  // (docs/phase5-design.md「対応する入力形式」参照)。
+  const variables: Record<string, string> = {};
 
-  if (!title || !promptId || !imageBase64 || !imageMediaType) {
-    return NextResponse.json(
-      { error: "タイトル・プロンプト・画像を指定してください" },
-      { status: 400 },
-    );
-  }
-  if (!isImageMediaType(imageMediaType)) {
-    return NextResponse.json(
-      { error: "対応していない画像形式です(jpeg/png/gif/webpのみ)" },
-      { status: 400 },
-    );
-  }
-  if (imageBase64.length > MAX_IMAGE_BASE64_LENGTH) {
-    return NextResponse.json(
-      { error: "画像サイズが大きすぎます(5MB以下にしてください)" },
-      { status: 400 },
-    );
+  if (inputType === "IMAGE") {
+    if (!imageBase64 || !imageMediaType) {
+      return NextResponse.json(
+        { error: "画像を指定してください" },
+        { status: 400 },
+      );
+    }
+    if (!isImageMediaType(imageMediaType)) {
+      return NextResponse.json(
+        { error: "対応していない画像形式です(jpeg/png/gif/webpのみ)" },
+        { status: 400 },
+      );
+    }
+    if (imageBase64.length > MAX_IMAGE_BASE64_LENGTH) {
+      return NextResponse.json(
+        { error: "画像サイズが大きすぎます(5MB以下にしてください)" },
+        { status: 400 },
+      );
+    }
+  } else {
+    const rawVariables = body.variables;
+    if (typeof rawVariables === "object" && rawVariables !== null) {
+      for (const [key, value] of Object.entries(rawVariables)) {
+        if (typeof value === "string") variables[key] = value;
+      }
+    }
   }
 
   const promptVersion = await prisma.promptVersion.findFirst({
@@ -108,7 +132,7 @@ export async function POST(request: Request) {
     data: {
       userId,
       promptVersionId: promptVersion.id,
-      inputType: "IMAGE",
+      inputType,
       title,
       status: "PENDING",
     },
@@ -120,29 +144,27 @@ export async function POST(request: Request) {
         promptVersionId: promptVersion.id,
         userId,
         model: DEFAULT_MODEL,
-        // 画像評価に{{変数名}}展開は使わないため空のまま記録する
-        // (プロンプト実行・AIレビューと同じExecution.variablesカラムを流用するための形合わせ)。
-        variables: {},
+        variables,
         call: async () => {
+          const content =
+            inputType === "IMAGE"
+              ? [
+                  {
+                    type: "image" as const,
+                    source: {
+                      type: "base64" as const,
+                      media_type: imageMediaType!,
+                      data: imageBase64!,
+                    },
+                  },
+                  { type: "text" as const, text: promptVersion.content },
+                ]
+              : renderTemplate(promptVersion.content, variables);
+
           const response = await anthropic.messages.parse({
             model: DEFAULT_MODEL,
             max_tokens: 16000,
-            messages: [
-              {
-                role: "user",
-                content: [
-                  {
-                    type: "image",
-                    source: {
-                      type: "base64",
-                      media_type: imageMediaType,
-                      data: imageBase64,
-                    },
-                  },
-                  { type: "text", text: promptVersion.content },
-                ],
-              },
-            ],
+            messages: [{ role: "user", content }],
             output_config: { format: zodOutputFormat(EvaluationOutputSchema) },
           });
 
