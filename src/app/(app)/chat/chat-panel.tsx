@@ -57,6 +57,15 @@ export function ChatPanel({
   const [formPullRequestNumber, setFormPullRequestNumber] = useState("");
   const [formPromptId, setFormPromptId] = useState("");
 
+  // 上部の「対象リポジトリ」フィルタで特定のリポジトリを選んだら、実行フォーム側の
+  // 初期値としても引き継ぐ(同じリポジトリに関心がある可能性が高いため)。
+  // 「すべて」に戻した場合は、実行フォーム側の選択(既に個別に選んでいるかもしれない)
+  // をそのまま保持する。
+  function handleRepositoryFilterChange(value: string) {
+    setRepositoryId(value);
+    if (value) setFormRepositoryId(value);
+  }
+
   function pushActionProposal(question: string, proposal: ChatActionProposal) {
     setTurns((prev) => {
       setPendingActionIndex(prev.length);
@@ -172,7 +181,7 @@ export function ChatPanel({
           <select
             id="chat-repository-filter"
             value={repositoryId}
-            onChange={(e) => setRepositoryId(e.target.value)}
+            onChange={(e) => handleRepositoryFilterChange(e.target.value)}
             className="rounded border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-900"
           >
             <option value="">すべて</option>
@@ -277,6 +286,7 @@ export function ChatPanel({
               value={formRepositoryId}
               onChange={(e) => setFormRepositoryId(e.target.value)}
               required
+              aria-label="レビュー対象のリポジトリ"
               className="rounded border border-zinc-300 px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
             >
               <option value="" disabled>
@@ -288,7 +298,9 @@ export function ChatPanel({
                 </option>
               ))}
             </select>
-            <span className="text-zinc-500">PR #</span>
+            <span aria-hidden="true" className="text-zinc-500">
+              PR #
+            </span>
             <input
               type="number"
               min={1}
@@ -297,12 +309,14 @@ export function ChatPanel({
               onChange={(e) => setFormPullRequestNumber(e.target.value)}
               required
               placeholder="12"
+              aria-label="PR番号"
               className="w-16 rounded border border-zinc-300 px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
             />
             <select
               value={formPromptId}
               onChange={(e) => setFormPromptId(e.target.value)}
               required
+              aria-label="使用するプロンプト"
               className="rounded border border-zinc-300 px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
             >
               <option value="" disabled>
