@@ -256,7 +256,7 @@ export function DocumentManager({
             <button
               onClick={handleSync}
               disabled={sync.pending}
-              className="inline-flex items-center gap-1.5 rounded border border-zinc-300 px-3 py-1.5 text-xs disabled:opacity-50 dark:border-zinc-700"
+              className="inline-flex items-center gap-1.5 rounded border border-zinc-300 px-3 py-1.5 text-xs hover:bg-zinc-100 disabled:opacity-50 disabled:hover:bg-transparent dark:border-zinc-700 dark:hover:bg-zinc-900"
             >
               {sync.pending && <Spinner className="h-3.5 w-3.5" />}
               {sync.pending ? "同期中..." : "設計書を同期"}
@@ -299,7 +299,7 @@ export function DocumentManager({
                 <button
                   onClick={handleRepoSync}
                   disabled={repoSync.pending}
-                  className="inline-flex items-center gap-1.5 rounded border border-zinc-300 px-3 py-1.5 text-xs disabled:opacity-50 dark:border-zinc-700"
+                  className="inline-flex items-center gap-1.5 rounded border border-zinc-300 px-3 py-1.5 text-xs hover:bg-zinc-100 disabled:opacity-50 disabled:hover:bg-transparent dark:border-zinc-700 dark:hover:bg-zinc-900"
                 >
                   {repoSync.pending && <Spinner className="h-3.5 w-3.5" />}
                   {repoSync.pending ? "同期中..." : "設計書を同期"}
@@ -326,7 +326,7 @@ export function DocumentManager({
             <button
               onClick={handleBackfill}
               disabled={backfill.pending || pendingEmbeddingCount === 0}
-              className="inline-flex items-center gap-1.5 rounded border border-zinc-300 px-3 py-1.5 text-xs disabled:opacity-50 dark:border-zinc-700"
+              className="inline-flex items-center gap-1.5 rounded border border-zinc-300 px-3 py-1.5 text-xs hover:bg-zinc-100 disabled:opacity-50 disabled:hover:bg-transparent dark:border-zinc-700 dark:hover:bg-zinc-900"
             >
               {backfill.pending && <Spinner className="h-3.5 w-3.5" />}
               {backfill.pending ? "処理中..." : "既存のレビュー指摘を取り込む"}
@@ -353,7 +353,7 @@ export function DocumentManager({
               disabled={
                 promptVersionBackfill.pending || pendingPromptVersionEmbeddingCount === 0
               }
-              className="inline-flex items-center gap-1.5 rounded border border-zinc-300 px-3 py-1.5 text-xs disabled:opacity-50 dark:border-zinc-700"
+              className="inline-flex items-center gap-1.5 rounded border border-zinc-300 px-3 py-1.5 text-xs hover:bg-zinc-100 disabled:opacity-50 disabled:hover:bg-transparent dark:border-zinc-700 dark:hover:bg-zinc-900"
             >
               {promptVersionBackfill.pending && <Spinner className="h-3.5 w-3.5" />}
               {promptVersionBackfill.pending ? "処理中..." : "既存のプロンプトを取り込む"}
@@ -378,7 +378,7 @@ export function DocumentManager({
             <button
               onClick={handleExecutionBackfill}
               disabled={executionBackfill.pending || pendingExecutionEmbeddingCount === 0}
-              className="inline-flex items-center gap-1.5 rounded border border-zinc-300 px-3 py-1.5 text-xs disabled:opacity-50 dark:border-zinc-700"
+              className="inline-flex items-center gap-1.5 rounded border border-zinc-300 px-3 py-1.5 text-xs hover:bg-zinc-100 disabled:opacity-50 disabled:hover:bg-transparent dark:border-zinc-700 dark:hover:bg-zinc-900"
             >
               {executionBackfill.pending && <Spinner className="h-3.5 w-3.5" />}
               {executionBackfill.pending ? "処理中..." : "既存の実行結果を取り込む"}
@@ -443,7 +443,7 @@ export function DocumentManager({
         <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
           {documents.length === 0 && (
             <li className="px-4 py-6 text-center text-sm text-zinc-500">
-              ドキュメントがまだありません
+              ドキュメントがまだありません。上の「設計書を同期」で取り込むか、フォームから貼り付けて登録してください。
             </li>
           )}
           {documents.map((document) => (
@@ -461,7 +461,7 @@ export function DocumentManager({
               <button
                 onClick={() => setDeleteTarget(document)}
                 disabled={pending}
-                className="shrink-0 rounded border border-red-300 px-3 py-1.5 text-xs text-red-600 disabled:opacity-50 dark:border-red-900 dark:text-red-400"
+                className="shrink-0 rounded border border-red-300 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:hover:bg-transparent dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
               >
                 削除
               </button>

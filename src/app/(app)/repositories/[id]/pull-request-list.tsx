@@ -60,12 +60,12 @@ export function PullRequestList({
           className="rounded-lg border border-zinc-200 px-4 py-3 dark:border-zinc-800"
         >
           <div className="flex items-center justify-between gap-3">
-            <div>
+            <div className="min-w-0">
               <a
                 href={pr.url}
                 target="_blank"
                 rel="noreferrer"
-                className="text-sm font-medium hover:underline"
+                className="block truncate text-sm font-medium hover:underline"
               >
                 #{pr.number} {pr.title}
               </a>
@@ -76,7 +76,7 @@ export function PullRequestList({
             </div>
             <button
               onClick={() => setOpenFor(openFor === pr.number ? null : pr.number)}
-              className="shrink-0 rounded border border-zinc-300 px-3 py-1.5 text-xs dark:border-zinc-700"
+              className="shrink-0 rounded border border-zinc-300 px-3 py-1.5 text-xs hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900"
             >
               レビューを実行
             </button>

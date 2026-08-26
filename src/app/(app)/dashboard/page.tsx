@@ -107,7 +107,7 @@ export default async function DashboardPage() {
         </Link>
         <Link
           href="/documents"
-          className="rounded border border-zinc-300 px-4 py-2 text-sm dark:border-zinc-700"
+          className="rounded border border-zinc-300 px-4 py-2 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900"
         >
           ドキュメントを管理
         </Link>
