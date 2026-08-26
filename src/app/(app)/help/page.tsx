@@ -154,6 +154,9 @@ export default async function HelpPage() {
             <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">{"{{diff}}"}</code>
             を含めてください。実行時にPRの差分がこの部分に展開されます。含まれていないプロンプトは実行前に警告が表示され、実行できません。
           </p>
+          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+            成功したレビューの詳細画面では「共有リンクを作成」から、ログイン不要で誰でも閲覧できる読み取り専用のURLを発行できます。作成前に確認ダイアログが表示されるので、非公開の情報が含まれていないか確認してください。「共有を解除」を押すと、それまでのリンクは使えなくなります。
+          </p>
         </section>
 
         <section id="trends" className="scroll-mt-6">
@@ -222,8 +225,11 @@ export default async function HelpPage() {
           <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
             アップロードした画像自体はサーバーに保存されません。Claudeへのリクエストで使われるだけで、評価結果(テキスト)のみが記録されます。
           </p>
-          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+          <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
             評価の実行を押すと、Claudeの応答を待たずにすぐ「処理中」の状態で結果画面に移動します(裏側でバックグラウンド実行中)。完了すると、開いたままの結果画面は自動的に更新され、他の画面に移動していても画面下部に完了の通知が表示されます。
+          </p>
+          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+            成功した評価の詳細画面では、AIレビューと同じ「共有リンクを作成」からログイン不要の読み取り専用URLを発行できます(確認ダイアログ・解除の挙動もAIレビューと共通です)。
           </p>
         </section>
 

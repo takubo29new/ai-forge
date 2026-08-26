@@ -1,21 +1,19 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { requireUserId } from "@/lib/session";
 import { Markdown } from "@/components/markdown";
 import { SEVERITY_TEXT, countBySeverity } from "@/lib/review-severity";
-import { ShareControl } from "@/components/share-control";
 
-export default async function ReviewDetailPage({
+// ログイン不要の読み取り専用公開ページ。shareTokenが一致するレビューのみを
+// 表示し、userIdでの所有者チェックは行わない(トークン自体が公開用の鍵)。
+export default async function SharedReviewPage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{ token: string }>;
 }) {
-  const userId = await requireUserId();
-
-  const { id } = await params;
+  const { token } = await params;
   const review = await prisma.review.findUnique({
-    where: { id },
+    where: { shareToken: token },
     include: {
       repository: true,
       execution: true,
@@ -23,7 +21,7 @@ export default async function ReviewDetailPage({
     },
   });
 
-  if (!review || review.userId !== userId) {
+  if (!review) {
     notFound();
   }
 
@@ -31,13 +29,16 @@ export default async function ReviewDetailPage({
 
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-8">
-      <Link
-        href={`/repositories/${review.repositoryId}?tab=history`}
-        className="text-sm text-zinc-500 hover:underline dark:text-zinc-400"
-      >
-        ← リポジトリへ戻る
-      </Link>
-      <h1 className="mt-2 mb-1 text-xl font-semibold">
+      <div className="mb-6 flex items-center justify-between">
+        <Link href="/" className="text-sm font-semibold">
+          ai-forge
+        </Link>
+        <span className="rounded bg-accent/10 px-2 py-1 text-xs text-accent">
+          公開共有ページ(読み取り専用)
+        </span>
+      </div>
+
+      <h1 className="mb-1 text-xl font-semibold">
         <a href={review.pullRequestUrl} target="_blank" rel="noreferrer" className="hover:underline">
           #{review.pullRequestNumber} {review.pullRequestTitle}
         </a>
@@ -47,48 +48,22 @@ export default async function ReviewDetailPage({
       </p>
 
       <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-zinc-500">
-        <span>status: {review.status}</span>
         <span>実行: {review.createdAt.toLocaleString("ja-JP")}</span>
         {review.execution && <span>{review.execution.model}</span>}
-        {review.triggeredVia === "CHAT" && (
-          <span className="rounded bg-accent/10 px-1.5 py-0.5 text-accent">
-            チャットから実行
-          </span>
-        )}
-        {review.status === "SUCCESS" && (
-          <span className="flex gap-3">
-            <span className={SEVERITY_TEXT.CRITICAL}>
-              CRITICAL {counts.CRITICAL}
-            </span>
-            <span className={SEVERITY_TEXT.WARNING}>WARNING {counts.WARNING}</span>
-            <span className={SEVERITY_TEXT.INFO}>INFO {counts.INFO}</span>
-          </span>
-        )}
+        <span className="flex gap-3">
+          <span className={SEVERITY_TEXT.CRITICAL}>CRITICAL {counts.CRITICAL}</span>
+          <span className={SEVERITY_TEXT.WARNING}>WARNING {counts.WARNING}</span>
+          <span className={SEVERITY_TEXT.INFO}>INFO {counts.INFO}</span>
+        </span>
       </div>
 
-      {review.status === "SUCCESS" && (
-        <div className="mb-6">
-          <ShareControl
-            kind="reviews"
-            id={review.id}
-            initialShareToken={review.shareToken}
-          />
-        </div>
-      )}
-
-      {review.status === "FAILED" && (
-        <p className="rounded-lg border border-red-200 px-4 py-3 text-sm text-red-600 dark:border-red-900 dark:text-red-400">
-          {review.execution?.errorMessage ?? "レビューの実行に失敗しました"}
-        </p>
-      )}
-
-      {review.status === "SUCCESS" && review.comments.length === 0 && (
+      {review.comments.length === 0 && (
         <p className="py-16 text-center text-sm text-zinc-500">
           指摘事項はありませんでした
         </p>
       )}
 
-      {review.status === "SUCCESS" && review.comments.length > 0 && (
+      {review.comments.length > 0 && (
         <ul className="flex flex-col gap-2">
           {review.comments.map((c) => (
             <li
@@ -109,6 +84,13 @@ export default async function ReviewDetailPage({
           ))}
         </ul>
       )}
+
+      <p className="mt-10 text-center text-xs text-zinc-400">
+        <Link href="/" className="hover:underline">
+          ai-forge
+        </Link>
+        で作成されたAIレビュー結果です
+      </p>
     </div>
   );
 }

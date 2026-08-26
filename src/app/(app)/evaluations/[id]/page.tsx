@@ -6,6 +6,7 @@ import { Markdown } from "@/components/markdown";
 import { TONES, TONE_TEXT, TONE_LABEL, countByTone } from "@/lib/evaluation-tone";
 import { EvaluationOutputSchema } from "@/lib/evaluation-schema";
 import { PendingRefresher } from "./pending-refresher";
+import { ShareControl } from "@/components/share-control";
 
 export default async function EvaluationDetailPage({
   params,
@@ -71,6 +72,16 @@ export default async function EvaluationDetailPage({
           </span>
         )}
       </div>
+
+      {evaluation.status === "SUCCESS" && (
+        <div className="mb-6">
+          <ShareControl
+            kind="evaluations"
+            id={evaluation.id}
+            initialShareToken={evaluation.shareToken}
+          />
+        </div>
+      )}
 
       {evaluation.status === "PENDING" && (
         <>
