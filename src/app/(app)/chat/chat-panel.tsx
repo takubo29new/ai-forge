@@ -330,7 +330,7 @@ export function ChatPanel({
             </select>
             <button
               type="submit"
-              className="rounded border border-zinc-300 px-2 py-1 font-medium hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+              className="rounded border border-zinc-300 px-2 py-1 font-medium hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900"
             >
               確認画面を表示
             </button>

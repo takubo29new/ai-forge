@@ -54,7 +54,7 @@ export default async function PromptsPage({
         />
         <button
           type="submit"
-          className="rounded border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-700"
+          className="rounded border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900"
         >
           絞り込み
         </button>
@@ -67,9 +67,26 @@ export default async function PromptsPage({
       </form>
 
       {prompts.length === 0 ? (
-        <p className="py-16 text-center text-sm text-zinc-500">
-          プロンプトがまだありません
-        </p>
+        <div className="flex flex-col items-center gap-3 py-16 text-center text-sm text-zinc-500">
+          {categoryId || q ? (
+            <>
+              <p>絞り込み条件に一致するプロンプトがありません</p>
+              <Link href="/prompts" className="text-accent hover:underline">
+                絞り込みを解除する
+              </Link>
+            </>
+          ) : (
+            <>
+              <p>プロンプトがまだありません</p>
+              <Link
+                href="/prompts/new"
+                className="rounded-full bg-accent transition-opacity hover:opacity-90 px-4 py-1.5 text-sm font-medium text-white"
+              >
+                + 最初のプロンプトを作成
+              </Link>
+            </>
+          )}
+        </div>
       ) : (
         <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
           {prompts.map((prompt) => (

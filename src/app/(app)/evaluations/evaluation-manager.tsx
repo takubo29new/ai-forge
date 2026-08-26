@@ -217,7 +217,7 @@ export function EvaluationManager({
               <button
                 onClick={() => setDeleteTarget(evaluation)}
                 disabled={del.pending}
-                className="shrink-0 rounded border border-red-300 px-3 py-1.5 text-xs text-red-600 disabled:opacity-50 dark:border-red-900 dark:text-red-400"
+                className="shrink-0 rounded border border-red-300 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:hover:bg-transparent dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
               >
                 削除
               </button>

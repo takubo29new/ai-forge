@@ -31,17 +31,17 @@ export async function AppHeader() {
   }
 
   return (
-    <header className="flex items-center justify-between border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
-      <nav className="flex items-center gap-4">
+    <header className="flex flex-wrap items-center justify-between gap-y-2 border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
+      <nav className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <Link href="/dashboard" className="font-semibold">
           ai-forge
         </Link>
-        <span className="mx-1 h-4 w-px bg-zinc-300 dark:bg-zinc-700" aria-hidden />
+        <span className="mx-1 hidden h-4 w-px bg-zinc-300 sm:block dark:bg-zinc-700" aria-hidden />
         <NavLinks links={PROMPT_NAV_LINKS} />
-        <span className="mx-1 h-4 w-px bg-zinc-300 dark:bg-zinc-700" aria-hidden />
+        <span className="mx-1 hidden h-4 w-px bg-zinc-300 sm:block dark:bg-zinc-700" aria-hidden />
         <NavLinks links={OTHER_NAV_LINKS} />
       </nav>
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Link
           href="/errors"
           title="エラーログ"
@@ -58,7 +58,7 @@ export async function AppHeader() {
         >
           <HelpIcon />
         </Link>
-        <span className="mx-1 h-4 w-px bg-zinc-300 dark:bg-zinc-700" aria-hidden />
+        <span className="mx-1 hidden h-4 w-px bg-zinc-300 sm:block dark:bg-zinc-700" aria-hidden />
         <ThemeToggle />
         {session.user.image && (
           <Image
@@ -69,7 +69,7 @@ export async function AppHeader() {
             className="rounded-full"
           />
         )}
-        <span className="text-sm text-zinc-600 dark:text-zinc-400">
+        <span className="hidden text-sm text-zinc-600 sm:inline dark:text-zinc-400">
           {session.user.name}
         </span>
         <form action={signOutAction}>

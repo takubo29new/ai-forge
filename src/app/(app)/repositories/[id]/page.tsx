@@ -84,7 +84,9 @@ export default async function RepositoryDetailPage({
       : null;
 
   let severityTotals: Record<string, number> | null = null;
+  let severityGrandTotal = 0;
   let topFiles: { filePath: string; count: number }[] = [];
+  let maxTopFileCount = 0;
   let trendReviews: {
     id: string;
     pullRequestNumber: number;
@@ -120,11 +122,13 @@ export default async function RepositoryDetailPage({
     for (const g of severityGroups) {
       severityTotals[g.severity] = g._count.severity;
     }
+    severityGrandTotal = SEVERITIES.reduce((sum, s) => sum + severityTotals![s], 0);
 
     topFiles = fileGroups.map((g) => ({
       filePath: g.filePath,
       count: g._count.filePath,
     }));
+    maxTopFileCount = Math.max(...topFiles.map((f) => f.count), 0);
 
     trendReviews = recentReviews.map((review) => {
       const counts = countBySeverity(review.comments);
@@ -247,6 +251,21 @@ export default async function RepositoryDetailPage({
                     </div>
                   ))}
                 </div>
+                {severityGrandTotal > 0 && (
+                  <div className="mt-3 flex h-2 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+                    {SEVERITIES.map((s) =>
+                      severityTotals![s] > 0 ? (
+                        <div
+                          key={s}
+                          className={SEVERITY_BG[s]}
+                          style={{
+                            width: `${(severityTotals![s] / severityGrandTotal) * 100}%`,
+                          }}
+                        />
+                      ) : null,
+                    )}
+                  </div>
+                )}
               </section>
 
               <section>
@@ -301,12 +320,19 @@ export default async function RepositoryDetailPage({
                     {topFiles.map((f) => (
                       <li
                         key={f.filePath}
-                        className="flex items-center justify-between gap-3 border-b border-zinc-100 py-1.5 text-sm last:border-0 dark:border-zinc-800/60"
+                        className="relative flex items-center justify-between gap-3 overflow-hidden border-b border-zinc-100 py-1.5 text-sm last:border-0 dark:border-zinc-800/60"
                       >
-                        <span className="truncate font-mono text-xs">
+                        <div
+                          aria-hidden="true"
+                          className="absolute inset-y-0 left-0 bg-accent/10"
+                          style={{
+                            width: `${(f.count / maxTopFileCount) * 100}%`,
+                          }}
+                        />
+                        <span className="relative truncate font-mono text-xs">
                           {f.filePath}
                         </span>
-                        <span className="shrink-0 text-xs text-zinc-500">
+                        <span className="relative shrink-0 text-xs text-zinc-500">
                           {f.count}件
                         </span>
                       </li>

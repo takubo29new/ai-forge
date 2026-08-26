@@ -52,7 +52,7 @@ export function ImprovementSuggestions({
           type="button"
           onClick={handleClick}
           disabled={pending}
-          className="rounded-full border border-zinc-300 px-4 py-1.5 text-sm disabled:opacity-50 dark:border-zinc-700"
+          className="rounded-full border border-zinc-300 px-4 py-1.5 text-sm hover:bg-zinc-100 disabled:opacity-50 disabled:hover:bg-transparent dark:border-zinc-700 dark:hover:bg-zinc-900"
         >
           {pending
             ? "分析中…"
