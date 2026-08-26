@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/session";
-import { SEVERITIES, SEVERITY_TEXT } from "@/lib/review-severity";
+import { SEVERITIES, SEVERITY_TEXT, SEVERITY_ICON } from "@/lib/review-severity";
 
 export default async function DashboardPage() {
   const userId = await requireUserId();
@@ -86,14 +86,20 @@ export default async function DashboardPage() {
             レビュー指摘の重要度内訳
           </p>
           <div className="flex gap-6">
-            {SEVERITIES.map((s) => (
-              <div key={s}>
-                <p className={`text-lg font-semibold ${SEVERITY_TEXT[s]}`}>
-                  {severityTotals[s]}
-                </p>
-                <p className="text-xs text-zinc-500">{s}</p>
-              </div>
-            ))}
+            {SEVERITIES.map((s) => {
+              const SevIcon = SEVERITY_ICON[s];
+              return (
+                <div key={s}>
+                  <p className={`text-lg font-semibold ${SEVERITY_TEXT[s]}`}>
+                    {severityTotals[s]}
+                  </p>
+                  <p className="inline-flex items-center gap-1 text-xs text-zinc-500">
+                    <SevIcon className="h-3.5 w-3.5" />
+                    {s}
+                  </p>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

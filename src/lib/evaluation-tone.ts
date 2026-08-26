@@ -1,6 +1,13 @@
 import type { EvaluationTone } from "@/generated/prisma/client";
+import { AlertTriangleIcon, CheckCircleIcon, LightbulbIcon } from "@/components/icons";
 
 export const TONES: EvaluationTone[] = ["CONCERN", "SUGGESTION", "POSITIVE"];
+
+export const TONE_ICON: Record<EvaluationTone, typeof AlertTriangleIcon> = {
+  CONCERN: AlertTriangleIcon,
+  SUGGESTION: LightbulbIcon,
+  POSITIVE: CheckCircleIcon,
+};
 
 export const TONE_TEXT: Record<EvaluationTone, string> = {
   CONCERN: "text-red-600 dark:text-red-400",

@@ -1,6 +1,13 @@
 import type { ReviewCommentSeverity } from "@/generated/prisma/client";
+import { AlertOctagonIcon, AlertTriangleIcon, InfoCircleIcon } from "@/components/icons";
 
 export const SEVERITIES: ReviewCommentSeverity[] = ["CRITICAL", "WARNING", "INFO"];
+
+export const SEVERITY_ICON: Record<ReviewCommentSeverity, typeof AlertOctagonIcon> = {
+  CRITICAL: AlertOctagonIcon,
+  WARNING: AlertTriangleIcon,
+  INFO: InfoCircleIcon,
+};
 
 export const SEVERITY_TEXT: Record<ReviewCommentSeverity, string> = {
   CRITICAL: "text-red-600 dark:text-red-400",
