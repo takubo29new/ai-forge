@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useApiMutation } from "@/lib/use-api-mutation";
 import { useToast } from "@/components/toast-provider";
 import { PROMPT_TEMPLATES } from "@/lib/prompt-templates";
-import { INPUT_TYPE_LABEL, type EvaluationInputType } from "@/lib/evaluation-input-type";
+import { INPUT_TYPE_LABEL, INPUT_TYPE_ICON, type EvaluationInputType } from "@/lib/evaluation-input-type";
 
 const TEMPLATE_GROUPS: EvaluationInputType[] = ["IMAGE", "TEXT", "PDF"];
 
@@ -49,9 +49,13 @@ export function NewPromptForm({ categories }: { categories: Category[] }) {
           {TEMPLATE_GROUPS.map((group) => {
             const templates = PROMPT_TEMPLATES.filter((t) => t.inputTypeHint === group);
             if (templates.length === 0) return null;
+            const GroupIcon = INPUT_TYPE_ICON[group];
             return (
               <div key={group} className="flex flex-wrap items-center gap-2">
-                <span className="text-xs text-zinc-400">{INPUT_TYPE_LABEL[group]}用:</span>
+                <span className="inline-flex items-center gap-1 text-xs text-zinc-400">
+                  <GroupIcon className="h-3.5 w-3.5" />
+                  {INPUT_TYPE_LABEL[group]}用:
+                </span>
                 {templates.map((t) => (
                   <button
                     key={t.id}

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Markdown } from "@/components/markdown";
+import { STATUS_LABEL, STATUS_ICON, STATUS_TEXT } from "@/lib/execution-status";
 
 type ExecutionRow = {
   id: string;
@@ -62,7 +63,9 @@ export function ExecutionHistory({
       )}
 
       <ul className="flex flex-col gap-2">
-        {executions.map((e) => (
+        {executions.map((e) => {
+          const StatusIcon = STATUS_ICON[e.status];
+          return (
           <li
             key={e.id}
             className="flex items-start gap-2 rounded-lg border border-zinc-200 px-4 py-3 dark:border-zinc-800"
@@ -80,14 +83,9 @@ export function ExecutionHistory({
                   {new Date(e.createdAt).toLocaleString("ja-JP")}
                 </span>{" "}
                 <span className="font-medium">v{e.versionNumber}</span>{" "}
-                <span
-                  className={
-                    e.status === "SUCCESS"
-                      ? "text-emerald-600 dark:text-emerald-400"
-                      : "text-red-600 dark:text-red-400"
-                  }
-                >
-                  {e.status}
+                <span className={`inline-flex items-center gap-1 ${STATUS_TEXT[e.status]}`}>
+                  <StatusIcon className="h-3.5 w-3.5" />
+                  {STATUS_LABEL[e.status]}
                 </span>{" "}
                 <span className="text-zinc-500">{e.model}</span>
               </summary>
@@ -95,7 +93,8 @@ export function ExecutionHistory({
                 {e.status === "SUCCESS" ? (
                   <Markdown>{e.resultText ?? ""}</Markdown>
                 ) : (
-                  <p className="text-xs text-red-600 dark:text-red-400">
+                  <p className="flex items-start gap-1.5 text-xs text-red-600 dark:text-red-400">
+                    <StatusIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                     {e.errorMessage}
                   </p>
                 )}
@@ -108,7 +107,8 @@ export function ExecutionHistory({
               </div>
             </details>
           </li>
-        ))}
+          );
+        })}
       </ul>
     </div>
   );

@@ -2,8 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { Markdown } from "@/components/markdown";
-import { TONES, TONE_TEXT, TONE_LABEL, countByTone } from "@/lib/evaluation-tone";
-import { INPUT_TYPE_LABEL } from "@/lib/evaluation-input-type";
+import { TONES, TONE_TEXT, TONE_LABEL, TONE_ICON, countByTone } from "@/lib/evaluation-tone";
+import { INPUT_TYPE_LABEL, INPUT_TYPE_ICON } from "@/lib/evaluation-input-type";
 import { resolveEvaluationSummary } from "@/lib/evaluation-summary";
 import { decryptField } from "@/lib/field-crypto";
 
@@ -30,6 +30,7 @@ export default async function SharedEvaluationPage({
   const summary = resolveEvaluationSummary(evaluation);
 
   const counts = countByTone(evaluation.findings);
+  const InputTypeIcon = INPUT_TYPE_ICON[evaluation.inputType];
 
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-8">
@@ -45,15 +46,22 @@ export default async function SharedEvaluationPage({
       <h1 className="mb-4 text-xl font-semibold">{evaluation.title}</h1>
 
       <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-zinc-500">
-        <span>入力形式: {INPUT_TYPE_LABEL[evaluation.inputType]}</span>
+        <span className="inline-flex items-center gap-1">
+          <InputTypeIcon className="h-4 w-4" />
+          {INPUT_TYPE_LABEL[evaluation.inputType]}
+        </span>
         <span>実行: {evaluation.createdAt.toLocaleString("ja-JP")}</span>
         {evaluation.execution && <span>{evaluation.execution.model}</span>}
         <span className="flex gap-3">
-          {TONES.map((t) => (
-            <span key={t} className={TONE_TEXT[t]}>
-              {TONE_LABEL[t]} {counts[t]}
-            </span>
-          ))}
+          {TONES.map((t) => {
+            const ToneIcon = TONE_ICON[t];
+            return (
+              <span key={t} className={`inline-flex items-center gap-1 ${TONE_TEXT[t]}`}>
+                <ToneIcon className="h-4 w-4" />
+                {TONE_LABEL[t]} {counts[t]}
+              </span>
+            );
+          })}
         </span>
       </div>
 
@@ -72,25 +80,29 @@ export default async function SharedEvaluationPage({
 
       {evaluation.findings.length > 0 && (
         <ul className="flex flex-col gap-2">
-          {evaluation.findings.map((f) => (
-            <li
-              key={f.id}
-              className="rounded-lg border border-zinc-200 px-4 py-3 dark:border-zinc-800"
-            >
-              <p className="text-sm font-medium">
-                {f.label}{" "}
-                <span className={`text-xs ${TONE_TEXT[f.tone]}`}>
-                  [{TONE_LABEL[f.tone]}]
-                </span>
-                {f.score !== null && (
-                  <span className="ml-2 text-xs text-zinc-500">{f.score}/100</span>
-                )}
-              </p>
-              <div className="mt-1">
-                <Markdown>{decryptField(f.body)}</Markdown>
-              </div>
-            </li>
-          ))}
+          {evaluation.findings.map((f) => {
+            const FindingToneIcon = TONE_ICON[f.tone];
+            return (
+              <li
+                key={f.id}
+                className="rounded-lg border border-zinc-200 px-4 py-3 dark:border-zinc-800"
+              >
+                <p className="flex items-center gap-1.5 text-sm font-medium">
+                  {f.label}
+                  <span className={`inline-flex items-center gap-1 text-xs ${TONE_TEXT[f.tone]}`}>
+                    <FindingToneIcon className="h-3.5 w-3.5" />
+                    {TONE_LABEL[f.tone]}
+                  </span>
+                  {f.score !== null && (
+                    <span className="text-xs text-zinc-500">{f.score}/100</span>
+                  )}
+                </p>
+                <div className="mt-1">
+                  <Markdown>{decryptField(f.body)}</Markdown>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
 

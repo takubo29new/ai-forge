@@ -10,9 +10,11 @@ import { useToast } from "@/components/toast-provider";
 import { usePendingEvaluations } from "@/components/pending-evaluations-context";
 import { extractVariableNames } from "@/lib/prompt-variables";
 import { submitOnModEnter } from "@/lib/keyboard-shortcuts";
-import { INPUT_TYPE_LABEL, type EvaluationInputType } from "@/lib/evaluation-input-type";
+import { ImageIcon, FileTextIcon, FileIcon } from "@/components/icons";
+import { INPUT_TYPE_LABEL, INPUT_TYPE_ICON, type EvaluationInputType } from "@/lib/evaluation-input-type";
+import { STATUS_LABEL, STATUS_ICON, STATUS_TEXT, type FlowStatus } from "@/lib/execution-status";
 
-type EvaluationStatus = "PENDING" | "SUCCESS" | "FAILED";
+type EvaluationStatus = FlowStatus;
 type InputType = EvaluationInputType;
 
 type Evaluation = {
@@ -25,12 +27,6 @@ type Evaluation = {
 };
 
 type Prompt = { id: string; title: string; content: string };
-
-const STATUS_TEXT: Record<EvaluationStatus, string> = {
-  PENDING: "処理中",
-  SUCCESS: "成功",
-  FAILED: "失敗",
-};
 
 // Claude Vision/ドキュメント入力向けの簡易な事前チェック。厳密な上限はAPI側の
 // 判定に委ね、ここでは明らかに大きすぎるファイルを早期に弾くだけに留める。
@@ -219,6 +215,7 @@ export function EvaluationManager({
                   checked={inputType === "IMAGE"}
                   onChange={() => handleInputTypeChange("IMAGE")}
                 />
+                <ImageIcon className="h-4 w-4" />
                 画像
               </label>
               <label className="flex items-center gap-1.5">
@@ -228,6 +225,7 @@ export function EvaluationManager({
                   checked={inputType === "TEXT"}
                   onChange={() => handleInputTypeChange("TEXT")}
                 />
+                <FileTextIcon className="h-4 w-4" />
                 テキスト
               </label>
               <label className="flex items-center gap-1.5">
@@ -237,6 +235,7 @@ export function EvaluationManager({
                   checked={inputType === "PDF"}
                   onChange={() => handleInputTypeChange("PDF")}
                 />
+                <FileIcon className="h-4 w-4" />
                 PDF
               </label>
             </div>
@@ -315,7 +314,10 @@ export function EvaluationManager({
               評価履歴がまだありません
             </li>
           )}
-          {evaluations.map((evaluation) => (
+          {evaluations.map((evaluation) => {
+            const InputTypeIcon = INPUT_TYPE_ICON[evaluation.inputType];
+            const StatusIcon = STATUS_ICON[evaluation.status];
+            return (
             <li
               key={evaluation.id}
               className="flex items-center justify-between gap-3 px-4 py-3"
@@ -324,12 +326,21 @@ export function EvaluationManager({
                 <p className="truncate text-sm font-medium hover:underline">
                   {evaluation.title}
                 </p>
-                <p className="text-xs text-zinc-500">
-                  {new Date(evaluation.createdAt).toLocaleString("ja-JP")} ・{" "}
-                  {INPUT_TYPE_LABEL[evaluation.inputType]} ・{" "}
-                  {STATUS_TEXT[evaluation.status]}
-                  {evaluation.status === "SUCCESS" &&
-                    ` ・ ${evaluation.findingCount}件のコメント`}
+                <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-zinc-500">
+                  <span>{new Date(evaluation.createdAt).toLocaleString("ja-JP")}</span>
+                  <span>・</span>
+                  <span className="inline-flex items-center gap-1">
+                    <InputTypeIcon className="h-3.5 w-3.5" />
+                    {INPUT_TYPE_LABEL[evaluation.inputType]}
+                  </span>
+                  <span>・</span>
+                  <span className={`inline-flex items-center gap-1 ${STATUS_TEXT[evaluation.status]}`}>
+                    <StatusIcon className="h-3.5 w-3.5" />
+                    {STATUS_LABEL[evaluation.status]}
+                  </span>
+                  {evaluation.status === "SUCCESS" && (
+                    <span>・ {evaluation.findingCount}件のコメント</span>
+                  )}
                 </p>
               </Link>
               <button
@@ -340,7 +351,8 @@ export function EvaluationManager({
                 削除
               </button>
             </li>
-          ))}
+            );
+          })}
         </ul>
       </section>
 

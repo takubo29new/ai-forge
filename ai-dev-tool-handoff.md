@@ -122,6 +122,8 @@ PDF評価の追加を受けて、ユーザーから「個人情報の扱いは�
 - **モバイル対応**: `AppHeader`(ブランド・ナビ・アイコン・ユーザー名・ログアウトが一列で折り返し不可だった)に`flex-wrap`を追加し、区切り線とユーザー名を`sm:`未満で非表示に。`pull-request-list.tsx`のPRタイトル行に`min-w-0`+`truncate`を追加し、長いタイトルでボタンが画面外に押し出されないようにした
 - **ローディング表現の統一**: `src/app/(app)/loading.tsx`を新設。従来`(app)`配下のどのページにも`loading.tsx`が無く、Server Componentのデータ取得中は画面が白いままだったため、汎用スケルトン(`animate-pulse`)を追加した
 
+「画像の永続化」を見送った後、ユーザーから「アイコン等使って表示をわかりやすくできないか、画像部分に限らず検討してほしい」と依頼され、状態ラベルへのアイコン追加を実施。`src/components/icons.tsx`に10種のfeatherスタイルSVGアイコン(入力形式: 画像/テキスト/PDF、重要度: CRITICAL/WARNING/INFO、トーン: 良い点/提案/気になる点、ステータス: 処理中/成功/失敗)を追加し、`review-severity.ts`・`evaluation-tone.ts`・`evaluation-input-type.ts`にICON定数を、新設の`src/lib/execution-status.ts`にReview/Evaluation共通のステータスラベル・アイコン・配色を集約した。AI評価・AIレビューの一覧/詳細/比較/共有ページ、プロンプト実行の実行結果/実行履歴/比較ページ、ダッシュボードのKPI表示など、ラベルテキストが並ぶ箇所全般に適用し、あわせて`status: PENDING`のような未加工のenum値表示を日本語ラベルに置き換えた。新規アイコンライブラリは導入せず、既存の手書きSVGパターンを踏襲。
+
 ### 積み残しの小さな改善
 
 - ~~ルートレベルの統合テストが薄い箇所(categories/promptsのCRUD等)の拡充~~ → 対応済み。`/api/categories`・`/api/categories/:id`・`/api/prompts`・`/api/prompts/:id`(GET/DELETE。PATCHは既存)・`/api/prompts/:id/versions`・`/api/prompts/:id/executions`に統合テストを追加(認可404・バリデーション400・一意制約409・カスケード/SetNullの実DB確認を含む計36件)。ルートレベルの統合テストは全体で124件

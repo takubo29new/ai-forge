@@ -7,6 +7,7 @@ import {
   SEVERITIES,
   SEVERITY_BG,
   SEVERITY_TEXT,
+  SEVERITY_ICON,
   countBySeverity,
 } from "@/lib/review-severity";
 import { PullRequestList } from "./pull-request-list";
@@ -227,14 +228,20 @@ export default async function RepositoryDetailPage({
                   累計の指摘件数
                 </h2>
                 <div className="flex gap-6">
-                  {SEVERITIES.map((s) => (
-                    <div key={s}>
-                      <p className={`text-2xl font-semibold ${SEVERITY_TEXT[s]}`}>
-                        {severityTotals![s]}
-                      </p>
-                      <p className="text-xs text-zinc-500">{s}</p>
-                    </div>
-                  ))}
+                  {SEVERITIES.map((s) => {
+                    const SevIcon = SEVERITY_ICON[s];
+                    return (
+                      <div key={s}>
+                        <p className={`text-2xl font-semibold ${SEVERITY_TEXT[s]}`}>
+                          {severityTotals![s]}
+                        </p>
+                        <p className="inline-flex items-center gap-1 text-xs text-zinc-500">
+                          <SevIcon className="h-3.5 w-3.5" />
+                          {s}
+                        </p>
+                      </div>
+                    );
+                  })}
                 </div>
                 {severityGrandTotal > 0 && (
                   <div className="mt-3 flex h-2 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { Markdown } from "@/components/markdown";
-import { SEVERITY_TEXT, countBySeverity } from "@/lib/review-severity";
+import { SEVERITIES, SEVERITY_TEXT, SEVERITY_ICON, countBySeverity } from "@/lib/review-severity";
 
 // ログイン不要の読み取り専用公開ページ。shareTokenが一致するレビューのみを
 // 表示し、userIdでの所有者チェックは行わない(トークン自体が公開用の鍵)。
@@ -51,9 +51,15 @@ export default async function SharedReviewPage({
         <span>実行: {review.createdAt.toLocaleString("ja-JP")}</span>
         {review.execution && <span>{review.execution.model}</span>}
         <span className="flex gap-3">
-          <span className={SEVERITY_TEXT.CRITICAL}>CRITICAL {counts.CRITICAL}</span>
-          <span className={SEVERITY_TEXT.WARNING}>WARNING {counts.WARNING}</span>
-          <span className={SEVERITY_TEXT.INFO}>INFO {counts.INFO}</span>
+          {SEVERITIES.map((s) => {
+            const SevIcon = SEVERITY_ICON[s];
+            return (
+              <span key={s} className={`inline-flex items-center gap-1 ${SEVERITY_TEXT[s]}`}>
+                <SevIcon className="h-4 w-4" />
+                {s} {counts[s]}
+              </span>
+            );
+          })}
         </span>
       </div>
 
@@ -65,23 +71,27 @@ export default async function SharedReviewPage({
 
       {review.comments.length > 0 && (
         <ul className="flex flex-col gap-2">
-          {review.comments.map((c) => (
-            <li
-              key={c.id}
-              className="rounded-lg border border-zinc-200 px-4 py-3 dark:border-zinc-800"
-            >
-              <p className="text-sm font-medium">
-                {c.filePath}
-                {c.line !== null && `:${c.line}`}{" "}
-                <span className={`text-xs ${SEVERITY_TEXT[c.severity]}`}>
-                  [{c.severity}]
-                </span>
-              </p>
-              <div className="mt-1">
-                <Markdown>{c.body}</Markdown>
-              </div>
-            </li>
-          ))}
+          {review.comments.map((c) => {
+            const CommentSevIcon = SEVERITY_ICON[c.severity];
+            return (
+              <li
+                key={c.id}
+                className="rounded-lg border border-zinc-200 px-4 py-3 dark:border-zinc-800"
+              >
+                <p className="flex items-center gap-1.5 text-sm font-medium">
+                  {c.filePath}
+                  {c.line !== null && `:${c.line}`}
+                  <span className={`inline-flex items-center gap-1 text-xs ${SEVERITY_TEXT[c.severity]}`}>
+                    <CommentSevIcon className="h-3.5 w-3.5" />
+                    {c.severity}
+                  </span>
+                </p>
+                <div className="mt-1">
+                  <Markdown>{c.body}</Markdown>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
 
