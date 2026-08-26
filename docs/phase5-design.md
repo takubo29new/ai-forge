@@ -138,6 +138,15 @@ const EvaluationOutputSchema = z.object({
 - 公開ページは`(app)`ルートグループの外(`/share/reviews/:token`・`/share/evaluations/:token`)に置き、認証を要求しない。`shareToken`一致のみで対象を取得し(所有者チェックはしない。トークン自体が公開用の鍵)、詳細画面と同じ内容を編集操作なしの読み取り専用で表示する。
 - 詳細画面(`/reviews/:id`・`/evaluations/:id`)に共通コンポーネント`src/components/share-control.tsx`を設置。作成前には「リンクを知っている人は誰でも閲覧できる」旨の`ConfirmDialog`を挟む(プライベートリポジトリの内容や個人的な入力内容が意図せず公開されるリスクへの配慮)。解除は非破壊的なため確認なしで実行できる。
 
+## 通知センター(実装済み)
+
+トースト(`ToastProvider`)はその場でアプリを見ている間しか気づけず、4秒で消えるため見逃しやすい。評価の完了に気づける手段をトースト以外にも用意するため、`Notification`モデルと、ヘッダーに常駐する通知センター(ベルアイコン)を追加した。
+
+- `Notification`(`userId`・`message`・`link`・`read`)を追加。AI評価のバックグラウンド処理(`POST /api/evaluations`の`scheduleBackground`コールバック)が、SUCCESS/FAILEDいずれの完了時にもサーバー側で1件作成する(`src/lib/notifications.ts`の`createEvaluationNotification`)。通知作成自体はEvaluationの確定より重要度が低い副次処理のため、`ReviewComment`の埋め込み生成と同じベストエフォート方針(失敗してもEvaluationのステータス確定には影響させず、`ErrorLog`にのみ記録)にした
+- `GET /api/notifications`(直近20件+未読件数)・`PATCH /api/notifications/:id`(既読化)・`POST /api/notifications/read-all`(一括既読化)を追加
+- `src/components/notification-center.tsx`をヘッダーに常駐させ、20秒間隔でポーリングして未読件数をバッジ表示する。`PendingEvaluationsProvider`(トースト用)とは独立して動作するため、他のタブ・別セッションで作成した評価が完了した場合も拾える
+- クライアント側の作成直後の監視状態(`registerPending`)には依存せず、サーバー側で確定した`Notification`だけを見るシンプルな設計にした(トースト用の仕組みを拡張するのではなく、別の恒久的な仕組みとして並存させている)
+
 ## 今後の拡張候補
 
 - **画像の永続化**: Vercel Blob等を導入し、アップロードした画像を結果画面に表示できるようにする
