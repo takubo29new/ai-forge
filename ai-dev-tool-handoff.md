@@ -110,7 +110,7 @@ Phase 5(汎用AI評価ツール)は画像評価(`inputType: IMAGE`)・テキス�
 
 プロンプトテンプレート集も実装完了。専用のDBモデル・APIは追加せず、`src/lib/prompt-templates.ts`に静的なリストとして持たせ、`/prompts/new`の「テンプレートから始める」から選ぶとタイトル・本文欄が置き換わる(そのまま保存も自由な編集も可能)というシンプルな仕組みにした。これで「追加機能アイデア」として挙がっていた項目はすべて実装完了。
 
-ユーザーから「汎用評価の対象を増やしたい」「テンプレートも充実させたい」との要望を受け、PDF評価(`inputType: PDF`)を追加。画像評価と同じ「ファイルをBase64にしてClaudeへのメッセージに積む」パターンを踏襲し、content配列の要素を`image`ブロックから`document`ブロック(`{ type: "document", source: { type: "base64", media_type: "application/pdf", data } }`)に差し替えるだけで実現した(`Evaluation`/バックグラウンド実行・通知・共有リンクの仕組みは画像評価と完全共通)。履歴書・契約書・論文などのレビュー用途を想定し、画像と同じ「保存しない」方針を適用(20MBまで)。あわせてプロンプトテンプレートをIMAGE/TEXT/PDF計9種に拡充し、入力形式のラベル表記を`src/lib/evaluation-input-type.ts`に集約して各画面(フォーム・一覧・詳細・共有ページ・テンプレート一覧)の表記揺れを防いだ。詳細は[`docs/phase5-design.md`](./docs/phase5-design.md)の「PDF評価」を参照。
+ユーザーから「汎用評価の対象を増やしたい」「テンプレートも充実させたい」との要望を受け、PDF評価(`inputType: PDF`)を追加。画像評価と同じ「ファイルをBase64にしてClaudeへのメッセージに積む」パターンを踏襲し、content配列の要素を`image`ブロックから`document`ブロック(`{ type: "document", source: { type: "base64", media_type: "application/pdf", data } }`)に差し替えるだけで実現した(`Evaluation`/バックグラウンド実行・通知・共有リンクの仕組みは画像評価と完全共通)。履歴書・契約書・論文などのレビュー用途を想定し、画像と同じ「保存しない」方針を適用(20MBまで)。あわせてプロンプトテンプレートをIMAGE/TEXT/PDF計10種(写真の筋肉評価テンプレートを含む)に拡充し、入力形式のラベル表記を`src/lib/evaluation-input-type.ts`に集約して各画面(フォーム・一覧・詳細・共有ページ・テンプレート一覧)の表記揺れを防いだ。詳細は[`docs/phase5-design.md`](./docs/phase5-design.md)の「PDF評価」を参照。
 
 ### UI/UX・デザインのブラッシュアップ — 完了
 

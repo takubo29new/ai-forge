@@ -39,6 +39,14 @@ export const PROMPT_TEMPLATES: PromptTemplate[] = [
       "この部屋の写真を評価してください。整理整頓・配色の統一感・動線の3つの観点でコメントし、改善案を1つずつ提案してください。",
   },
   {
+    id: "muscle-photo",
+    label: "筋肉の評価",
+    inputTypeHint: "IMAGE",
+    title: "筋肉の評価",
+    content:
+      "この写真を見て、筋肉の発達度合いを評価してください。写真に写っている部位(胸・背中・肩・腕・脚など)ごとにコメントし、100点満点の総合スコアも付けてください。医学的な診断ではなく、トレーニングの参考として使う想定です。",
+  },
+  {
     id: "lyrics",
     label: "歌詞の評価",
     inputTypeHint: "TEXT",
