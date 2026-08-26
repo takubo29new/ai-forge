@@ -123,7 +123,7 @@ export async function POST(request: Request) {
     typeof body.imageMediaType === "string" ? body.imageMediaType : null;
   const pdfBase64 = typeof body.pdfBase64 === "string" ? body.pdfBase64 : null;
   // テキスト評価は既存のプロンプト実行と同じ{{変数名}}展開を使う
-  // (docs/phase5-design.md「対応する入力形式」参照)。
+  // (docs/phases/phase5-design.md「対応する入力形式」参照)。
   const variables: Record<string, string> = {};
 
   if (inputType === "IMAGE") {
@@ -185,7 +185,7 @@ export async function POST(request: Request) {
 
   // Claude Vision呼び出しはレイテンシが大きいため、先にPENDINGなEvaluationを
   // 作って即座に返し、実際のAI呼び出し・結果の書き込みはバックグラウンドで行う
-  // (Phase 5「バックグラウンド処理」、docs/phase5-design.md参照)。
+  // (Phase 5「バックグラウンド処理」、docs/phases/phase5-design.md参照)。
   const evaluation = await prisma.evaluation.create({
     data: {
       userId,

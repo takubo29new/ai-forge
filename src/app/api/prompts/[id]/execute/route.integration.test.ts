@@ -108,7 +108,7 @@ describe("POST /api/prompts/:id/execute", () => {
     expect(execution?.status).toBe("SUCCESS");
 
     // reviewを伴わないSUCCESS実行のため、埋め込みが生成されるはず
-    // (docs/phase4-design.md参照)。
+    // (docs/phases/phase4-design.md参照)。
     expect(mockEmbedDocuments).toHaveBeenCalledWith(["こんにちは、太郎さん"]);
     const embedded = await prisma.$queryRaw<{ count: bigint }[]>`
       SELECT COUNT(*)::int AS count FROM "ExecutionEmbedding"

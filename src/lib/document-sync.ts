@@ -26,7 +26,7 @@ export function prepareSyncFiles(
 }
 
 // 埋め込み生成後に呼ぶ。同じsourcePath(+repositoryId)のDocumentを丸ごと作り直す
-// (差分検出はせず全置き換え。docs/phase3-design.md参照)。repositoryIdはai-forge
+// (差分検出はせず全置き換え。docs/phases/phase3-design.md参照)。repositoryIdはai-forge
 // 自身の同期ではnull。
 export async function writeSyncedDocuments(
   userId: string,

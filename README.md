@@ -17,7 +17,7 @@ AIに投げるプロンプトを「コードのように」管理・改善する
 - プロンプトCRUD・バージョン履歴(編集のたびに新しいバージョンを追加)
 - Claude実行(モデル選択、`{{変数名}}`のテンプレート変数、実行履歴の記録。結果はMarkdownで表示)
 
-設計の詳細は [`docs/phase1-design.md`](./docs/phase1-design.md)(全体設計)、[`docs/db-design.md`](./docs/db-design.md)(DB設計)、[`docs/phase1-ui-design.md`](./docs/phase1-ui-design.md)(画面遷移・UI設計)を参照。
+設計の詳細は [`docs/phases/phase1-design.md`](./docs/phases/phase1-design.md)(全体設計)、[`docs/db-design.md`](./docs/db-design.md)(DB設計)、[`docs/phases/phase1-ui-design.md`](./docs/phases/phase1-ui-design.md)(画面遷移・UI設計)を参照。
 
 ### Phase 2: AIコードレビューツール
 
@@ -29,7 +29,7 @@ GitHubリポジトリを接続し、PRの差分をPhase 1のプロンプト資�
 - レビュー結果の蓄積・可視化(リポジトリ単位の累計指摘件数・直近レビューの推移・指摘の多いファイル)
 - レビュー結果の共有リンク(成功したレビューを、ログイン不要の読み取り専用URLで公開できる。作成前に非公開情報が含まれていないかの確認ダイアログを挟む)
 
-設計の詳細は [`docs/phase2-design.md`](./docs/phase2-design.md)(画面遷移・UI設計・API設計)を参照。
+設計の詳細は [`docs/phases/phase2-design.md`](./docs/phases/phase2-design.md)(画面遷移・UI設計・API設計)を参照。
 
 ### 品質・運用面の取り組み
 
@@ -54,7 +54,7 @@ GitHubリポジトリを接続し、PRの差分をPhase 1のプロンプト資�
 - RAG検索チャット(`/chat`。ドキュメント・レビュー指摘を横断検索し、Claudeが出典付きで回答)
 - 統合ダッシュボード(`/dashboard`。プロンプト数・接続リポジトリ数・累計レビュー指摘件数・登録ドキュメント数の横断サマリ)
 
-画面遷移・DB設計・実装状況は [`docs/phase3-design.md`](./docs/phase3-design.md) を参照。
+画面遷移・DB設計・実装状況は [`docs/phases/phase3-design.md`](./docs/phases/phase3-design.md) を参照。
 
 ### Phase 4: 統合基盤の強化
 
@@ -65,7 +65,7 @@ Phase 1〜3を「別々の機能」から「データを掛け合わせて初め
 - **レビュー指摘蓄積からのプロンプト改善提案**: プロンプト詳細画面(`/prompts/:id`)から、過去のAIレビュー指摘を分析してプロンプトの改善案をClaudeに構造化出力で生成させるボタンを追加(永続化はせず、押すたびに生成し直す)
 - **チャットからの直接アクション実行**: `/chat`でユーザーの発話をClaudeのtool useで解析し、「保存済みプロンプトでのAIレビュー実行」の意図・パラメータを検出した場合のみ実行内容の確認ダイアログを表示。ユーザーが確認した場合のみ既存の`POST /api/repositories/:id/reviews`を呼び出す(それ以外の操作はチャットから実行不可)
 
-設計・実装状況は [`docs/phase4-design.md`](./docs/phase4-design.md) を参照。
+設計・実装状況は [`docs/phases/phase4-design.md`](./docs/phases/phase4-design.md) を参照。
 
 ### Phase 5: 汎用AI評価ツール(画像・テキスト・PDF評価、バックグラウンド処理)
 
@@ -81,7 +81,7 @@ Phase 1〜3を「別々の機能」から「データを掛け合わせて初め
 - プロンプトテンプレート集(`/prompts/new`の「テンプレートから始める」。画像・テキスト・PDFそれぞれの評価用の叩き台プロンプト計10種を選ぶとタイトル・本文が自動入力される)
 - 評価結果(総評・観点別コメント)はAES-256-GCMで暗号化して保存(GitHubトークンと同じ仕組み。履歴書・契約書などPDF評価が個人情報を含みうるようになったための対応)
 
-「画像の永続化」(アップロード画像を結果画面に表示する案)は個人情報リスクを理由に見送り済み。設計・実装状況は [`docs/phase5-design.md`](./docs/phase5-design.md) を参照。
+「画像の永続化」(アップロード画像を結果画面に表示する案)は個人情報リスクを理由に見送り済み。設計・実装状況は [`docs/phases/phase5-design.md`](./docs/phases/phase5-design.md) を参照。
 
 ## 技術スタック
 

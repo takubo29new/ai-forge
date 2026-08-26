@@ -2,7 +2,7 @@ const MAX_CHUNK_LENGTH = 2000;
 
 // Markdownの見出し(##/###)単位を第一境界としてチャンク分割する。
 // 見出し単位にする理由は、設計書の1セクションが意味的にまとまった単位であり、
-// 検索結果をそのまま出典として提示しやすいため(docs/phase3-design.md参照)。
+// 検索結果をそのまま出典として提示しやすいため(docs/phases/phase3-design.md参照)。
 // 1チャンクが長すぎる場合はさらに段落(空行区切り)単位で分割する。
 export function chunkMarkdown(content: string): string[] {
   return splitByHeading(content)

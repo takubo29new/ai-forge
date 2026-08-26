@@ -26,7 +26,7 @@ export type ChatContextEntry = {
 // チャットからの直接アクション実行(Phase 4項目4)で、意図解析の結果として
 // 提案する操作。実行はここでは行わず、フロント側の確認ダイアログでユーザーが
 // 承認した場合のみPOST /api/repositories/:id/reviewsを呼び出す
-// (docs/phase4-design.md「4. チャットからの直接アクション実行」参照)。
+// (docs/phases/phase4-design.md「4. チャットからの直接アクション実行」参照)。
 export type ChatActionProposal = {
   repositoryId: string;
   repositoryLabel: string;

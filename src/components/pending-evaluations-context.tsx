@@ -17,7 +17,7 @@ type EvaluationStatusRow = { id: string; title: string; status: "PENDING" | "SUC
 
 // AI評価(Phase 5、画像・テキスト共通)はバックグラウンドで実行されるため、実行を依頼した画面から
 // 離れても完了に気づけるよう、(app)レイアウトに常駐してPENDINGなEvaluationを
-// ポーリングし、完了時にトースト通知する(docs/phase5-design.md「バックグラウンド
+// ポーリングし、完了時にトースト通知する(docs/phases/phase5-design.md「バックグラウンド
 // 処理」参照)。ToastProviderと同じくレイアウトに1つだけマウントされ、アプリ内の
 // 画面遷移(クライアントサイドナビゲーション)をまたいで動き続ける。
 export function PendingEvaluationsProvider({ children }: { children: React.ReactNode }) {

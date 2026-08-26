@@ -2,7 +2,7 @@ import type { EvaluationInputType } from "@/lib/evaluation-input-type";
 
 // /prompts/newの「テンプレートから始める」向けの叩き台プロンプト集。
 // 主にPhase 5(AI評価)を試しやすくする目的のため、画像・テキスト・PDF
-// 入力の評価用途を中心に用意する(docs/phase5-design.md「今後の拡張候補」参照)。
+// 入力の評価用途を中心に用意する(docs/phases/phase5-design.md「今後の拡張候補」参照)。
 // DBには保存せず、静的なリストからタイトル・本文をフォームに反映するだけの
 // シンプルな仕組みにしている(専用モデル・APIは追加しない)。
 export type PromptTemplate = {

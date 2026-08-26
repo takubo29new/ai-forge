@@ -95,7 +95,7 @@ export async function POST(
   // が同じrunAiExecution()を直接呼び出しており、この埋め込み生成は経由しない)。
   // レビュー由来のExecution.resultTextはReviewCommentとして既に個別に埋め込み済みのため、
   // 対象をこのルートに限定してJSON構造化出力全体の重複埋め込みを避ける
-  // (docs/phase4-design.md参照)。
+  // (docs/phases/phase4-design.md参照)。
   if (outcome.status === "SUCCESS" && outcome.execution.resultText) {
     try {
       const [embedding] = await embedDocuments([outcome.execution.resultText]);

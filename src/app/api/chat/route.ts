@@ -23,7 +23,7 @@ const CONTEXT_LIMIT = 5;
 // RAG検索チャットの回答生成。ユーザーが登録したプロンプト資産(PromptVersion)を
 // 使う実行ではなくシステム側で組み立てるプロンプトのため、Phase 1・2のExecutionの
 // 枠組み(promptVersionId必須)には乗せず、ここで直接Claudeを呼び出す
-// (docs/phase3-design.md参照)。
+// (docs/phases/phase3-design.md参照)。
 export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
   // 両方を持つユーザーのみ対象とする(片方でも無ければ実行しようがなく、
   // 意図解析の追加API呼び出し自体が無駄になるため)。アクションが提案された
   // 場合はRAG検索・回答生成は行わず、確認用の提案だけを返す
-  // (docs/phase4-design.md「4. チャットからの直接アクション実行」参照)。
+  // (docs/phases/phase4-design.md「4. チャットからの直接アクション実行」参照)。
   const [actionRepositories, actionPrompts] = await Promise.all([
     prisma.repository.findMany({
       where: { userId },
@@ -110,7 +110,7 @@ export async function POST(request: Request) {
 
   // PromptVersion・Executionはリポジトリに紐づく概念がないため、repositoryId
   // 絞り込み時もDocument・ReviewCommentのみを絞り込み対象にする
-  // (docs/phase4-design.md「2. プロジェクト単位のドキュメント管理」参照)。
+  // (docs/phases/phase4-design.md「2. プロジェクト単位のドキュメント管理」参照)。
   const [docHits, reviewHits, promptVersionHits, executionHits] = await Promise.all([
     searchDocumentChunks(userId, queryEmbedding, SEARCH_LIMIT_PER_SOURCE, repositoryId),
     searchReviewComments(userId, queryEmbedding, SEARCH_LIMIT_PER_SOURCE, repositoryId),

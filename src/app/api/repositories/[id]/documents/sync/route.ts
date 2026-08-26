@@ -12,7 +12,7 @@ import { logError } from "@/lib/error-log";
 // DB書き込みを1リクエストで行うため、/api/documents/syncと同様に上限を引き上げる
 export const maxDuration = 60;
 
-// 接続済みリポジトリのdocs/配下・README.mdを取り込む(docs/phase4-design.md
+// 接続済みリポジトリのdocs/配下・README.mdを取り込む(docs/phases/phase4-design.md
 // 「2. プロジェクト単位のドキュメント管理」参照)。/api/documents/syncと
 // 同じ「同じsourcePathのDocumentを丸ごと作り直す」方式だが、対象を
 // このリポジトリ(repositoryId)のDocumentに限定する
