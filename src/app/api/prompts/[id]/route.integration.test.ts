@@ -9,7 +9,7 @@ vi.mock("@/lib/voyage", async (importOriginal) => ({
 import { auth } from "@/auth";
 import { embedDocuments } from "@/lib/voyage";
 import { prisma } from "@/lib/prisma";
-import { PATCH } from "./route";
+import { GET, PATCH, DELETE } from "./route";
 import { cleanupTestUser, createTestPrompt, createTestUser } from "@/test/db-helpers";
 
 const mockAuth = vi.mocked(auth) as unknown as Mock<
@@ -91,5 +91,89 @@ describe("PATCH /api/prompts/:id", () => {
     const res = await PATCH(request({ title: "新しいタイトル" }), ctx(promptId));
     expect(res.status).toBe(200);
     expect(mockEmbedDocuments).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /api/prompts/:id", () => {
+  let userId: string;
+  let promptId: string;
+
+  beforeEach(async () => {
+    const user = await createTestUser();
+    userId = user.id;
+    const prompt = await createTestPrompt(userId, "本文");
+    promptId = prompt.id;
+    mockAuth.mockReset().mockResolvedValue({ user: { id: userId } } as never);
+  });
+
+  afterEach(async () => {
+    await cleanupTestUser(userId);
+  });
+
+  it("認証がなければ401を返す", async () => {
+    mockAuth.mockResolvedValue(null);
+    const res = await GET(new Request("http://localhost/api/prompts/x"), ctx(promptId));
+    expect(res.status).toBe(401);
+  });
+
+  it("他ユーザーのプロンプトには404を返す", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "someone-else" } } as never);
+    const res = await GET(new Request("http://localhost/api/prompts/x"), ctx(promptId));
+    expect(res.status).toBe(404);
+  });
+
+  it("存在しないIDには404を返す", async () => {
+    const res = await GET(
+      new Request("http://localhost/api/prompts/x"),
+      ctx("does-not-exist"),
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("取得に成功すると最新バージョンを含めて返す", async () => {
+    const res = await GET(new Request("http://localhost/api/prompts/x"), ctx(promptId));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.id).toBe(promptId);
+    expect(body.versions[0].content).toBe("本文");
+  });
+});
+
+describe("DELETE /api/prompts/:id", () => {
+  let userId: string;
+  let promptId: string;
+
+  beforeEach(async () => {
+    const user = await createTestUser();
+    userId = user.id;
+    const prompt = await createTestPrompt(userId, "本文");
+    promptId = prompt.id;
+    mockAuth.mockReset().mockResolvedValue({ user: { id: userId } } as never);
+  });
+
+  afterEach(async () => {
+    await cleanupTestUser(userId);
+  });
+
+  it("認証がなければ401を返す", async () => {
+    mockAuth.mockResolvedValue(null);
+    const res = await DELETE(new Request("http://localhost/api/prompts/x"), ctx(promptId));
+    expect(res.status).toBe(401);
+  });
+
+  it("他ユーザーのプロンプトには404を返す", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "someone-else" } } as never);
+    const res = await DELETE(new Request("http://localhost/api/prompts/x"), ctx(promptId));
+    expect(res.status).toBe(404);
+  });
+
+  it("削除に成功すると204を返し、バージョンもカスケード削除される", async () => {
+    const res = await DELETE(new Request("http://localhost/api/prompts/x"), ctx(promptId));
+    expect(res.status).toBe(204);
+
+    const found = await prisma.prompt.findUnique({ where: { id: promptId } });
+    expect(found).toBeNull();
+    const versions = await prisma.promptVersion.findMany({ where: { promptId } });
+    expect(versions).toHaveLength(0);
   });
 });
