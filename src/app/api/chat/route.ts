@@ -14,6 +14,8 @@ import { buildChatContext, renderContextForPrompt } from "@/lib/chat-context";
 import { checkChatRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { voyageErrorResponse } from "@/lib/voyage-error-response";
 import { logError } from "@/lib/error-log";
+import { detectReviewActionIntent } from "@/lib/chat-action";
+import { LIST_LIMIT } from "@/lib/list-limits";
 
 const SEARCH_LIMIT_PER_SOURCE = 5;
 const CONTEXT_LIMIT = 5;
@@ -55,6 +57,48 @@ export async function POST(request: Request) {
   const rateLimit = await checkChatRateLimit(userId);
   if (!rateLimit.allowed) {
     return rateLimitResponse(rateLimit.limit);
+  }
+
+  // チャットからの直接アクション実行(Phase 4項目4)。リポジトリ・プロンプトの
+  // 両方を持つユーザーのみ対象とする(片方でも無ければ実行しようがなく、
+  // 意図解析の追加API呼び出し自体が無駄になるため)。アクションが提案された
+  // 場合はRAG検索・回答生成は行わず、確認用の提案だけを返す
+  // (docs/phase4-design.md「4. チャットからの直接アクション実行」参照)。
+  const [actionRepositories, actionPrompts] = await Promise.all([
+    prisma.repository.findMany({
+      where: { userId },
+      select: { id: true, owner: true, name: true },
+      take: LIST_LIMIT,
+    }),
+    prisma.prompt.findMany({
+      where: { userId },
+      select: { id: true, title: true },
+      take: LIST_LIMIT,
+    }),
+  ]);
+
+  if (actionRepositories.length > 0 && actionPrompts.length > 0) {
+    let actionProposal;
+    try {
+      actionProposal = await detectReviewActionIntent(
+        question,
+        actionRepositories,
+        actionPrompts,
+      );
+    } catch (error) {
+      await logError({
+        source: "SERVER",
+        message: `チャットのアクション意図解析に失敗しました: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        path: "/api/chat",
+        userId,
+      });
+      actionProposal = null;
+    }
+    if (actionProposal) {
+      return NextResponse.json({ actionProposal });
+    }
   }
 
   let queryEmbedding: number[];

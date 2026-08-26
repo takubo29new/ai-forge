@@ -6,11 +6,18 @@ import { ChatPanel } from "./chat-panel";
 export default async function ChatPage() {
   const userId = await requireUserId();
 
-  const repositories = await prisma.repository.findMany({
-    where: { userId },
-    orderBy: { connectedAt: "desc" },
-    select: { id: true, owner: true, name: true },
-  });
+  const [repositories, prompts] = await Promise.all([
+    prisma.repository.findMany({
+      where: { userId },
+      orderBy: { connectedAt: "desc" },
+      select: { id: true, owner: true, name: true },
+    }),
+    prisma.prompt.findMany({
+      where: { userId },
+      orderBy: { updatedAt: "desc" },
+      select: { id: true, title: true },
+    }),
+  ]);
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col px-6 py-10">
@@ -29,6 +36,7 @@ export default async function ChatPage() {
           id: r.id,
           label: `${r.owner}/${r.name}`,
         }))}
+        prompts={prompts}
       />
     </div>
   );

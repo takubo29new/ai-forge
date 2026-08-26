@@ -134,7 +134,11 @@ describe("POST /api/chat", () => {
     // review_commentより先に来るはず
     expect(body.sources[0].kind).toBe("document_chunk");
 
-    const promptSent = mockCreate.mock.calls[0][0].messages[0].content as string;
+    // このケースはリポジトリ・プロンプトの両方が存在するため、回答生成の前に
+    // チャットアクション意図解析(Phase 4項目4)の呼び出しが1回挟まる。
+    // 回答生成本体は最後の呼び出しになる。
+    const lastCall = mockCreate.mock.calls[mockCreate.mock.calls.length - 1][0];
+    const promptSent = lastCall.messages[0].content as string;
     expect(promptSent).toContain("RateLimitBucketはupsertでアトミックに更新する");
   });
 
@@ -257,5 +261,115 @@ describe("POST /api/chat", () => {
       .map((s: { documentId: string }) => s.documentId);
     expect(documentIds).toContain(targetDoc.id);
     expect(documentIds).not.toContain(otherDoc.id);
+  });
+
+  describe("チャットからの直接アクション実行(Phase 4項目4)", () => {
+    it("意図解析でツールが呼ばれたらアクション提案を返し、RAG検索は行わない", async () => {
+      const repo = await prisma.repository.create({
+        data: { userId, githubRepoId: BigInt(2001), owner: "o", name: "target" },
+      });
+      const prompt = await prisma.prompt.create({
+        data: {
+          title: "コードレビュー用",
+          userId,
+          versions: { create: { versionNumber: 1, content: "レビュー: {{diff}}" } },
+        },
+      });
+
+      mockCreate.mockResolvedValue({
+        content: [
+          {
+            type: "tool_use",
+            id: "toolu_1",
+            name: "propose_review_execution",
+            input: {
+              repositoryId: repo.id,
+              pullRequestNumber: 42,
+              promptId: prompt.id,
+            },
+          },
+        ],
+      } as never);
+
+      const res = await POST(
+        request({ question: "target/repoのPR #42をコードレビュー用プロンプトでレビューして" }),
+      );
+      expect(res.status).toBe(200);
+      const body = await res.json();
+
+      expect(body.actionProposal).toMatchObject({
+        repositoryId: repo.id,
+        repositoryLabel: "o/target",
+        pullRequestNumber: 42,
+        promptId: prompt.id,
+        promptLabel: "コードレビュー用",
+      });
+      expect(body.answer).toBeUndefined();
+      expect(mockEmbedQuery).not.toHaveBeenCalled();
+    });
+
+    it("意図解析でツールが呼ばれなければ通常のRAG回答にフォールバックする", async () => {
+      await prisma.repository.create({
+        data: { userId, githubRepoId: BigInt(2002), owner: "o", name: "r" },
+      });
+      await prisma.prompt.create({
+        data: {
+          title: "何かのプロンプト",
+          userId,
+          versions: { create: { versionNumber: 1, content: "本文" } },
+        },
+      });
+
+      mockCreate.mockResolvedValue({
+        content: [{ type: "text", text: "(何もしない)" }],
+      } as never);
+      mockEmbedQuery.mockResolvedValue(vector(1));
+
+      const res = await POST(request({ question: "こんにちは" }));
+      expect(res.status).toBe(200);
+      const body = await res.json();
+
+      expect(body.actionProposal).toBeUndefined();
+      expect(body.sources).toEqual([]);
+      // 検索対象が0件のため、意図解析の1回だけが呼ばれ、回答生成の
+      // Claude呼び出しはスキップされる。
+      expect(mockCreate).toHaveBeenCalledTimes(1);
+    });
+
+    it("実在しないリポジトリ・プロンプトを指すツール呼び出しは無視してフォールバックする", async () => {
+      await prisma.repository.create({
+        data: { userId, githubRepoId: BigInt(2003), owner: "o", name: "r" },
+      });
+      await prisma.prompt.create({
+        data: {
+          title: "何かのプロンプト",
+          userId,
+          versions: { create: { versionNumber: 1, content: "本文" } },
+        },
+      });
+
+      mockCreate.mockResolvedValue({
+        content: [
+          {
+            type: "tool_use",
+            id: "toolu_1",
+            name: "propose_review_execution",
+            input: {
+              repositoryId: "does-not-exist",
+              pullRequestNumber: 1,
+              promptId: "does-not-exist",
+            },
+          },
+        ],
+      } as never);
+      mockEmbedQuery.mockResolvedValue(vector(1));
+
+      const res = await POST(request({ question: "適当なリポジトリをレビューして" }));
+      expect(res.status).toBe(200);
+      const body = await res.json();
+
+      expect(body.actionProposal).toBeUndefined();
+      expect(body.sources).toEqual([]);
+    });
   });
 });

@@ -51,6 +51,10 @@ pgvector拡張(`vector`、0.8.6)をここで初めて有効化した。詳細は
 - `PromptVersionEmbedding` — `PromptVersion.content`に対する埋め込みを1:1で追加する別テーブル(`ReviewCommentEmbedding`と同じパターン)。新しいバージョンが保存されるたびに生成し、過去バージョンは差し替えない
 - `ExecutionEmbedding` — `Execution.resultText`に対する埋め込みを1:1で追加する別テーブル。`reviewId`が無い(Phase 2のレビュー実行ではない)`SUCCESS`な実行のみを対象とする。レビュー由来の`resultText`は既に`ReviewComment`として個別に埋め込み済みのため、重複を避けてあえて対象外にしている
 
+### チャットからの直接アクション実行(Phase 4項目4)
+
+`Review`に`triggeredVia ReviewTrigger`(`UI` | `CHAT`、デフォルト`UI`)を追加した。UIの「オープンなPR」タブからの実行とチャットからの実行はいずれも同じ`POST /api/repositories/:id/reviews`・同じ`Review`テーブルを使うため、履歴上でどちらから実行したかを区別する目的だけの列。既存データは移行なしにUI扱いのままで問題ない。詳細は[`phase4-design.md`](./phase4-design.md)を参照。
+
 ### 汎用AI評価ドメイン(Phase 5)
 
 コードレビュー(`Review`)とは意図的に分離した並行の概念。詳細は[`phase5-design.md`](./phase5-design.md)を参照。
