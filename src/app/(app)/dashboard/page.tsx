@@ -76,7 +76,7 @@ export default async function DashboardPage() {
           className="rounded-lg border border-zinc-200 p-4 transition-all hover:-translate-y-0.5 hover:border-accent hover:shadow-md dark:border-zinc-800"
         >
           <p className="text-2xl font-semibold">{evaluationCount}</p>
-          <p className="text-xs text-zinc-500">画像評価</p>
+          <p className="text-xs text-zinc-500">AI評価</p>
         </Link>
       </div>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -8,18 +8,26 @@ import { useApiMutation } from "@/lib/use-api-mutation";
 import { Spinner } from "@/components/spinner";
 import { useToast } from "@/components/toast-provider";
 import { usePendingEvaluations } from "@/components/pending-evaluations-context";
+import { extractVariableNames } from "@/lib/prompt-variables";
 
 type EvaluationStatus = "PENDING" | "SUCCESS" | "FAILED";
+type InputType = "IMAGE" | "TEXT";
 
 type Evaluation = {
   id: string;
   title: string;
   status: EvaluationStatus;
+  inputType: InputType;
   findingCount: number;
   createdAt: string;
 };
 
-type Prompt = { id: string; title: string };
+const INPUT_TYPE_TEXT: Record<InputType, string> = {
+  IMAGE: "画像",
+  TEXT: "テキスト",
+};
+
+type Prompt = { id: string; title: string; content: string };
 
 const STATUS_TEXT: Record<EvaluationStatus, string> = {
   PENDING: "処理中",
@@ -60,7 +68,9 @@ export function EvaluationManager({
   const [evaluations, setEvaluations] = useState(initialEvaluations);
   const [title, setTitle] = useState("");
   const [promptId, setPromptId] = useState(prompts[0]?.id ?? "");
+  const [inputType, setInputType] = useState<InputType>("IMAGE");
   const [file, setFile] = useState<File | null>(null);
+  const [variableValues, setVariableValues] = useState<Record<string, string>>({});
   const [deleteTarget, setDeleteTarget] = useState<Evaluation | null>(null);
   const [reading, setReading] = useState(false);
   const { mutate, pending, error, setError } = useApiMutation();
@@ -71,37 +81,65 @@ export function EvaluationManager({
   // ファイル読み込み中もあわせてガードしないと二重送信を防げない。
   const busy = pending || reading;
 
+  const selectedPrompt = prompts.find((p) => p.id === promptId);
+  // テキスト評価は既存のプロンプト実行(execute-tab.tsx)と同じ{{変数名}}展開を
+  // 使う(docs/phase5-design.md「対応する入力形式」参照)。歌詞・楽譜のテキスト化
+  // した楽曲・文章など、内容が長くなりうるためtextareaで受け付ける。
+  const variableNames = useMemo(
+    () => (selectedPrompt ? extractVariableNames(selectedPrompt.content) : []),
+    [selectedPrompt],
+  );
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (busy) return;
-    if (!file) {
-      setError("画像を選択してください");
-      return;
-    }
-    if (file.size > MAX_IMAGE_BYTES) {
-      setError("画像サイズが大きすぎます(5MB以下にしてください)");
-      return;
-    }
 
-    setReading(true);
-    let imageBase64: string;
-    try {
-      imageBase64 = await readFileAsBase64(file);
-    } catch {
-      setError("画像の読み込みに失敗しました");
+    let data: { id: string } | null;
+    if (inputType === "IMAGE") {
+      if (!file) {
+        setError("画像を選択してください");
+        return;
+      }
+      if (file.size > MAX_IMAGE_BYTES) {
+        setError("画像サイズが大きすぎます(5MB以下にしてください)");
+        return;
+      }
+
+      setReading(true);
+      let imageBase64: string;
+      try {
+        imageBase64 = await readFileAsBase64(file);
+      } catch {
+        setError("画像の読み込みに失敗しました");
+        setReading(false);
+        return;
+      }
       setReading(false);
-      return;
-    }
-    setReading(false);
 
-    const data = await mutate<{ id: string }>(
-      "/api/evaluations",
-      {
-        method: "POST",
-        body: { title, promptId, imageBase64, imageMediaType: file.type },
-      },
-      "評価の実行に失敗しました",
-    );
+      data = await mutate<{ id: string }>(
+        "/api/evaluations",
+        {
+          method: "POST",
+          body: {
+            title,
+            promptId,
+            inputType: "IMAGE",
+            imageBase64,
+            imageMediaType: file.type,
+          },
+        },
+        "評価の実行に失敗しました",
+      );
+    } else {
+      data = await mutate<{ id: string }>(
+        "/api/evaluations",
+        {
+          method: "POST",
+          body: { title, promptId, inputType: "TEXT", variables: variableValues },
+        },
+        "評価の実行に失敗しました",
+      );
+    }
     if (!data) return;
     // 実際のAI呼び出しはバックグラウンドで進むため、ここではまだPENDING。
     // 完了はレイアウトに常駐するPendingEvaluationsProviderがポーリングして
@@ -165,15 +203,66 @@ export function EvaluationManager({
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-xs text-zinc-500">画像</label>
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/gif,image/webp"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              required
-              className="w-full text-sm"
-            />
+            <label className="mb-1 block text-xs text-zinc-500">入力形式</label>
+            <div className="flex gap-4 text-sm">
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="radio"
+                  name="inputType"
+                  checked={inputType === "IMAGE"}
+                  onChange={() => setInputType("IMAGE")}
+                />
+                画像
+              </label>
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="radio"
+                  name="inputType"
+                  checked={inputType === "TEXT"}
+                  onChange={() => setInputType("TEXT")}
+                />
+                テキスト
+              </label>
+            </div>
           </div>
+          {inputType === "IMAGE" ? (
+            <div>
+              <label className="mb-1 block text-xs text-zinc-500">画像</label>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/gif,image/webp"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                required
+                className="w-full text-sm"
+              />
+            </div>
+          ) : variableNames.length > 0 ? (
+            <div className="flex flex-col gap-2">
+              <p className="text-xs text-zinc-500">
+                評価対象のテキスト(プロンプト本文の{"{{変数名}}"}に埋め込まれます)
+              </p>
+              {variableNames.map((name) => (
+                <div key={name}>
+                  <label className="mb-1 block text-xs text-zinc-500">{name}</label>
+                  <textarea
+                    value={variableValues[name] ?? ""}
+                    onChange={(e) =>
+                      setVariableValues((prev) => ({
+                        ...prev,
+                        [name]: e.target.value,
+                      }))
+                    }
+                    rows={4}
+                    className="w-full rounded border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                  />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-zinc-500">
+              選択したプロンプトに{"{{変数名}}"}が含まれていないため、テキストを埋め込む箇所がありません。プロンプトを編集するか、他のプロンプトを選んでください。
+            </p>
+          )}
           <button
             type="submit"
             disabled={busy}
@@ -209,6 +298,7 @@ export function EvaluationManager({
                 </p>
                 <p className="text-xs text-zinc-500">
                   {new Date(evaluation.createdAt).toLocaleString("ja-JP")} ・{" "}
+                  {INPUT_TYPE_TEXT[evaluation.inputType]} ・{" "}
                   {STATUS_TEXT[evaluation.status]}
                   {evaluation.status === "SUCCESS" &&
                     ` ・ ${evaluation.findingCount}件のコメント`}

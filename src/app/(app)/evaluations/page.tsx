@@ -16,6 +16,7 @@ export default async function EvaluationsPage() {
     }),
     prisma.prompt.findMany({
       where: { userId },
+      include: { versions: { orderBy: { versionNumber: "desc" }, take: 1 } },
       orderBy: { updatedAt: "desc" },
     }),
   ]);
@@ -29,9 +30,9 @@ export default async function EvaluationsPage() {
         ← ダッシュボードへ
       </Link>
       <div className="mt-4 mb-6">
-        <h1 className="mb-2 text-xl font-semibold">画像評価</h1>
+        <h1 className="mb-2 text-xl font-semibold">AI評価</h1>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          画像とプロンプトを選ぶと、Claudeが観点別のコメント(良い点・提案・気になる点)で評価します。アップロードした画像自体は保存されず、評価結果のみ記録されます。
+          画像またはテキストとプロンプトを選ぶと、Claudeが観点別のコメント(良い点・提案・気になる点)で評価します。アップロードした画像自体は保存されず、評価結果のみ記録されます。
         </p>
       </div>
       <EvaluationManager
@@ -39,10 +40,15 @@ export default async function EvaluationsPage() {
           id: e.id,
           title: e.title,
           status: e.status,
+          inputType: e.inputType,
           findingCount: e._count.findings,
           createdAt: e.createdAt.toISOString(),
         }))}
-        prompts={promptRows.map((p) => ({ id: p.id, title: p.title }))}
+        prompts={promptRows.map((p) => ({
+          id: p.id,
+          title: p.title,
+          content: p.versions[0]?.content ?? "",
+        }))}
       />
     </div>
   );

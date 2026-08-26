@@ -14,7 +14,7 @@ const SECTIONS = [
   { id: "trends", label: "レビュー履歴・傾向" },
   { id: "documents", label: "ドキュメント" },
   { id: "chat", label: "RAG検索チャット" },
-  { id: "evaluations", label: "画像評価" },
+  { id: "evaluations", label: "AI評価" },
   { id: "dashboard", label: "ダッシュボード" },
   { id: "appearance", label: "表示設定・エラーログ" },
   { id: "faq", label: "よくある質問" },
@@ -169,9 +169,14 @@ export default async function HelpPage() {
         </section>
 
         <section id="evaluations" className="scroll-mt-6">
-          <h2 className="mb-2 text-lg font-semibold">画像評価</h2>
+          <h2 className="mb-2 text-lg font-semibold">AI評価</h2>
           <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
-            「評価」ページから、画像(料理の写真・自作の絵など)とプロンプトを選んで「評価を実行」を押すと、Claudeが画像を見て観点別のコメント(良い点・提案・気になる点)と総評を返します。コードレビューと同じ「プロンプトを選んでClaudeに実行させる」仕組みを画像入力向けに広げたものです。
+            「評価」ページから、画像(料理の写真・自作の絵など)またはテキスト(歌詞・文章など)とプロンプトを選んで「評価を実行」を押すと、Claudeが観点別のコメント(良い点・提案・気になる点)と総評を返します。コードレビューと同じ「プロンプトを選んでClaudeに実行させる」仕組みを画像・テキスト入力向けに広げたものです。
+          </p>
+          <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
+            「テキスト」を選ぶと、選んだプロンプトの本文に含まれる
+            <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">{"{{変数名}}"}</code>
+            ごとに入力欄が表示されるので、評価したい内容を入力してください(プロンプト実行の変数展開と同じ仕組みです)。変数が含まれていないプロンプトはテキスト評価には使えません。
           </p>
           <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
             アップロードした画像自体はサーバーに保存されません。Claudeへのリクエストで使われるだけで、評価結果(テキスト)のみが記録されます。
