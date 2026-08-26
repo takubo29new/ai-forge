@@ -4,6 +4,7 @@ import { HelpToc } from "./help-toc";
 
 const SECTIONS = [
   { id: "login", label: "ログイン" },
+  { id: "search", label: "横断検索" },
   { id: "categories", label: "カテゴリ" },
   { id: "prompts", label: "プロンプトの作成・編集" },
   { id: "versions", label: "バージョン履歴" },
@@ -44,6 +45,19 @@ export default async function HelpPage() {
           <h2 className="mb-2 text-lg font-semibold">ログイン</h2>
           <p className="text-sm text-zinc-700 dark:text-zinc-300">
             GitHubアカウントでログインします。トップページにアクセスすると未ログイン時は自動的にログイン画面に移動するので、「GitHubでログイン」を押してGitHub側で許可すれば、プロンプト一覧画面に入れます。ログアウトはヘッダー右側のボタンから行えます。
+          </p>
+        </section>
+
+        <section id="search" className="scroll-mt-6">
+          <h2 className="mb-2 text-lg font-semibold">横断検索</h2>
+          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+            ヘッダー右側の虫眼鏡アイコン、または
+            <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">Ctrl</code>
+            /
+            <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">⌘</code>
+            +
+            <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">K</code>
+            でどの画面からでもコマンドパレットを開けます。プロンプト・カテゴリ・リポジトリ・ドキュメント・評価・レビュー(PRタイトル)を横断して名前の部分一致で検索し、選ぶとその画面に移動します。矢印キーで候補を選び、Enterで移動できます。
           </p>
         </section>
 

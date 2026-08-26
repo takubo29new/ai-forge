@@ -2,6 +2,7 @@ import { AppHeader } from "@/components/app-header";
 import { requireUserId } from "@/lib/session";
 import { ToastProvider } from "@/components/toast-provider";
 import { PendingEvaluationsProvider } from "@/components/pending-evaluations-context";
+import { CommandPaletteProvider } from "@/components/command-palette";
 
 export default async function AppLayout({
   children,
@@ -13,10 +14,12 @@ export default async function AppLayout({
   return (
     <ToastProvider>
       <PendingEvaluationsProvider>
-        <div className="flex flex-1 flex-col">
-          <AppHeader />
-          {children}
-        </div>
+        <CommandPaletteProvider>
+          <div className="flex flex-1 flex-col">
+            <AppHeader />
+            {children}
+          </div>
+        </CommandPaletteProvider>
       </PendingEvaluationsProvider>
     </ToastProvider>
   );

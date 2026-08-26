@@ -5,6 +5,7 @@ import { getSession } from "@/lib/session";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ErrorLogIcon, HelpIcon } from "@/components/icons";
 import { NavLinks } from "@/components/nav-links";
+import { CommandPaletteTrigger } from "@/components/command-palette-trigger";
 
 // プロンプト関連(プロンプト一覧・そのカテゴリ管理)とそれ以外の機能を
 // 視覚的に区切って表示する。カテゴリ管理は単体では意味を持たず、あくまで
@@ -42,6 +43,7 @@ export async function AppHeader() {
         <NavLinks links={OTHER_NAV_LINKS} />
       </nav>
       <div className="flex flex-wrap items-center gap-3">
+        <CommandPaletteTrigger />
         <Link
           href="/errors"
           title="エラーログ"
