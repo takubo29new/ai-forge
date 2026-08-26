@@ -9,6 +9,7 @@ import { LIST_LIMIT } from "@/lib/list-limits";
 import { renderTemplate } from "@/lib/prompt-variables";
 import { runAiExecution } from "@/lib/run-ai-execution";
 import { scheduleBackground } from "@/lib/schedule-background";
+import { createEvaluationNotification } from "@/lib/notifications";
 import { logError } from "@/lib/error-log";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 
@@ -35,6 +36,29 @@ function isImageMediaType(value: string): value is ImageMediaType {
 // 上限バイト数から最大文字数を逆算する。
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_IMAGE_BASE64_LENGTH = Math.ceil(MAX_IMAGE_BYTES / 3) * 4;
+
+// 通知の作成は評価結果そのものより重要度が低い副次的な処理のため、失敗しても
+// Evaluationのステータス確定には影響させないベストエフォートで行う
+// (src/app/api/repositories/[id]/reviews/route.tsの埋め込み生成と同じ方針)。
+async function notifyEvaluationOutcomeBestEffort(
+  userId: string,
+  evaluationId: string,
+  title: string,
+  status: "SUCCESS" | "FAILED",
+) {
+  try {
+    await createEvaluationNotification({ userId, evaluationId, title, status });
+  } catch (error) {
+    await logError({
+      source: "SERVER",
+      message: `評価完了の通知作成に失敗しました: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      path: "/api/evaluations",
+      userId,
+    });
+  }
+}
 
 export async function GET() {
   const session = await auth();
@@ -200,6 +224,7 @@ export async function POST(request: Request) {
             });
           }
         });
+        await notifyEvaluationOutcomeBestEffort(userId, evaluation.id, title, "SUCCESS");
         return;
       }
 
@@ -207,6 +232,7 @@ export async function POST(request: Request) {
         where: { id: evaluation.id },
         data: { status: "FAILED", executionId: outcome.execution.id },
       });
+      await notifyEvaluationOutcomeBestEffort(userId, evaluation.id, title, "FAILED");
     } catch (error) {
       // runAiExecution自体は失敗時も例外を投げないが、その後のDB書き込みが
       // 失敗した場合にEvaluationがPENDINGのまま残り続けるのを防ぐため、
@@ -223,6 +249,7 @@ export async function POST(request: Request) {
       await prisma.evaluation
         .update({ where: { id: evaluation.id }, data: { status: "FAILED" } })
         .catch(() => {});
+      await notifyEvaluationOutcomeBestEffort(userId, evaluation.id, title, "FAILED");
     }
   });
 

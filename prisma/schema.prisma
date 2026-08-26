@@ -34,6 +34,7 @@ model User {
   errorLogs        ErrorLog[]
   documents        Document[]
   evaluations      Evaluation[]
+  notifications    Notification[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -489,4 +490,25 @@ model EvaluationFinding {
   createdAt DateTime @default(now())
 
   @@index([evaluationId])
+}
+
+// --- 通知(Phase 5のバックグラウンド処理向け通知の強化) ---
+// AI評価の完了通知をトースト(その場にいる間だけ見える)に加えて履歴として
+// 残すためのモデル。バックグラウンド処理の完了時(現状は評価のみ)にサーバー側で
+// 作成し、ヘッダーの通知センターがポーリングして表示する。トースト用の
+// PendingEvaluationsProviderとは独立して動作する(見逃しても後から確認できる
+// ことが目的のため、クライアント側の監視状態に依存させない設計)。
+model Notification {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  message String
+  link    String?
+  read    Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
 }

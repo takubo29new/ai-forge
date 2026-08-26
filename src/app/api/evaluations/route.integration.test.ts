@@ -142,6 +142,11 @@ describe("POST /api/evaluations", () => {
     expect(evaluation?.findings).toHaveLength(2);
     expect(evaluation?.findings[0].label).toBe("彩り");
 
+    const notification = await prisma.notification.findFirst({
+      where: { userId, link: `/evaluations/${body.id}` },
+    });
+    expect(notification?.message).toBe("評価「夕食」が完了しました");
+
     // Claudeにはbase64画像とプロンプト本文の両方を渡している
     const call = mockParse.mock.calls[0][0];
     const content = (call.messages[0].content ?? []) as {
@@ -169,6 +174,11 @@ describe("POST /api/evaluations", () => {
       where: { id: evaluationId },
     });
     expect(evaluation?.status).toBe("FAILED");
+
+    const notification = await prisma.notification.findFirst({
+      where: { userId, link: `/evaluations/${evaluationId}` },
+    });
+    expect(notification?.message).toBe("評価「夕食」の実行に失敗しました");
   });
 
   it("inputType: TEXTを指定すると{{変数名}}を展開してテキストとしてClaudeに渡す", async () => {
