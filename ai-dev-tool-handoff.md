@@ -105,8 +105,9 @@ Phase 5(汎用AI評価ツール)は画像評価(`inputType: IMAGE`)・テキス�
 
 利用状況ダッシュボードも実装完了(`/usage`)。ただし「コスト」の金額換算は行っていない — モデルごとの正確な現行料金をこの場で確認できず、不確かな数値を事実として表示するリスクがあると判断し、ユーザーに相談のうえ「トークン数のみ表示」を選んだ経緯がある。Claude(Anthropic)は`Execution.promptTokens`/`completionTokens`(既存データ、プロンプト実行・AIレビュー・AI評価のみが対象。RAG検索チャットの回答生成・チャットのtool use解析・プロンプト改善提案は`Execution`を作らないため含まれない)を合計・モデル別・直近14日の日別で集計。Voyage AIはトークン数を記録していないため、`DocumentChunk`/`ReviewCommentEmbedding`/`PromptVersionEmbedding`/`ExecutionEmbedding`の件数のみを表示する。
 
+評価結果の共有リンクも実装完了。成功したAIレビュー(`Review`)・AI評価(`Evaluation`)を、ログイン不要の読み取り専用URL(`/share/reviews/:token`・`/share/evaluations/:token`)で共有できる。トークンは`crypto.randomBytes`で発行し(IDそのものは使わない)、共有解除で無効化・再共有で新しい値になる設計。作成前には「非公開情報が含まれていないか確認してください」という`ConfirmDialog`を挟み、意図しない情報公開を防ぐ。詳細は[`docs/phase5-design.md`](./docs/phase5-design.md)の「共有リンク」を参照。
+
 - 通知の強化(Phase 5のバックグラウンド処理と合わせて、トースト以外の通知手段も検討)
-- 評価結果の共有リンク(AIレビュー・評価結果を読み取り専用の公開URLで共有。Phase 5との相性が良い)
 - プロンプトテンプレート集(Phase 5を試しやすくするための叩き台プロンプト)
 
 ### UI/UX・デザインのブラッシュアップ — 完了

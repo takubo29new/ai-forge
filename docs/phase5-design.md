@@ -128,9 +128,18 @@ const EvaluationOutputSchema = z.object({
 - **maxDuration**: `after()`のコールバックもルートの実行時間上限(`maxDuration`)内でしか動かないため、`documents/sync`ルートと同様に`60`秒へ引き上げている
 - **完了の通知**: `(app)/layout.tsx`に常駐する`PendingEvaluationsProvider`(`src/components/pending-evaluations-context.tsx`)が、生成直後に登録された`PENDING`な`Evaluation`をポーリングし(5秒間隔)、`SUCCESS`/`FAILED`への変化を検知したらトースト通知する。作成した画面を離れても、アプリ内の別画面に遷移していれば通知される(レイアウトに1つだけマウントされ画面遷移をまたいで動き続けるため)。加えて`/evaluations/:id`を開いたまま待っている場合は、`PENDING`中だけ`PendingRefresher`が定期的に`router.refresh()`してその場で結果を反映する
 
+## 共有リンク(実装済み)
+
+`Evaluation`(成功したもののみ)を、ログイン不要で閲覧できる読み取り専用の公開URLで共有できるようにした。同じ仕組みを`Review`(Phase 2)にも適用しており、Phase 5固有の機能ではなく`ReviewComment`・`EvaluationFinding`を持つ2つの結果画面に共通の機能として実装している。
+
+- `Review`/`Evaluation`それぞれに`shareToken`(発行時に`crypto.randomBytes`で生成する高エントロピーな値。IDそのものは使わない)・`sharedAt`を追加(`src/lib/share-token.ts`)。値がnullなら未共有。
+- `POST /api/reviews/:id/share`・`POST /api/evaluations/:id/share`でトークンを発行(所有者のみ、対象が`SUCCESS`でない場合は400で拒否)。既に発行済みなら同じトークンを返す冪等な設計にし、共有中に押し直しても既存のリンクが失効しないようにした。
+- `DELETE /api/reviews/:id/share`・`DELETE /api/evaluations/:id/share`でトークンをnullに戻し、旧リンクを無効化する(解除後に同じURLで新しいトークンが復活することはない)。
+- 公開ページは`(app)`ルートグループの外(`/share/reviews/:token`・`/share/evaluations/:token`)に置き、認証を要求しない。`shareToken`一致のみで対象を取得し(所有者チェックはしない。トークン自体が公開用の鍵)、詳細画面と同じ内容を編集操作なしの読み取り専用で表示する。
+- 詳細画面(`/reviews/:id`・`/evaluations/:id`)に共通コンポーネント`src/components/share-control.tsx`を設置。作成前には「リンクを知っている人は誰でも閲覧できる」旨の`ConfirmDialog`を挟む(プライベートリポジトリの内容や個人的な入力内容が意図せず公開されるリスクへの配慮)。解除は非破壊的なため確認なしで実行できる。
+
 ## 今後の拡張候補
 
 - **画像の永続化**: Vercel Blob等を導入し、アップロードした画像を結果画面に表示できるようにする
-- **評価結果の共有リンク**: `Evaluation`を読み取り専用の公開URLで共有できるようにする
 - **プロンプトテンプレート集**: 料理・楽曲・絵など、評価用途別の叩き台プロンプトを用意する
 - **音声対応**: 音声解析サービスとの連携(Phase 5では見送り)

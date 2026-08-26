@@ -285,6 +285,11 @@ model Review {
 
   createdAt DateTime @default(now())
 
+  // 読み取り専用の公開共有リンク用トークン。null=未共有。共有解除時はnullに戻す
+  // (トークンを使い回さず、解除後に古いリンクが復活しないようにするため)。
+  shareToken String?   @unique
+  sharedAt   DateTime?
+
   @@index([repositoryId])
   @@index([userId])
 }
@@ -454,6 +459,10 @@ model Evaluation {
   findings EvaluationFinding[]
 
   createdAt DateTime @default(now())
+
+  // Reviewと同じ設計の読み取り専用公開共有リンク用トークン。
+  shareToken String?   @unique
+  sharedAt   DateTime?
 
   @@index([userId])
 }
