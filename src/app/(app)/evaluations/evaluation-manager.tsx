@@ -7,6 +7,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useApiMutation } from "@/lib/use-api-mutation";
 import { Spinner } from "@/components/spinner";
 import { useToast } from "@/components/toast-provider";
+import { usePendingEvaluations } from "@/components/pending-evaluations-context";
 
 type EvaluationStatus = "PENDING" | "SUCCESS" | "FAILED";
 
@@ -65,6 +66,7 @@ export function EvaluationManager({
   const { mutate, pending, error, setError } = useApiMutation();
   const del = useApiMutation();
   const { showToast } = useToast();
+  const { registerPending } = usePendingEvaluations();
   // pendingはmutate()呼び出し以降しかtrueにならないため、それより前段の
   // ファイル読み込み中もあわせてガードしないと二重送信を防げない。
   const busy = pending || reading;
@@ -101,6 +103,10 @@ export function EvaluationManager({
       "評価の実行に失敗しました",
     );
     if (!data) return;
+    // 実際のAI呼び出しはバックグラウンドで進むため、ここではまだPENDING。
+    // 完了はレイアウトに常駐するPendingEvaluationsProviderがポーリングして
+    // トースト通知する(docs/phase5-design.md「バックグラウンド処理」参照)。
+    registerPending(data.id);
     router.push(`/evaluations/${data.id}`);
   }
 

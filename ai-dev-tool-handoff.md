@@ -78,7 +78,7 @@ Phase 3完了後、ユーザーからの要望を受けてUI/UX改善(ナビゲ�
 
 Phase 4(統合基盤の強化)は4項目すべて実装完了。項目1「RAG検索対象の拡張」では`PromptVersion`(プロンプト本文)・`Execution`(レビュー由来を除くプロンプト実行結果)を`PromptVersionEmbedding`/`ExecutionEmbedding`として埋め込み、`/chat`の検索対象が`Document`・`ReviewComment`に加えてこの2つにも広がった(既存データのバックフィルAPI・`/documents`ページのボタンも実装済み)。項目2「プロジェクト単位のドキュメント管理」では`Document`に`repositoryId`(任意)を追加し、「リポジトリ」ページで接続したGitHubリポジトリごとにdocs/配下・README.mdをGitHub API経由で同期できるようになった(`/documents`の「接続済みリポジトリの設計書を同期」)。`/chat`にも対象リポジトリの絞り込みセレクトを追加し、指定時は`Document`・`ReviewComment`をそのリポジトリに限定する(`PromptVersion`・`Execution`はリポジトリに紐づかないため常に横断検索)。項目3「レビュー指摘蓄積からのプロンプト改善提案」では、プロンプト詳細画面(`/prompts/:id`)にボタンを追加し、過去の`ReviewComment`を分析してプロンプトの改善案をClaudeに構造化出力で生成させる。専用テーブルは持たず、押すたびに生成し直す(永続化しない)設計。項目4「チャットからの直接アクション実行」では、`/chat`でユーザーの発話をClaudeのtool use(低コストな`claude-haiku-4-5`を使用)で解析し、「保存済みプロンプトでのAIレビュー実行」の意図とパラメータ(リポジトリ・PR番号・プロンプト)を検出した場合のみ`ConfirmDialog`で確認内容を表示、ユーザーが確認した場合のみ既存の`POST /api/repositories/:id/reviews`を呼び出す(新規の実行用エンドポイントは追加していない)。詳細は[`docs/phase4-design.md`](./docs/phase4-design.md)を参照。
 
-Phase 5(汎用AI評価ツール)は「実装方針(段階的ロールアウト)」の1段階目、画像評価(`inputType: IMAGE`)のプロトタイプを実装完了。`Evaluation`/`EvaluationFinding`をReviewとは独立したモデルとして追加し、`/evaluations`から画像+プロンプトを送るとClaude Visionで評価し観点別コメントを取得できる。画像はDBに永続化しない設計。テキスト評価・画像の永続化・バックグラウンド処理・共有リンクは未着手。詳細は[`docs/phase5-design.md`](./docs/phase5-design.md)を参照。
+Phase 5(汎用AI評価ツール)は「実装方針(段階的ロールアウト)」の1段階目、画像評価(`inputType: IMAGE`)のプロトタイプに加え、バックグラウンド処理も実装完了。`Evaluation`/`EvaluationFinding`をReviewとは独立したモデルとして追加し、`/evaluations`から画像+プロンプトを送るとClaude Visionで評価し観点別コメントを取得できる。画像はDBに永続化しない設計。バックグラウンド処理では、`POST /api/evaluations`がバリデーション後すぐ`PENDING`な`Evaluation`を`202`で返し、実際のAI呼び出しはNext.jsの`after()`でレスポンス送出後に継続する(新規の常駐ワーカー・キューは追加していない)。`(app)/layout.tsx`に常駐する`PendingEvaluationsProvider`がポーリングし、完了をトースト通知する(離れた画面からでも通知される)。テキスト評価・画像の永続化・共有リンクは未着手。詳細は[`docs/phase5-design.md`](./docs/phase5-design.md)を参照。
 
 ## 次のステップ候補
 
@@ -90,11 +90,10 @@ Phase 5(汎用AI評価ツール)は「実装方針(段階的ロールアウト)�
 
 ### Phase 5: 汎用AI評価ツール(残りスコープ)
 
-画像評価(`inputType: IMAGE`)のプロトタイプは実装完了(上記「進捗」参照)。残りは設計のみで未着手(詳細は[`docs/phase5-design.md`](./docs/phase5-design.md)を参照)。
+画像評価(`inputType: IMAGE`)のプロトタイプ・バックグラウンド処理は実装完了(上記「進捗」参照)。残りは設計のみで未着手(詳細は[`docs/phase5-design.md`](./docs/phase5-design.md)を参照)。
 
 - **テキスト評価**(`inputType: TEXT`): 既存の`{{変数名}}`実行とほぼ同じ形になるため優先度は高くない
 - **画像の永続化**: 現状はリクエスト内でClaudeに渡すのみでDB/ストレージに保存しない。将来Vercel Blob等の導入を再検討
-- **バックグラウンド処理**: 画像評価などレイテンシの大きい処理が増えるこのタイミングで導入するのが自然。既存の`Execution`のstatus管理を拡張し、PENDING→バックグラウンド実行→完了時にトースト通知、という流れが既存基盤と相性が良い
 - **共有リンク・プロンプトテンプレート集**: 評価結果を読み取り専用の公開URLで共有する機能、Phase 5を試しやすくするための叩き台プロンプト
 
 ### 追加機能アイデア

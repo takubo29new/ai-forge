@@ -173,8 +173,11 @@ export default async function HelpPage() {
           <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
             「評価」ページから、画像(料理の写真・自作の絵など)とプロンプトを選んで「評価を実行」を押すと、Claudeが画像を見て観点別のコメント(良い点・提案・気になる点)と総評を返します。コードレビューと同じ「プロンプトを選んでClaudeに実行させる」仕組みを画像入力向けに広げたものです。
           </p>
-          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+          <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
             アップロードした画像自体はサーバーに保存されません。Claudeへのリクエストで使われるだけで、評価結果(テキスト)のみが記録されます。
+          </p>
+          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+            評価の実行を押すと、Claudeの応答を待たずにすぐ「処理中」の状態で結果画面に移動します(裏側でバックグラウンド実行中)。完了すると、開いたままの結果画面は自動的に更新され、他の画面に移動していても画面下部に完了の通知が表示されます。
           </p>
         </section>
 

@@ -1,6 +1,6 @@
 # Phase 5 基本設計書(汎用AI評価ツール)
 
-対象: コードレビューに限定していたAI評価機能を、画像・テキストなど他の入力形式にも対象を広げる。アーキテクチャ・認証は [`phase1-design.md`](./phase1-design.md) を、DB設計の全体像は [`db-design.md`](./db-design.md) を参照。**「実装方針(段階的ロールアウト)」の1段階目にあたる画像評価(`inputType: IMAGE`)のプロトタイプを実装済み。テキスト評価(`TEXT`)・画像の永続化(Vercel Blob等)・バックグラウンド処理・共有リンク・プロンプトテンプレート集は「今後の拡張候補」のまま未着手。**
+対象: コードレビューに限定していたAI評価機能を、画像・テキストなど他の入力形式にも対象を広げる。アーキテクチャ・認証は [`phase1-design.md`](./phase1-design.md) を、DB設計の全体像は [`db-design.md`](./db-design.md) を参照。**「実装方針(段階的ロールアウト)」の1段階目にあたる画像評価(`inputType: IMAGE`)のプロトタイプ、および「今後の拡張候補」のバックグラウンド処理を実装済み。テキスト評価(`TEXT`)・画像の永続化(Vercel Blob等)・共有リンク・プロンプトテンプレート集は未着手。**
 
 ## 概要
 
@@ -100,7 +100,7 @@ const EvaluationOutputSchema = z.object({
 | `GET /api/evaluations/:id` | 詳細取得 |
 | `DELETE /api/evaluations/:id` | 削除 |
 
-画像評価はClaude Vision呼び出しがコードレビューより時間がかかる可能性があるため、`POST /api/evaluations`は最初から「今後の拡張候補」のバックグラウンド処理を見据えた設計(`Execution`と同じ`PENDING`ステータスの概念を持たせる)にしておく。Phase 5の最初のバージョンでは同期実行のままでもよいが、レスポンスの形は非同期化してもクライアント側の変更が最小で済むようにしておく。
+画像評価はClaude Vision呼び出しがコードレビューより時間がかかるため、`POST /api/evaluations`はバックグラウンド処理(後述)で実行する。まず`PENDING`な`Evaluation`を作って`202 Accepted`ですぐ返し、実際のAI呼び出し・結果の書き込みは応答後に続行する。
 
 ## レート制限
 
@@ -112,10 +112,18 @@ const EvaluationOutputSchema = z.object({
 2. `EvaluationOutputSchema`が実際の用途(料理・絵など)でうまく機能するか、手動でいくつか試して検証してから`/evaluations`画面を作り込む
 3. 汎用化の手応えが良ければ、プロンプトテンプレート集(今後の拡張候補)を用意して他の用途を試しやすくする
 
+## バックグラウンド処理(実装済み)
+
+`POST /api/evaluations`はバリデーション・レート制限チェックまで済ませた時点で`Evaluation`を`status: PENDING`で作成し、`{ id, status: "PENDING" }`を`202 Accepted`で即座に返す。実際のClaude Vision呼び出し・`Evaluation`/`EvaluationFinding`の書き込みは、Next.jsの[`after()`](https://nextjs.org/docs/app/api-reference/functions/after)でレスポンス送出後に継続する(`src/lib/schedule-background.ts`の`scheduleBackground()`)。新規の常駐ワーカー・キューサービスは追加していない。
+
+- **`scheduleBackground()`の設計**: `after()`はNextのリクエストスコープ(AsyncLocalStorage)が無いと例外を投げる。本番のルートハンドラ経由の呼び出しでは問題なくスケジューリングされるが、統合テストがルートハンドラを直接呼び出す場合はこの例外が発生するため、その場合は`task()`の完了を待ってから返すようフォールバックしている。これにより、本番は非同期・テストは同期という自然な切り替えになり、モックの差し替えが不要になっている
+- **失敗時のフォールバック**: バックグラウンド処理中に予期しない例外が発生しても`Evaluation`が`PENDING`のまま残り続けないよう、`try/catch`で最終的に`FAILED`へ倒し、`ErrorLog`にも記録する
+- **maxDuration**: `after()`のコールバックもルートの実行時間上限(`maxDuration`)内でしか動かないため、`documents/sync`ルートと同様に`60`秒へ引き上げている
+- **完了の通知**: `(app)/layout.tsx`に常駐する`PendingEvaluationsProvider`(`src/components/pending-evaluations-context.tsx`)が、生成直後に登録された`PENDING`な`Evaluation`をポーリングし(5秒間隔)、`SUCCESS`/`FAILED`への変化を検知したらトースト通知する。作成した画面を離れても、アプリ内の別画面に遷移していれば通知される(レイアウトに1つだけマウントされ画面遷移をまたいで動き続けるため)。加えて`/evaluations/:id`を開いたまま待っている場合は、`PENDING`中だけ`PendingRefresher`が定期的に`router.refresh()`してその場で結果を反映する
+
 ## 今後の拡張候補
 
 - **画像の永続化**: Vercel Blob等を導入し、アップロードした画像を結果画面に表示できるようにする
-- **バックグラウンド処理**: `Evaluation.status`を`PENDING`→`SUCCESS`/`FAILED`で管理し、処理完了をトースト通知する(`ai-dev-tool-handoff.md`の次のステップ候補と連動)
 - **評価結果の共有リンク**: `Evaluation`を読み取り専用の公開URLで共有できるようにする
 - **プロンプトテンプレート集**: 料理・楽曲・絵など、評価用途別の叩き台プロンプトを用意する
 - **音声対応**: 音声解析サービスとの連携(Phase 5では見送り)

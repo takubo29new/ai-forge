@@ -105,7 +105,7 @@ describe("POST /api/evaluations", () => {
     expect(mockParse).not.toHaveBeenCalled();
   });
 
-  it("成功時はClaudeの評価どおりにEvaluationFindingを作成し201を返す", async () => {
+  it("成功時はPENDINGで202を返し、バックグラウンドでClaudeの評価どおりにEvaluationFindingを作成する", async () => {
     mockParse.mockResolvedValue({
       parsed_output: {
         summary: "彩り豊かで美味しそうです",
@@ -125,11 +125,16 @@ describe("POST /api/evaluations", () => {
         imageMediaType: "image/png",
       }),
     );
-    expect(res.status).toBe(201);
-    const { id: evaluationId } = await res.json();
+    // 実際のAI呼び出しはバックグラウンド実行(scheduleBackground)のため、
+    // レスポンス自体は作成直後のPENDINGを返す(next/serverのafter()はNextの
+    // リクエストスコープ外であるテスト環境では例外を投げ、scheduleBackground が
+    // その場でtaskを待ってから返すため、この時点でDBへの反映は完了している)。
+    expect(res.status).toBe(202);
+    const body = await res.json();
+    expect(body.status).toBe("PENDING");
 
     const evaluation = await prisma.evaluation.findUnique({
-      where: { id: evaluationId },
+      where: { id: body.id },
       include: { findings: true },
     });
     expect(evaluation?.status).toBe("SUCCESS");
@@ -146,7 +151,7 @@ describe("POST /api/evaluations", () => {
     expect(content.some((b) => b.type === "text")).toBe(true);
   });
 
-  it("AI呼び出し失敗時はEvaluationをFAILEDで作成し200を返す(201にしない)", async () => {
+  it("AI呼び出し失敗時はバックグラウンドでEvaluationをFAILEDにする", async () => {
     mockParse.mockRejectedValue(new Error("upstream boom"));
 
     const res = await POST(
@@ -157,7 +162,7 @@ describe("POST /api/evaluations", () => {
         imageMediaType: "image/png",
       }),
     );
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(202);
 
     const { id: evaluationId } = await res.json();
     const evaluation = await prisma.evaluation.findUnique({
