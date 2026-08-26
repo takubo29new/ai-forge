@@ -59,14 +59,17 @@ export default async function DocumentsPage({
     prisma.promptVersion.count({
       where: { prompt: { userId }, embedding: null },
     }),
-    // 埋め込み未生成の実行結果数(Phase 4)。対象はreviewIdが無いSUCCESSな実行のみ
-    // (レビュー由来のresultTextはReviewCommentとして既に埋め込み済みのため対象外)。
+    // 埋め込み未生成の実行結果数(Phase 4)。対象はreviewIdが無い・evaluationIdが無い
+    // SUCCESSな実行のみ(レビュー由来のresultTextはReviewCommentとして既に埋め込み済み、
+    // AI評価由来のresultTextは平文プレースホルダーのため、いずれも対象外。
+    // src/app/api/executions/backfill-embeddings/route.tsと同じ条件)。
     prisma.execution.count({
       where: {
         userId,
         status: "SUCCESS",
         resultText: { not: null },
         review: null,
+        evaluation: null,
         embedding: null,
       },
     }),

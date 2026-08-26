@@ -79,6 +79,7 @@ Phase 1〜3を「別々の機能」から「データを掛け合わせて初め
 - 評価結果の共有リンク(成功した評価をログイン不要の読み取り専用URLで公開。レビューの共有リンクと同じ仕組み)
 - 通知センター(ヘッダーのベルアイコン)。トーストは見逃しやすいため、評価の完了をサーバー側で`Notification`として残し、未読件数のバッジ表示・既読管理ができる
 - プロンプトテンプレート集(`/prompts/new`の「テンプレートから始める」。画像・テキスト・PDFそれぞれの評価用の叩き台プロンプト計10種を選ぶとタイトル・本文が自動入力される)
+- 評価結果(総評・観点別コメント)はAES-256-GCMで暗号化して保存(GitHubトークンと同じ仕組み。履歴書・契約書などPDF評価が個人情報を含みうるようになったための対応)
 
 画像の永続化は設計のみで未着手。設計・実装状況は [`docs/phase5-design.md`](./docs/phase5-design.md) を参照。
 
@@ -132,7 +133,7 @@ cp .env.example .env
 | `NEXTAUTH_URL` | ローカルでは `http://localhost:3000` |
 | `ANTHROPIC_API_KEY` | [console.anthropic.com](https://console.anthropic.com) の「API Keys」で発行(要クレジット残高) |
 | `VOYAGE_API_KEY` | [dashboard.voyageai.com](https://dashboard.voyageai.com) で発行(Phase 3のドキュメント埋め込みに使用) |
-| `TOKEN_ENCRYPTION_KEY` | `openssl rand -base64 32` 等で生成したランダムな文字列(GitHubのaccess_token/refresh_tokenをDBに暗号化して保存するための鍵。既存の`.env`にこの変数が無い状態でアップデートした場合、GitHub連携機能を使う前に必ず設定すること) |
+| `TOKEN_ENCRYPTION_KEY` | `openssl rand -base64 32` 等で生成したランダムな文字列(GitHubのaccess_token/refresh_token、AI評価結果をDBに暗号化して保存するための鍵。既存の`.env`にこの変数が無い状態でアップデートした場合、GitHub連携機能・AI評価機能を使う前に必ず設定すること) |
 
 ### 4. DBマイグレーション
 

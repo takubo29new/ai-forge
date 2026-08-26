@@ -126,6 +126,27 @@ describe("POST /api/executions/backfill-embeddings", () => {
     expect(mockEmbedDocuments).not.toHaveBeenCalled();
   });
 
+  it("AI評価由来のSUCCESS実行は対象にしない", async () => {
+    const execution = await createExecution(userId, promptVersionId, {
+      resultText: "(AI評価の結果は暗号化してEvaluationに個別保存されています)",
+    });
+    await prisma.evaluation.create({
+      data: {
+        userId,
+        promptVersionId,
+        executionId: execution.id,
+        inputType: "TEXT",
+        title: "test",
+        status: "SUCCESS",
+      },
+    });
+
+    const res = await POST();
+    const body = await res.json();
+    expect(body).toEqual({ processed: 0, remaining: false });
+    expect(mockEmbedDocuments).not.toHaveBeenCalled();
+  });
+
   it("既に埋め込み済みの実行結果は対象にしない", async () => {
     await createExecution(userId, promptVersionId);
     mockEmbedDocuments.mockResolvedValue([fakeEmbedding(1)]);

@@ -458,6 +458,11 @@ model Evaluation {
   title     String
   status    EvaluationStatus    @default(PENDING)
 
+  // 総評。AES-256-GCMで暗号化して保存する(src/lib/field-crypto.ts)。SUCCESS時のみ
+  // 設定される。この列を追加する前に作成された評価はnullのまま(詳細画面側で
+  // Execution.resultTextからの再構築にフォールバックする)。
+  summary String? @db.Text
+
   findings EvaluationFinding[]
 
   createdAt DateTime @default(now())
@@ -486,7 +491,10 @@ model EvaluationFinding {
   label String
   tone  EvaluationTone
   score Int?
-  body  String         @db.Text
+  // AES-256-GCMで暗号化して保存する(src/lib/field-crypto.ts)。この列の暗号化を
+  // 導入する前に作成された行は平文のままで、読み取り時にそのまま扱われる
+  // (GitHubトークン暗号化と同じ後方互換の考え方)。
+  body String @db.Text
 
   createdAt DateTime @default(now())
 

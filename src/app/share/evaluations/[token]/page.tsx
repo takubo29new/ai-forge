@@ -3,8 +3,9 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { Markdown } from "@/components/markdown";
 import { TONES, TONE_TEXT, TONE_LABEL, countByTone } from "@/lib/evaluation-tone";
-import { EvaluationOutputSchema } from "@/lib/evaluation-schema";
 import { INPUT_TYPE_LABEL } from "@/lib/evaluation-input-type";
+import { resolveEvaluationSummary } from "@/lib/evaluation-summary";
+import { decryptField } from "@/lib/field-crypto";
 
 // ログイン不要の読み取り専用公開ページ。shareTokenが一致する評価のみを
 // 表示し、userIdでの所有者チェックは行わない(トークン自体が公開用の鍵)。
@@ -26,19 +27,7 @@ export default async function SharedEvaluationPage({
     notFound();
   }
 
-  let summary: string | null = null;
-  if (evaluation.execution?.resultText) {
-    try {
-      const parsed = EvaluationOutputSchema.safeParse(
-        JSON.parse(evaluation.execution.resultText),
-      );
-      if (parsed.success) {
-        summary = parsed.data.summary;
-      }
-    } catch {
-      // 詳細画面と同様、総評のみ省略し下のコメント一覧は表示する。
-    }
-  }
+  const summary = resolveEvaluationSummary(evaluation);
 
   const counts = countByTone(evaluation.findings);
 
@@ -98,7 +87,7 @@ export default async function SharedEvaluationPage({
                 )}
               </p>
               <div className="mt-1">
-                <Markdown>{f.body}</Markdown>
+                <Markdown>{decryptField(f.body)}</Markdown>
               </div>
             </li>
           ))}
