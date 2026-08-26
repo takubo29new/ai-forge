@@ -17,6 +17,7 @@ const SECTIONS = [
   { id: "chat", label: "RAG検索チャット" },
   { id: "evaluations", label: "AI評価" },
   { id: "dashboard", label: "ダッシュボード" },
+  { id: "usage", label: "利用状況" },
   { id: "appearance", label: "表示設定・エラーログ" },
   { id: "faq", label: "よくある質問" },
 ];
@@ -230,6 +231,16 @@ export default async function HelpPage() {
           <h2 className="mb-2 text-lg font-semibold">ダッシュボード</h2>
           <p className="text-sm text-zinc-700 dark:text-zinc-300">
             「ダッシュボード」ページで、プロンプト数・接続リポジトリ数・累計レビュー指摘件数(重要度別)・登録ドキュメント数をまとめて確認できます。「チャットで質問する」「ドキュメントを管理」から各画面にすぐ移動できます。
+          </p>
+        </section>
+
+        <section id="usage" className="scroll-mt-6">
+          <h2 className="mb-2 text-lg font-semibold">利用状況</h2>
+          <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
+            「利用状況」ページで、Claude(Anthropic)のトークン使用量(プロンプト実行・AIレビュー・AI評価の合計、モデル別内訳、直近14日の推移)と、Voyage AIの埋め込み件数を確認できます。
+          </p>
+          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+            モデルごとの正確な現行料金をアプリ側で把握できないため、金額換算(概算コスト)は表示していません。またRAG検索チャットの回答生成・チャットからのアクション解析・プロンプト改善提案はトークン数を記録していないため、Claudeの集計には含まれません。
           </p>
         </section>
 
