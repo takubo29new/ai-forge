@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useApiMutation } from "@/lib/use-api-mutation";
 import { useToast } from "@/components/toast-provider";
+import { PROMPT_TEMPLATES } from "@/lib/prompt-templates";
 
 type Category = { id: string; name: string };
 
@@ -27,8 +28,36 @@ export function NewPromptForm({ categories }: { categories: Category[] }) {
     showToast("プロンプトを作成しました");
   }
 
+  function applyTemplate(template: (typeof PROMPT_TEMPLATES)[number]) {
+    setTitle(template.title);
+    setContent(template.content);
+  }
+
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <div>
+        <label className="mb-1 block text-xs text-zinc-500">
+          テンプレートから始める(任意)
+        </label>
+        <p className="mb-1.5 text-xs text-zinc-500">
+          AI評価(画像・テキスト)を試しやすくする叩き台です。選ぶとタイトル・本文が置き換わります(あとから自由に編集できます)。
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {PROMPT_TEMPLATES.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => applyTemplate(t)}
+              className="rounded-full border border-zinc-300 px-3 py-1 text-xs hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900"
+            >
+              {t.label}
+              <span className="ml-1 text-zinc-400">
+                ({t.inputTypeHint === "IMAGE" ? "画像用" : "テキスト用"})
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
       <div>
         <label className="mb-1 block text-xs text-zinc-500">タイトル</label>
         <input
