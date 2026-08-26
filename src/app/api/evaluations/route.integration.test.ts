@@ -240,6 +240,66 @@ describe("POST /api/evaluations", () => {
     expect(res.status).toBe(202);
   });
 
+  it("inputType: PDFでPDFファイルを指定しないと400を返す", async () => {
+    const res = await POST(
+      request({ title: "契約書", promptId, inputType: "PDF" }),
+    );
+    expect(res.status).toBe(400);
+    expect(mockParse).not.toHaveBeenCalled();
+  });
+
+  it("PDFサイズの上限(base64換算)を超えると400を返す", async () => {
+    const oversized = "A".repeat(Math.ceil((20 * 1024 * 1024) / 3) * 4 + 4);
+    const res = await POST(
+      request({
+        title: "契約書",
+        promptId,
+        inputType: "PDF",
+        pdfBase64: oversized,
+      }),
+    );
+    expect(res.status).toBe(400);
+    expect(mockParse).not.toHaveBeenCalled();
+  });
+
+  it("inputType: PDFを指定するとdocumentブロックとしてClaudeに渡す", async () => {
+    mockParse.mockResolvedValue({
+      parsed_output: {
+        summary: "要点を整理しました",
+        findings: [{ label: "第3条", tone: "SUGGESTION", score: null, body: "..." }],
+      },
+      usage: { input_tokens: 300, output_tokens: 100 },
+    } as never);
+
+    const res = await POST(
+      request({
+        title: "契約書",
+        promptId,
+        inputType: "PDF",
+        pdfBase64: "JVBERi0xLjQK",
+      }),
+    );
+    expect(res.status).toBe(202);
+    const { id: evaluationId } = await res.json();
+
+    const evaluation = await prisma.evaluation.findUnique({
+      where: { id: evaluationId },
+      include: { findings: true },
+    });
+    expect(evaluation?.status).toBe("SUCCESS");
+    expect(evaluation?.inputType).toBe("PDF");
+    expect(evaluation?.findings).toHaveLength(1);
+
+    const call = mockParse.mock.calls[0][0];
+    const content = (call.messages[0].content ?? []) as {
+      type: string;
+      source?: { media_type?: string };
+    }[];
+    const documentBlock = content.find((b) => b.type === "document");
+    expect(documentBlock?.source?.media_type).toBe("application/pdf");
+    expect(content.some((b) => b.type === "text")).toBe(true);
+  });
+
   it("評価系レート制限の上限に達すると429を返す", async () => {
     mockParse.mockResolvedValue({
       parsed_output: { summary: "ok", findings: [] },

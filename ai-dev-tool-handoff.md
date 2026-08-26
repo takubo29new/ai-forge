@@ -78,7 +78,7 @@ Phase 3完了後、ユーザーからの要望を受けてUI/UX改善(ナビゲ�
 
 Phase 4(統合基盤の強化)は4項目すべて実装完了。項目1「RAG検索対象の拡張」では`PromptVersion`(プロンプト本文)・`Execution`(レビュー由来を除くプロンプト実行結果)を`PromptVersionEmbedding`/`ExecutionEmbedding`として埋め込み、`/chat`の検索対象が`Document`・`ReviewComment`に加えてこの2つにも広がった(既存データのバックフィルAPI・`/documents`ページのボタンも実装済み)。項目2「プロジェクト単位のドキュメント管理」では`Document`に`repositoryId`(任意)を追加し、「リポジトリ」ページで接続したGitHubリポジトリごとにdocs/配下・README.mdをGitHub API経由で同期できるようになった(`/documents`の「接続済みリポジトリの設計書を同期」)。`/chat`にも対象リポジトリの絞り込みセレクトを追加し、指定時は`Document`・`ReviewComment`をそのリポジトリに限定する(`PromptVersion`・`Execution`はリポジトリに紐づかないため常に横断検索)。項目3「レビュー指摘蓄積からのプロンプト改善提案」では、プロンプト詳細画面(`/prompts/:id`)にボタンを追加し、過去の`ReviewComment`を分析してプロンプトの改善案をClaudeに構造化出力で生成させる。専用テーブルは持たず、押すたびに生成し直す(永続化しない)設計。項目4「チャットからの直接アクション実行」では、`/chat`でユーザーの発話をClaudeのtool use(低コストな`claude-haiku-4-5`を使用)で解析し、「保存済みプロンプトでのAIレビュー実行」の意図とパラメータ(リポジトリ・PR番号・プロンプト)を検出した場合のみ`ConfirmDialog`で確認内容を表示、ユーザーが確認した場合のみ既存の`POST /api/repositories/:id/reviews`を呼び出す(新規の実行用エンドポイントは追加していない)。詳細は[`docs/phase4-design.md`](./docs/phase4-design.md)を参照。
 
-Phase 5(汎用AI評価ツール)は画像評価(`inputType: IMAGE`)・テキスト評価(`inputType: TEXT`)・バックグラウンド処理を実装完了。`Evaluation`/`EvaluationFinding`をReviewとは独立したモデルとして追加し、`/evaluations`から画像またはテキスト+プロンプトを送るとClaudeが評価し観点別コメントを取得できる。画像評価はClaude Visionへ画像をBase64で渡し、DBに永続化しない設計。テキスト評価は既存のプロンプト実行と同じ`{{変数名}}`展開(`renderTemplate()`)を再利用し、選んだプロンプトの変数ごとに`<textarea>`を表示する。バックグラウンド処理では、`POST /api/evaluations`がバリデーション後すぐ`PENDING`な`Evaluation`を`202`で返し、実際のAI呼び出しはNext.jsの`after()`でレスポンス送出後に継続する(新規の常駐ワーカー・キューは追加していない)。`(app)/layout.tsx`に常駐する`PendingEvaluationsProvider`がポーリングし、完了をトースト通知する(離れた画面からでも通知される)。画像の永続化・共有リンクは未着手。詳細は[`docs/phase5-design.md`](./docs/phase5-design.md)を参照。
+Phase 5(汎用AI評価ツール)は画像評価(`inputType: IMAGE`)・テキスト評価(`inputType: TEXT`)・バックグラウンド処理を実装完了。`Evaluation`/`EvaluationFinding`をReviewとは独立したモデルとして追加し、`/evaluations`から画像またはテキスト+プロンプトを送るとClaudeが評価し観点別コメントを取得できる。画像評価はClaude Visionへ画像をBase64で渡し、DBに永続化しない設計。テキスト評価は既存のプロンプト実行と同じ`{{変数名}}`展開(`renderTemplate()`)を再利用し、選んだプロンプトの変数ごとに`<textarea>`を表示する。バックグラウンド処理では、`POST /api/evaluations`がバリデーション後すぐ`PENDING`な`Evaluation`を`202`で返し、実際のAI呼び出しはNext.jsの`after()`でレスポンス送出後に継続する(新規の常駐ワーカー・キューは追加していない)。`(app)/layout.tsx`に常駐する`PendingEvaluationsProvider`がポーリングし、完了をトースト通知する(離れた画面からでも通知される)。画像の永続化は未着手(下記の追加機能アイデアの流れで共有リンク・通知センター・プロンプトテンプレート集・PDF評価も実装済み)。詳細は[`docs/phase5-design.md`](./docs/phase5-design.md)を参照。
 
 ## 次のステップ候補
 
@@ -108,7 +108,9 @@ Phase 5(汎用AI評価ツール)は画像評価(`inputType: IMAGE`)・テキス�
 
 通知の強化も実装完了。トースト(`ToastProvider`)はその場でアプリを見ている間しか気づけず4秒で消えるため見逃しやすいという課題に対し、`Notification`モデルとヘッダー常駐の通知センター(ベルアイコン)を追加した。AI評価のバックグラウンド処理が完了した時点でサーバー側で`Notification`を作成し(埋め込み生成と同じベストエフォート方針)、ヘッダーが20秒間隔でポーリングして未読件数をバッジ表示する。クライアント側の監視状態(トースト用の`registerPending`)には依存しないため、他のタブ・別セッションで作成した評価の完了も拾える。詳細は[`docs/phase5-design.md`](./docs/phase5-design.md)の「通知センター」を参照。
 
-プロンプトテンプレート集も実装完了。専用のDBモデル・APIは追加せず、`src/lib/prompt-templates.ts`に静的なリスト(料理写真の評価・イラストの評価・歌詞の評価・文章の評価)として持たせ、`/prompts/new`の「テンプレートから始める」から選ぶとタイトル・本文欄が置き換わる(そのまま保存も自由な編集も可能)というシンプルな仕組みにした。これで「追加機能アイデア」として挙がっていた項目はすべて実装完了。
+プロンプトテンプレート集も実装完了。専用のDBモデル・APIは追加せず、`src/lib/prompt-templates.ts`に静的なリストとして持たせ、`/prompts/new`の「テンプレートから始める」から選ぶとタイトル・本文欄が置き換わる(そのまま保存も自由な編集も可能)というシンプルな仕組みにした。これで「追加機能アイデア」として挙がっていた項目はすべて実装完了。
+
+ユーザーから「汎用評価の対象を増やしたい」「テンプレートも充実させたい」との要望を受け、PDF評価(`inputType: PDF`)を追加。画像評価と同じ「ファイルをBase64にしてClaudeへのメッセージに積む」パターンを踏襲し、content配列の要素を`image`ブロックから`document`ブロック(`{ type: "document", source: { type: "base64", media_type: "application/pdf", data } }`)に差し替えるだけで実現した(`Evaluation`/バックグラウンド実行・通知・共有リンクの仕組みは画像評価と完全共通)。履歴書・契約書・論文などのレビュー用途を想定し、画像と同じ「保存しない」方針を適用(20MBまで)。あわせてプロンプトテンプレートをIMAGE/TEXT/PDF計9種に拡充し、入力形式のラベル表記を`src/lib/evaluation-input-type.ts`に集約して各画面(フォーム・一覧・詳細・共有ページ・テンプレート一覧)の表記揺れを防いだ。詳細は[`docs/phase5-design.md`](./docs/phase5-design.md)の「PDF評価」を参照。
 
 ### UI/UX・デザインのブラッシュアップ — 完了
 

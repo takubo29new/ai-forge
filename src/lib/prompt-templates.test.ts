@@ -19,4 +19,12 @@ describe("PROMPT_TEMPLATES", () => {
       expect(t.content).toMatch(/\{\{\w+\}\}/);
     }
   });
+
+  it("IMAGE・TEXT・PDFそれぞれ1件以上ある", () => {
+    for (const type of ["IMAGE", "TEXT", "PDF"] as const) {
+      expect(
+        PROMPT_TEMPLATES.filter((t) => t.inputTypeHint === type).length,
+      ).toBeGreaterThan(0);
+    }
+  });
 });

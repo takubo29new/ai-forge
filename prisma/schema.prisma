@@ -428,6 +428,7 @@ model ExecutionEmbedding {
 enum EvaluationInputType {
   IMAGE
   TEXT
+  PDF
 }
 
 enum EvaluationStatus {
