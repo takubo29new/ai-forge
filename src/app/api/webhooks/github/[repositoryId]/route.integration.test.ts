@@ -248,4 +248,39 @@ describe("POST /api/webhooks/github/:repositoryId", () => {
     expect(notifications).toHaveLength(1);
     expect(notifications[0].message).toContain("上限");
   });
+
+  it("webhookSecretの復号に失敗した場合は401を返す(TOKEN_ENCRYPTION_KEYローテーション等を想定)", async () => {
+    // 正規に暗号化した値の末尾を書き換え、AES-GCMの認証タグ検証を失敗させる
+    // (decryptTokenが例外を投げるケースを再現する)。
+    const validEncrypted = encryptToken(SECRET);
+    const corrupted = validEncrypted.slice(0, -4) + "0000";
+    await prisma.repository.update({
+      where: { id: repositoryId },
+      data: { webhookSecret: corrupted },
+    });
+
+    const res = await POST(
+      request(repositoryId, pullRequestPayload("opened")),
+      ctx(repositoryId),
+    );
+    expect(res.status).toBe(401);
+    expect(mockGetPR).not.toHaveBeenCalled();
+  });
+
+  it("PR取得に失敗した場合はReviewを作らずスキップ通知を作成する", async () => {
+    mockGetPR.mockRejectedValue(new Error("boom"));
+
+    const res = await POST(
+      request(repositoryId, pullRequestPayload("opened")),
+      ctx(repositoryId),
+    );
+    expect(res.status).toBe(200);
+
+    const review = await prisma.review.findFirst({ where: { repositoryId } });
+    expect(review).toBeNull();
+
+    const notifications = await prisma.notification.findMany({ where: { userId } });
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0].message).toContain("スキップ");
+  });
 });

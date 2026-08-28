@@ -39,7 +39,26 @@ export async function POST(
   // 解釈するのは検証が通った後にする(検証前のペイロード内容を信用しない)。
   const rawBody = await request.text();
   const signature = request.headers.get("x-hub-signature-256");
-  const secret = decryptToken(repository.webhookSecret);
+
+  // TOKEN_ENCRYPTION_KEYのローテーション等でwebhookSecretの復号に失敗しうる
+  // (AES-GCMの認証タグ検証エラーは例外を投げる)。ここで捕まえず伝播させると
+  // 生の例外で500になり、GitHubは配信失敗として扱い続けWebhookを自動無効化
+  // してしまうため、署名不一致と同じ401(意図的な拒否)として扱う。
+  let secret: string;
+  try {
+    secret = decryptToken(repository.webhookSecret);
+  } catch (error) {
+    await logError({
+      source: "SERVER",
+      message: `Webhook secretの復号に失敗しました: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      path: `/api/webhooks/github/${repository.id}`,
+      userId: repository.userId,
+    });
+    return NextResponse.json({ error: "invalid signature" }, { status: 401 });
+  }
+
   if (!verifyWebhookSignature(rawBody, signature, secret)) {
     return NextResponse.json({ error: "invalid signature" }, { status: 401 });
   }
@@ -149,8 +168,17 @@ export async function POST(
           pullRequestNumber,
           status: result.status,
         });
+      } else {
+        // FETCH_ERRORはrunRepositoryReview内で既にErrorLogへ記録済みだが、
+        // Reviewが作成されないためユーザーからは何も起きていないように
+        // 見えてしまう。他のスキップ経路と同様にNotificationでも知らせる。
+        await createReviewSkippedNotification({
+          userId,
+          repositoryId: repository.id,
+          pullRequestNumber,
+          reason: result.errorMessage,
+        });
       }
-      // FETCH_ERRORはrunRepositoryReview内で既にErrorLogへ記録済み。
     } catch (error) {
       await logError({
         source: "SERVER",

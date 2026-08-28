@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getGitHubClient } from "@/lib/github";
-import { logError } from "@/lib/error-log";
+import { deleteGitHubWebhookBestEffort } from "@/lib/github-webhook";
 
 export async function DELETE(
   _request: Request,
@@ -28,22 +28,14 @@ export async function DELETE(
   if (existing.webhookId) {
     const octokit = await getGitHubClient(userId);
     if (octokit) {
-      try {
-        await octokit.rest.repos.deleteWebhook({
-          owner: existing.owner,
-          repo: existing.name,
-          hook_id: existing.webhookId,
-        });
-      } catch (error) {
-        await logError({
-          source: "SERVER",
-          message: `リポジトリ接続解除時のGitHub Webhook削除に失敗しました(${existing.owner}/${existing.name}): ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-          path: `/api/repositories/${id}`,
-          userId,
-        });
-      }
+      await deleteGitHubWebhookBestEffort({
+        octokit,
+        owner: existing.owner,
+        repo: existing.name,
+        hookId: existing.webhookId,
+        userId,
+        path: `/api/repositories/${id}`,
+      });
     }
   }
 

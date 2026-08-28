@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getGitHubClient } from "@/lib/github";
-import { generateWebhookSecret } from "@/lib/github-webhook";
+import { generateWebhookSecret, deleteGitHubWebhookBestEffort } from "@/lib/github-webhook";
 import { encryptToken } from "@/lib/token-crypto";
 import { logError } from "@/lib/error-log";
 
@@ -114,15 +114,43 @@ export async function POST(
     );
   }
 
-  await prisma.repository.update({
-    where: { id },
-    data: {
-      webhookEnabled: true,
-      webhookId: hookId,
-      webhookSecret: encryptToken(secret),
-      defaultPromptId: promptId,
-    },
-  });
+  try {
+    await prisma.repository.update({
+      where: { id },
+      data: {
+        webhookEnabled: true,
+        webhookId: hookId,
+        webhookSecret: encryptToken(secret),
+        defaultPromptId: promptId,
+      },
+    });
+  } catch (error) {
+    // GitHub側の作成は既に成功しているため、DB保存に失敗したまま放置すると
+    // secretがどこにも残らない孤立したWebhookになり、かつ「有効化」の再試行が
+    // 新しいWebhookをもう1つ作ってしまう(DB上はwebhookEnabled=falseのまま
+    // なので既存判定に引っかからない)。作成直後のWebhookを削除して
+    // ロールバックしてから、呼び出し元にエラーを伝える。
+    await deleteGitHubWebhookBestEffort({
+      octokit,
+      owner: repository.owner,
+      repo: repository.name,
+      hookId,
+      userId,
+      path: `/api/repositories/${repository.id}/webhook`,
+    });
+    await logError({
+      source: "SERVER",
+      message: `Webhook設定のDB保存に失敗しました(${repository.owner}/${repository.name}): ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      path: `/api/repositories/${repository.id}/webhook`,
+      userId,
+    });
+    return NextResponse.json(
+      { error: "Webhookの設定保存に失敗しました。もう一度お試しください。" },
+      { status: 500 },
+    );
+  }
 
   return NextResponse.json({ webhookEnabled: true });
 }
@@ -149,24 +177,14 @@ export async function DELETE(
   if (repository.webhookId) {
     const octokit = await getGitHubClient(userId);
     if (octokit) {
-      try {
-        await octokit.rest.repos.deleteWebhook({
-          owner: repository.owner,
-          repo: repository.name,
-          hook_id: repository.webhookId,
-        });
-      } catch (error) {
-        // GitHub側で既に削除されている等でも、DB側の無効化は継続する
-        // (孤立したWebhookが残ってもGitHub側で無害。ベストエフォート)。
-        await logError({
-          source: "SERVER",
-          message: `GitHub Webhookの削除に失敗しました(${repository.owner}/${repository.name}): ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-          path: `/api/repositories/${repository.id}/webhook`,
-          userId,
-        });
-      }
+      await deleteGitHubWebhookBestEffort({
+        octokit,
+        owner: repository.owner,
+        repo: repository.name,
+        hookId: repository.webhookId,
+        userId,
+        path: `/api/repositories/${repository.id}/webhook`,
+      });
     }
   }
 
