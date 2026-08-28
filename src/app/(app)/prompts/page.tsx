@@ -1,15 +1,18 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/session";
+import { parsePageSize } from "@/lib/list-limits";
+import { PageSizeSelect } from "@/components/page-size-select";
 
 export default async function PromptsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ categoryId?: string; q?: string }>;
+  searchParams: Promise<{ categoryId?: string; q?: string; limit?: string }>;
 }) {
   const userId = await requireUserId();
 
-  const { categoryId, q } = await searchParams;
+  const { categoryId, q, limit: limitParam } = await searchParams;
+  const limit = parsePageSize(limitParam);
 
   const [categories, prompts] = await Promise.all([
     prisma.category.findMany({
@@ -27,6 +30,7 @@ export default async function PromptsPage({
         versions: { orderBy: { versionNumber: "desc" }, take: 1 },
       },
       orderBy: { updatedAt: "desc" },
+      take: limit,
     }),
   ]);
 
@@ -65,6 +69,13 @@ export default async function PromptsPage({
           + 新規作成
         </Link>
       </form>
+
+      <div className="mb-4 flex items-end justify-between gap-3">
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          {prompts.length}件
+        </p>
+        <PageSizeSelect current={limit} />
+      </div>
 
       {prompts.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-16 text-center text-sm text-zinc-500 dark:text-zinc-400">

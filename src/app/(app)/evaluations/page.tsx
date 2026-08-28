@@ -1,18 +1,24 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/session";
-import { LIST_LIMIT } from "@/lib/list-limits";
+import { parsePageSize } from "@/lib/list-limits";
 import { EvaluationManager } from "./evaluation-manager";
 
-export default async function EvaluationsPage() {
+export default async function EvaluationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ limit?: string }>;
+}) {
   const userId = await requireUserId();
+  const { limit: limitParam } = await searchParams;
+  const limit = parsePageSize(limitParam);
 
   const [evaluations, promptRows] = await Promise.all([
     prisma.evaluation.findMany({
       where: { userId },
       include: { _count: { select: { findings: true } } },
       orderBy: { createdAt: "desc" },
-      take: LIST_LIMIT,
+      take: limit,
     }),
     prisma.prompt.findMany({
       where: { userId },
@@ -49,6 +55,7 @@ export default async function EvaluationsPage() {
           title: p.title,
           content: p.versions[0]?.content ?? "",
         }))}
+        currentLimit={limit}
       />
     </div>
   );

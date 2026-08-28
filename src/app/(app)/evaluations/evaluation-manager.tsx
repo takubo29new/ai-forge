@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { PageSizeSelect } from "@/components/page-size-select";
 import { useApiMutation } from "@/lib/use-api-mutation";
 import { Spinner } from "@/components/spinner";
 import { useToast } from "@/components/toast-provider";
@@ -54,9 +55,11 @@ function readFileAsBase64(file: File): Promise<string> {
 export function EvaluationManager({
   initialEvaluations,
   prompts,
+  currentLimit,
 }: {
   initialEvaluations: Evaluation[];
   prompts: Prompt[];
+  currentLimit: number;
 }) {
   const router = useRouter();
   const [evaluations, setEvaluations] = useState(initialEvaluations);
@@ -305,9 +308,12 @@ export function EvaluationManager({
       </section>
 
       <section>
-        <h2 className="mb-3 text-sm font-medium text-zinc-500 dark:text-zinc-400">
-          評価履歴({evaluations.length}件)
-        </h2>
+        <div className="mb-3 flex items-end justify-between gap-3">
+          <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+            評価履歴({evaluations.length}件)
+          </h2>
+          <PageSizeSelect current={currentLimit} />
+        </div>
         <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
           {evaluations.length === 0 && (
             <li className="px-4 py-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
