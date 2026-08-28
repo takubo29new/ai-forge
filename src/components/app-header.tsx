@@ -7,6 +7,7 @@ import { ErrorLogIcon, HelpIcon } from "@/components/icons";
 import { NavLinks } from "@/components/nav-links";
 import { CommandPaletteTrigger } from "@/components/command-palette-trigger";
 import { NotificationCenter } from "@/components/notification-center";
+import { MobileNavToggle } from "@/components/mobile-nav-toggle";
 
 // プロンプト関連(プロンプト一覧・そのカテゴリ管理)とそれ以外の機能を
 // 視覚的に区切って表示する。カテゴリ管理は単体では意味を持たず、あくまで
@@ -35,15 +36,21 @@ export async function AppHeader() {
 
   return (
     <header className="flex flex-wrap items-center justify-between gap-y-2 border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
-      <nav className="flex flex-wrap items-center gap-x-4 gap-y-2">
+      <div className="flex items-center gap-x-3">
+        <MobileNavToggle
+          promptLinks={PROMPT_NAV_LINKS}
+          otherLinks={OTHER_NAV_LINKS}
+        />
         <Link href="/dashboard" className="font-semibold">
           ai-forge
         </Link>
-        <span className="mx-1 hidden h-4 w-px bg-zinc-300 sm:block dark:bg-zinc-700" aria-hidden />
-        <NavLinks links={PROMPT_NAV_LINKS} />
-        <span className="mx-1 hidden h-4 w-px bg-zinc-300 sm:block dark:bg-zinc-700" aria-hidden />
-        <NavLinks links={OTHER_NAV_LINKS} />
-      </nav>
+        <nav className="hidden items-center gap-x-4 gap-y-2 md:flex md:flex-wrap">
+          <span className="mx-1 h-4 w-px bg-zinc-300 dark:bg-zinc-700" aria-hidden />
+          <NavLinks links={PROMPT_NAV_LINKS} />
+          <span className="mx-1 h-4 w-px bg-zinc-300 dark:bg-zinc-700" aria-hidden />
+          <NavLinks links={OTHER_NAV_LINKS} />
+        </nav>
+      </div>
       <div className="flex flex-wrap items-center gap-3">
         <CommandPaletteTrigger />
         <NotificationCenter />

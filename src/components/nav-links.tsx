@@ -7,7 +7,13 @@ type NavLink = { href: string; label: string };
 
 // 現在地のリンクをアクセントカラーでハイライトする(サーバーコンポーネント
 // のAppHeaderからはpathnameが取れないため、この部分だけクライアント化する)。
-export function NavLinks({ links }: { links: NavLink[] }) {
+export function NavLinks({
+  links,
+  onNavigate,
+}: {
+  links: NavLink[];
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
 
   return (
@@ -19,6 +25,7 @@ export function NavLinks({ links }: { links: NavLink[] }) {
           <Link
             key={link.href}
             href={link.href}
+            onClick={onNavigate}
             className={`text-sm transition-colors ${
               active
                 ? "font-medium text-accent"
