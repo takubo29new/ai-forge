@@ -122,7 +122,7 @@ flowchart TD
 
 Phase 2完了後、`Review`は以下の横断機能の対象にもなった(いずれもPhase 2固有ではなく複数ドメインにまたがる機能のため、設計の詳細は追加先のドキュメントを参照): レビュー結果の比較機能(追加機能アイデア、[`ai-dev-tool-handoff.md`](../../ai-dev-tool-handoff.md)参照)、チャットからの直接アクション実行に伴う`triggeredVia`列([`phase4-design.md`](./phase4-design.md)項目4)、共有リンク([`phase5-design.md`](./phase5-design.md)「共有リンク」)。
 
-## Webhook自動レビュー(Issue #106、未着手・設計フェーズ)
+## Webhook自動レビュー(Issue #106)
 
 対象: PRの作成・更新をGitHub Webhookで受け取り、`/repositories/:id`の「オープンなPR」タブからの手動実行と並ぶもう一つのトリガーとして、AIレビューを自動実行できるようにする。
 
@@ -227,3 +227,17 @@ flowchart TD
 - Organization・複数リポジトリへの一括設定(まずリポジトリ単位のON/OFFのみ)
 - `pull_request_review`等、`pull_request`以外のイベント種別
 - Webhook配信ログの独自保持(GitHub側の「Recent Deliveries」で足りるため、アプリ側では持たない)
+
+### 実装状況
+
+実装完了(`feature/webhook-auto-review`ブランチ)。設計どおり以下を実装。
+
+- `Repository`に`webhookEnabled`/`webhookId`/`webhookSecret`/`defaultPromptId`を追加し、`ReviewTrigger`に`WEBHOOK`を追加するマイグレーション
+- レビュー本体の処理を`src/lib/run-repository-review.ts`に共通化し、`POST /api/repositories/:id/reviews`(手動)・`POST /api/webhooks/github/:repositoryId`(Webhook)の両方から呼ぶ形にリファクタ
+- `POST/DELETE /api/repositories/:id/webhook`(有効化・デフォルトプロンプト変更・無効化)、`POST /api/webhooks/github/:repositoryId`(署名検証・`pull_request`イベント処理)
+- `/repositories/:id`に「Webhook設定」タブを追加(`webhook-settings.tsx`)
+- リポジトリ接続解除時にGitHub側のWebhookも削除するよう`DELETE /api/repositories/:id`を拡張
+- 完了・スキップ時のNotification(`createReviewNotification`/`createReviewSkippedNotification`)
+- 単体テスト(`github-webhook.test.ts`、署名検証)・統合テスト(webhook有効化/無効化ルート、Webhook受信ルート)を追加
+
+未検証な点: 実際のGitHub Webhook配信によるE2E動作確認(ローカル環境はGitHubから到達できないため、本番デプロイ後に確認予定)。

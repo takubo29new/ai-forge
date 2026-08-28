@@ -60,6 +60,11 @@ export default async function ReviewDetailPage({
             チャットから実行
           </span>
         )}
+        {review.triggeredVia === "WEBHOOK" && (
+          <span className="rounded bg-accent/10 px-1.5 py-0.5 text-accent">
+            Webhookで自動実行
+          </span>
+        )}
         {review.status === "SUCCESS" && (
           <span className="flex gap-3">
             {SEVERITIES.map((s) => {
