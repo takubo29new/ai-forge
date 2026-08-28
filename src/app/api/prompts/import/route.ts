@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { PROMPT_EXPORT_FORMAT } from "@/app/api/prompts/export/route";
+import { LIST_LIMIT } from "@/lib/list-limits";
 
 type ImportEntry = { title: string; categoryName: string | null; content: string };
 
@@ -40,6 +41,13 @@ export async function POST(request: Request) {
   }
 
   const rawEntries = (body as { prompts: unknown[] }).prompts;
+  if (rawEntries.length > LIST_LIMIT) {
+    return NextResponse.json(
+      { error: `一度にインポートできるのは${LIST_LIMIT}件までです(${rawEntries.length}件)` },
+      { status: 400 },
+    );
+  }
+
   const entries: ImportEntry[] = [];
   let skipped = 0;
   for (const raw of rawEntries) {
@@ -64,6 +72,15 @@ export async function POST(request: Request) {
       continue;
     }
     entries.push({ title, categoryName, content });
+  }
+
+  // rawEntries自体が空(0件のエクスポートを取り込んだだけ)なら不正ではないため、
+  // 「中身はあったのに1件も有効な項目が無かった」場合だけエラーにする。
+  if (rawEntries.length > 0 && entries.length === 0) {
+    return NextResponse.json(
+      { error: "有効なプロンプトが見つかりませんでした。ai-forgeのエクスポート形式か確認してください" },
+      { status: 400 },
+    );
   }
 
   let createdCount = 0;

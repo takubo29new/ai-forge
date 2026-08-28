@@ -79,6 +79,7 @@ export default async function PromptsPage({
           {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- APIルートへのダウンロードリンクのためLink化しない */}
           <a
             href="/api/prompts/export"
+            title="全プロンプトをJSON形式でダウンロード"
             className="text-sm text-accent hover:underline"
           >
             エクスポート
