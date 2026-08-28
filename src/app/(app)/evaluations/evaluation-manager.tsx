@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { PageSizeSelect } from "@/components/page-size-select";
+import { FileDropzone } from "@/components/file-dropzone";
 import { useApiMutation } from "@/lib/use-api-mutation";
 import { Spinner } from "@/components/spinner";
 import { useToast } from "@/components/toast-provider";
@@ -90,6 +91,11 @@ export function EvaluationManager({
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (busy) return;
+
+    if (!title.trim()) {
+      setError("タイトルを入力してください");
+      return;
+    }
 
     let data: { id: string } | null;
     if (inputType === "IMAGE" || inputType === "PDF") {
@@ -182,6 +188,7 @@ export function EvaluationManager({
         <h2 className="mb-3 text-sm font-medium text-zinc-500 dark:text-zinc-400">新規評価</h2>
         <form
           onSubmit={handleCreate}
+          noValidate
           className="flex flex-col gap-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800"
         >
           <div>
@@ -189,7 +196,6 @@ export function EvaluationManager({
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              required
               placeholder="例: 今日の夕食"
               className="w-full rounded border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
             />
@@ -246,24 +252,17 @@ export function EvaluationManager({
           {inputType === "IMAGE" ? (
             <div>
               <label className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400">画像</label>
-              <input
-                type="file"
+              <FileDropzone
                 accept="image/jpeg,image/png,image/gif,image/webp"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                required
-                className="w-full text-sm"
+                file={file}
+                onChange={setFile}
+                previewImage
               />
             </div>
           ) : inputType === "PDF" ? (
             <div>
               <label className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400">PDFファイル</label>
-              <input
-                type="file"
-                accept="application/pdf"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                required
-                className="w-full text-sm"
-              />
+              <FileDropzone accept="application/pdf" file={file} onChange={setFile} />
             </div>
           ) : variableNames.length > 0 ? (
             <div className="flex flex-col gap-2">
