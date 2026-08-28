@@ -35,6 +35,8 @@ export default async function DashboardPage() {
     severityTotals[g.severity] = g._count.severity;
   }
   const totalFindings = SEVERITIES.reduce((sum, s) => sum + severityTotals[s], 0);
+  const isFirstTimeUser =
+    promptCount === 0 && repositoryCount === 0 && documentCount === 0 && evaluationCount === 0;
 
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-10">
@@ -42,6 +44,40 @@ export default async function DashboardPage() {
       <p className="mb-8 text-sm text-zinc-600 dark:text-zinc-400">
         プロンプト・リポジトリ・レビュー・ドキュメントを横断したサマリです。
       </p>
+
+      {isFirstTimeUser && (
+        <div className="mb-8 rounded-lg border border-accent/30 bg-accent/5 p-4">
+          <p className="mb-3 text-sm font-medium">
+            ようこそ。まずは以下のいずれかから始めてください
+          </p>
+          <ul className="flex flex-col gap-2 text-sm">
+            <li>
+              <Link href="/prompts/new" className="text-accent hover:underline">
+                + 最初のプロンプトを作成する
+              </Link>
+              <span className="ml-2 text-xs text-zinc-500 dark:text-zinc-400">
+                プロンプトを保存し、いつでも同じ条件でAIを実行できるようにする
+              </span>
+            </li>
+            <li>
+              <Link href="/repositories" className="text-accent hover:underline">
+                + リポジトリを接続する
+              </Link>
+              <span className="ml-2 text-xs text-zinc-500 dark:text-zinc-400">
+                GitHubリポジトリを接続し、AIコードレビューを実行できるようにする
+              </span>
+            </li>
+            <li>
+              <Link href="/documents" className="text-accent hover:underline">
+                + ドキュメントを登録する
+              </Link>
+              <span className="ml-2 text-xs text-zinc-500 dark:text-zinc-400">
+                RAG検索チャットの検索対象を登録する
+              </span>
+            </li>
+          </ul>
+        </div>
+      )}
 
       <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-5">
         <Link
@@ -58,10 +94,13 @@ export default async function DashboardPage() {
           <p className="text-2xl font-semibold">{repositoryCount}</p>
           <p className="text-xs text-zinc-500 dark:text-zinc-400">接続リポジトリ</p>
         </Link>
-        <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+        <Link
+          href="/repositories"
+          className="rounded-lg border border-zinc-200 p-4 transition-all hover:-translate-y-0.5 hover:border-accent hover:shadow-md dark:border-zinc-800"
+        >
           <p className="text-2xl font-semibold">{totalFindings}</p>
           <p className="text-xs text-zinc-500 dark:text-zinc-400">累計レビュー指摘</p>
-        </div>
+        </Link>
         <Link
           href="/documents"
           className="rounded-lg border border-zinc-200 p-4 transition-all hover:-translate-y-0.5 hover:border-accent hover:shadow-md dark:border-zinc-800"
