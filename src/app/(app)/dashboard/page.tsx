@@ -49,25 +49,25 @@ export default async function DashboardPage() {
           className="rounded-lg border border-zinc-200 p-4 transition-all hover:-translate-y-0.5 hover:border-accent hover:shadow-md dark:border-zinc-800"
         >
           <p className="text-2xl font-semibold">{promptCount}</p>
-          <p className="text-xs text-zinc-500">プロンプト</p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">プロンプト</p>
         </Link>
         <Link
           href="/repositories"
           className="rounded-lg border border-zinc-200 p-4 transition-all hover:-translate-y-0.5 hover:border-accent hover:shadow-md dark:border-zinc-800"
         >
           <p className="text-2xl font-semibold">{repositoryCount}</p>
-          <p className="text-xs text-zinc-500">接続リポジトリ</p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">接続リポジトリ</p>
         </Link>
         <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
           <p className="text-2xl font-semibold">{totalFindings}</p>
-          <p className="text-xs text-zinc-500">累計レビュー指摘</p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">累計レビュー指摘</p>
         </div>
         <Link
           href="/documents"
           className="rounded-lg border border-zinc-200 p-4 transition-all hover:-translate-y-0.5 hover:border-accent hover:shadow-md dark:border-zinc-800"
         >
           <p className="text-2xl font-semibold">{documentCount}</p>
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
             登録ドキュメント({documentChunkCount}チャンク)
           </p>
         </Link>
@@ -76,13 +76,13 @@ export default async function DashboardPage() {
           className="rounded-lg border border-zinc-200 p-4 transition-all hover:-translate-y-0.5 hover:border-accent hover:shadow-md dark:border-zinc-800"
         >
           <p className="text-2xl font-semibold">{evaluationCount}</p>
-          <p className="text-xs text-zinc-500">AI評価</p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">AI評価</p>
         </Link>
       </div>
 
       {totalFindings > 0 && (
         <div className="mb-8 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
-          <p className="mb-3 text-sm font-medium text-zinc-500">
+          <p className="mb-3 text-sm font-medium text-zinc-500 dark:text-zinc-400">
             レビュー指摘の重要度内訳
           </p>
           <div className="flex gap-6">
@@ -93,7 +93,7 @@ export default async function DashboardPage() {
                   <p className={`text-lg font-semibold ${SEVERITY_TEXT[s]}`}>
                     {severityTotals[s]}
                   </p>
-                  <p className="inline-flex items-center gap-1 text-xs text-zinc-500">
+                  <p className="inline-flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
                     <SevIcon className="h-3.5 w-3.5" />
                     {s}
                   </p>

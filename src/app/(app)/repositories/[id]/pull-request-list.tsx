@@ -46,7 +46,7 @@ export function PullRequestList({
 
   if (prompts.length === 0) {
     return (
-      <p className="py-16 text-center text-sm text-zinc-500">
+      <p className="py-16 text-center text-sm text-zinc-500 dark:text-zinc-400">
         レビューに使うプロンプトがまだありません。先にプロンプトを作成してください。
       </p>
     );
@@ -69,7 +69,7 @@ export function PullRequestList({
               >
                 #{pr.number} {pr.title}
               </a>
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
                 {pr.author && `${pr.author} · `}
                 {new Date(pr.updatedAt).toLocaleDateString("ja-JP")}
               </p>

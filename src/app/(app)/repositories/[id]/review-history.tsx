@@ -37,7 +37,7 @@ export function ReviewHistory({
 
   if (reviews.length === 0) {
     return (
-      <p className="py-16 text-center text-sm text-zinc-500">
+      <p className="py-16 text-center text-sm text-zinc-500 dark:text-zinc-400">
         レビュー履歴はまだありません
       </p>
     );
@@ -74,7 +74,7 @@ export function ReviewHistory({
               <p className="truncate text-sm font-medium">
                 #{review.pullRequestNumber} {review.pullRequestTitle}
               </p>
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
                 {new Date(review.createdAt).toLocaleString("ja-JP")} ·{" "}
                 {review.status} · {review.commentCount}件の指摘
                 {review.triggeredVia === "CHAT" && (

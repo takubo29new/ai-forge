@@ -175,7 +175,7 @@ export function ChatPanel({
     <div className="flex flex-col gap-6">
       {repositories.length > 0 && (
         <div className="flex items-center gap-2">
-          <label className="text-xs text-zinc-500" htmlFor="chat-repository-filter">
+          <label className="text-xs text-zinc-500 dark:text-zinc-400" htmlFor="chat-repository-filter">
             対象リポジトリ
           </label>
           <select
@@ -196,7 +196,7 @@ export function ChatPanel({
 
       <div className="flex flex-col gap-6">
         {turns.length === 0 && (
-          <p className="rounded-lg border border-zinc-200 px-4 py-6 text-center text-sm text-zinc-500 dark:border-zinc-800">
+          <p className="rounded-lg border border-zinc-200 px-4 py-6 text-center text-sm text-zinc-500 dark:text-zinc-400 dark:border-zinc-800">
             まだ質問がありません。下の入力欄から質問してみてください。
           </p>
         )}
@@ -211,7 +211,7 @@ export function ChatPanel({
                   プロンプト「{turn.proposal.promptLabel}」でレビュー
                 </p>
                 {turn.status === "cancelled" && (
-                  <p className="mt-2 text-xs text-zinc-500">キャンセルしました。</p>
+                  <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">キャンセルしました。</p>
                 )}
                 {turn.status === "confirmed" && turn.reviewId && (
                   <p className="mt-2 text-xs">
@@ -229,10 +229,10 @@ export function ChatPanel({
                 <Markdown>{turn.answer}</Markdown>
                 {turn.sources.length > 0 && (
                   <div className="mt-3 flex flex-col gap-1 border-t border-zinc-200 pt-3 dark:border-zinc-800">
-                    <p className="text-xs font-medium text-zinc-500">出典</p>
+                    <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">出典</p>
                     <ul className="flex flex-col gap-0.5">
                       {turn.sources.map((source) => (
-                        <li key={source.index} className="text-xs text-zinc-500">
+                        <li key={source.index} className="text-xs text-zinc-500 dark:text-zinc-400">
                           [出典{source.index}]{" "}
                           {source.kind === "review_comment" ? (
                             <Link
@@ -263,7 +263,7 @@ export function ChatPanel({
         {pending && (
           <div className="flex flex-col gap-2">
             <p className="text-sm font-medium">Q. {pendingQuestion}</p>
-            <div className="flex items-center gap-2 rounded-lg border border-zinc-200 p-4 text-sm text-zinc-500 dark:border-zinc-800">
+            <div className="flex items-center gap-2 rounded-lg border border-zinc-200 p-4 text-sm text-zinc-500 dark:text-zinc-400 dark:border-zinc-800">
               <Spinner className="h-4 w-4" />
               回答を生成中...
             </div>
@@ -301,7 +301,7 @@ export function ChatPanel({
                   </option>
                 ))}
               </select>
-              <span aria-hidden="true" className="text-zinc-500">
+              <span aria-hidden="true" className="text-zinc-500 dark:text-zinc-400">
                 PR #
               </span>
               <input

@@ -59,7 +59,7 @@ export default async function ReviewComparePage({
                   #{review.pullRequestNumber} {review.pullRequestTitle}
                 </Link>
               </p>
-              <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500">
+              <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400">
                 <span>{review.createdAt.toLocaleString("ja-JP")}</span>
                 <span className={`inline-flex items-center gap-1 ${STATUS_TEXT[review.status]}`}>
                   <StatusIcon className="h-3.5 w-3.5" />
@@ -86,7 +86,7 @@ export default async function ReviewComparePage({
                 </p>
               )}
               {review.status === "SUCCESS" && review.comments.length === 0 && (
-                <p className="text-xs text-zinc-500">指摘事項はありませんでした</p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">指摘事項はありませんでした</p>
               )}
               {review.status === "SUCCESS" && review.comments.length > 0 && (
                 <ul className="flex flex-col gap-2">

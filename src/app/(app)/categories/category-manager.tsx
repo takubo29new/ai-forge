@@ -82,7 +82,7 @@ export function CategoryManager({
         className="flex flex-col gap-2 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800 sm:flex-row sm:items-end"
       >
         <div className="flex-1">
-          <label className="mb-1 block text-xs text-zinc-500">
+          <label className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400">
             新規カテゴリ名
           </label>
           <input
@@ -93,7 +93,7 @@ export function CategoryManager({
           />
         </div>
         <div className="flex-1">
-          <label className="mb-1 block text-xs text-zinc-500">
+          <label className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400">
             説明(任意)
           </label>
           <input
@@ -117,7 +117,7 @@ export function CategoryManager({
 
       <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
         {categories.length === 0 && (
-          <li className="px-4 py-6 text-center text-sm text-zinc-500">
+          <li className="px-4 py-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
             カテゴリがまだありません
           </li>
         )}
@@ -157,12 +157,12 @@ export function CategoryManager({
                 <div>
                   <p className="text-sm font-medium">
                     {category.name}
-                    <span className="ml-2 text-xs text-zinc-500">
+                    <span className="ml-2 text-xs text-zinc-500 dark:text-zinc-400">
                       ({category.promptCount}件)
                     </span>
                   </p>
                   {category.description && (
-                    <p className="text-xs text-zinc-500">
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
                       {category.description}
                     </p>
                   )}

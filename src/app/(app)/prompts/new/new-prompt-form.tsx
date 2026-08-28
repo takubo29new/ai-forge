@@ -39,10 +39,10 @@ export function NewPromptForm({ categories }: { categories: Category[] }) {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div>
-        <label className="mb-1 block text-xs text-zinc-500">
+        <label className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400">
           テンプレートから始める(任意)
         </label>
-        <p className="mb-2 text-xs text-zinc-500">
+        <p className="mb-2 text-xs text-zinc-500 dark:text-zinc-400">
           AI評価(画像・テキスト・PDF)を試しやすくする叩き台です。選ぶとタイトル・本文が置き換わります(あとから自由に編集できます)。
         </p>
         <div className="flex flex-col gap-2">
@@ -72,7 +72,7 @@ export function NewPromptForm({ categories }: { categories: Category[] }) {
         </div>
       </div>
       <div>
-        <label className="mb-1 block text-xs text-zinc-500">タイトル</label>
+        <label className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400">タイトル</label>
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -81,7 +81,7 @@ export function NewPromptForm({ categories }: { categories: Category[] }) {
         />
       </div>
       <div>
-        <label className="mb-1 block text-xs text-zinc-500">カテゴリ</label>
+        <label className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400">カテゴリ</label>
         <select
           value={categoryId}
           onChange={(e) => setCategoryId(e.target.value)}
@@ -96,8 +96,8 @@ export function NewPromptForm({ categories }: { categories: Category[] }) {
         </select>
       </div>
       <div>
-        <label className="mb-1 block text-xs text-zinc-500">本文</label>
-        <p className="mb-1.5 text-xs text-zinc-500">
+        <label className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400">本文</label>
+        <p className="mb-1.5 text-xs text-zinc-500 dark:text-zinc-400">
           本文に{" "}
           <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono dark:bg-zinc-800">
             {"{{変数名}}"}

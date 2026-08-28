@@ -45,7 +45,7 @@ export default async function SharedEvaluationPage({
 
       <h1 className="mb-4 text-xl font-semibold">{evaluation.title}</h1>
 
-      <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-zinc-500">
+      <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-zinc-500 dark:text-zinc-400">
         <span className="inline-flex items-center gap-1">
           <InputTypeIcon className="h-4 w-4" />
           {INPUT_TYPE_LABEL[evaluation.inputType]}
@@ -67,13 +67,13 @@ export default async function SharedEvaluationPage({
 
       {summary && (
         <div className="mb-6 rounded-lg border border-zinc-200 px-4 py-3 dark:border-zinc-800">
-          <p className="mb-1 text-xs font-medium text-zinc-500">総評</p>
+          <p className="mb-1 text-xs font-medium text-zinc-500 dark:text-zinc-400">総評</p>
           <Markdown>{summary}</Markdown>
         </div>
       )}
 
       {evaluation.findings.length === 0 && (
-        <p className="py-16 text-center text-sm text-zinc-500">
+        <p className="py-16 text-center text-sm text-zinc-500 dark:text-zinc-400">
           コメントはありませんでした
         </p>
       )}
@@ -94,7 +94,7 @@ export default async function SharedEvaluationPage({
                     {TONE_LABEL[f.tone]}
                   </span>
                   {f.score !== null && (
-                    <span className="text-xs text-zinc-500">{f.score}/100</span>
+                    <span className="text-xs text-zinc-500 dark:text-zinc-400">{f.score}/100</span>
                   )}
                 </p>
                 <div className="mt-1">

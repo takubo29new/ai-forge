@@ -243,11 +243,11 @@ export function DocumentManager({
   return (
     <div className="flex flex-col gap-8">
       <section>
-        <h2 className="mb-3 text-sm font-medium text-zinc-500">検索対象の取り込み</h2>
+        <h2 className="mb-3 text-sm font-medium text-zinc-500 dark:text-zinc-400">検索対象の取り込み</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
             <p className="mb-2 text-sm font-medium">ai-forgeの設計書を同期</p>
-            <p className="mb-3 text-xs text-zinc-500">
+            <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">
               このai-forgeプロジェクト自身のdocs/配下のMarkdownファイル・README.md・ai-dev-tool-handoff.mdを取り込みます(GitHubで接続した他のリポジトリではなく、今動いているこのアプリ自身のファイルが対象です)。再度実行すると、同じファイルのドキュメントは最新の内容で作り直されます。
             </p>
             <p className="mb-3 text-xs text-zinc-400">
@@ -270,7 +270,7 @@ export function DocumentManager({
 
           <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
             <p className="mb-2 text-sm font-medium">接続済みリポジトリの設計書を同期</p>
-            <p className="mb-3 text-xs text-zinc-500">
+            <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">
               「リポジトリ」ページで接続したGitHubリポジトリのdocs/配下のMarkdownファイル・README.mdをGitHub API経由で取り込みます。再度実行すると、同じファイルのドキュメントは最新の内容で作り直されます。
             </p>
             {repositories.length === 0 ? (
@@ -315,7 +315,7 @@ export function DocumentManager({
 
           <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
             <p className="mb-2 text-sm font-medium">レビュー指摘の埋め込み</p>
-            <p className="mb-3 text-xs text-zinc-500">
+            <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">
               過去のAIレビュー指摘をRAG検索チャットの検索対象にします。新しく実行したレビューは自動で対象になるため、既存分を取り込むためのボタンです。
             </p>
             <p className="mb-3 text-xs text-zinc-400">
@@ -340,7 +340,7 @@ export function DocumentManager({
 
           <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
             <p className="mb-2 text-sm font-medium">プロンプトの埋め込み</p>
-            <p className="mb-3 text-xs text-zinc-500">
+            <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">
               過去に保存したプロンプトの本文をRAG検索チャットの検索対象にします。新しく保存したバージョンは自動で対象になるため、既存分を取り込むためのボタンです。
             </p>
             <p className="mb-3 text-xs text-zinc-400">
@@ -367,7 +367,7 @@ export function DocumentManager({
 
           <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
             <p className="mb-2 text-sm font-medium">実行結果の埋め込み</p>
-            <p className="mb-3 text-xs text-zinc-500">
+            <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">
               過去のプロンプト実行結果をRAG検索チャットの検索対象にします(AIレビューの実行は対象外)。新しく成功した実行は自動で対象になるため、既存分を取り込むためのボタンです。
             </p>
             <p className="mb-3 text-xs text-zinc-400">
@@ -393,13 +393,13 @@ export function DocumentManager({
       </section>
 
       <section>
-        <h2 className="mb-3 text-sm font-medium text-zinc-500">ドキュメントを貼り付けて登録</h2>
+        <h2 className="mb-3 text-sm font-medium text-zinc-500 dark:text-zinc-400">ドキュメントを貼り付けて登録</h2>
         <form
           onSubmit={handleCreate}
           className="flex flex-col gap-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800"
         >
           <div>
-            <label className="mb-1 block text-xs text-zinc-500">タイトル</label>
+            <label className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400">タイトル</label>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -408,7 +408,7 @@ export function DocumentManager({
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs text-zinc-500">
+            <label className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400">
               本文(Markdown可。見出し単位でチャンク分割されます)
             </label>
             <textarea
@@ -435,14 +435,14 @@ export function DocumentManager({
 
       <section>
         <div className="mb-3 flex items-end justify-between gap-3">
-          <h2 className="text-sm font-medium text-zinc-500">
+          <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
             登録済みドキュメント({documents.length}件)
           </h2>
           <PageSizeSelect current={currentLimit} />
         </div>
         <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
           {documents.length === 0 && (
-            <li className="px-4 py-6 text-center text-sm text-zinc-500">
+            <li className="px-4 py-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
               ドキュメントがまだありません。上の「設計書を同期」で取り込むか、フォームから貼り付けて登録してください。
             </li>
           )}
@@ -453,7 +453,7 @@ export function DocumentManager({
             >
               <div>
                 <p className="text-sm font-medium">{document.title}</p>
-                <p className="text-xs text-zinc-500">
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
                   {documentSourceLabel(document)} ・{" "}
                   {document.chunkCount}チャンク
                 </p>

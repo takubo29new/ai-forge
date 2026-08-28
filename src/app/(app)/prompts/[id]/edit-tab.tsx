@@ -62,7 +62,7 @@ export function EditTab({
     <form onSubmit={handleSave} className="flex flex-col gap-4">
       <div className="flex flex-col gap-4 sm:flex-row">
         <div className="flex-1">
-          <label className="mb-1 block text-xs text-zinc-500">
+          <label className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400">
             タイトル
           </label>
           <input
@@ -73,7 +73,7 @@ export function EditTab({
           />
         </div>
         <div className="w-full sm:w-48">
-          <label className="mb-1 block text-xs text-zinc-500">
+          <label className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400">
             カテゴリ
           </label>
           <select
@@ -91,9 +91,9 @@ export function EditTab({
         </div>
       </div>
 
-      <p className="text-xs text-zinc-500">現在のバージョン: v{versionNumber}</p>
+      <p className="text-xs text-zinc-500 dark:text-zinc-400">現在のバージョン: v{versionNumber}</p>
 
-      <p className="text-xs text-zinc-500">
+      <p className="text-xs text-zinc-500 dark:text-zinc-400">
         本文に{" "}
         <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono dark:bg-zinc-800">
           {"{{変数名}}"}
@@ -117,10 +117,10 @@ export function EditTab({
         rows={14}
         className="w-full rounded border border-zinc-300 px-3 py-2 font-mono text-sm dark:border-zinc-700 dark:bg-zinc-900"
       />
-      <p className="-mt-2 text-xs text-zinc-500">Ctrl/⌘+Enterで保存できます</p>
+      <p className="-mt-2 text-xs text-zinc-500 dark:text-zinc-400">Ctrl/⌘+Enterで保存できます</p>
 
       <div>
-        <label className="mb-1 block text-xs text-zinc-500">
+        <label className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400">
           更新メモ(任意)
         </label>
         <input
