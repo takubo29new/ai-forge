@@ -98,6 +98,24 @@ describe("POST/DELETE /api/repositories/:id/webhook", () => {
     expect(decryptToken(repository.webhookSecret!)).toBe(call.config.secret);
   });
 
+  it("WebhookのURLが到達不能な場合(ローカル開発環境等)は専用のエラーメッセージを返す", async () => {
+    createWebhook.mockRejectedValue(
+      new Error(
+        'Validation Failed: {"resource":"Hook","code":"custom","field":"url","message":"url is not supported because it isn\'t reachable over the public Internet (localhost)"} - https://docs.github.com/rest/repos/webhooks#create-a-repository-webhook',
+      ),
+    );
+
+    const res = await POST(request({ promptId: promptWithDiffId }), ctx(repositoryId));
+    expect(res.status).toBe(502);
+    const data = await res.json();
+    expect(data.error).toContain("公開インターネットから到達できない");
+
+    const repository = await prisma.repository.findUniqueOrThrow({
+      where: { id: repositoryId },
+    });
+    expect(repository.webhookEnabled).toBe(false);
+  });
+
   it("既に有効な場合はGitHub側を再作成せずデフォルトプロンプトのみ更新する", async () => {
     await POST(request({ promptId: promptWithDiffId }), ctx(repositoryId));
     createWebhook.mockClear();

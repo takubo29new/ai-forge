@@ -100,16 +100,26 @@ export async function POST(
     });
     hookId = data.id;
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     await logError({
       source: "SERVER",
-      message: `GitHub Webhookの作成に失敗しました(${repository.owner}/${repository.name}): ${
-        error instanceof Error ? error.message : String(error)
-      }`,
+      message: `GitHub Webhookの作成に失敗しました(${repository.owner}/${repository.name}): ${errorMessage}`,
       path: `/api/repositories/${repository.id}/webhook`,
       userId,
     });
+    // GitHubはWebhookのURLが公開インターネットから到達不能(主にlocalhost)だと
+    // このメッセージを含むバリデーションエラーで作成を拒否する。ローカル開発
+    // 環境では常にこのエラーになる(NEXTAUTH_URLがlocalhostのため)ため、
+    // 「権限不足」と誤解されないよう専用のメッセージを返す。
+    const isUnreachableUrlError = errorMessage.includes(
+      "isn't reachable over the public Internet",
+    );
     return NextResponse.json(
-      { error: "GitHub側でのWebhook作成に失敗しました。リポジトリの管理者権限があるか確認してください。" },
+      {
+        error: isUnreachableUrlError
+          ? "WebhookのURLが公開インターネットから到達できないため作成できませんでした。ローカル開発環境(localhost)では動作しません。本番デプロイ後にお試しください。"
+          : "GitHub側でのWebhook作成に失敗しました。リポジトリの管理者権限があるか確認してください。",
+      },
       { status: 502 },
     );
   }
