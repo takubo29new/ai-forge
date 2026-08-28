@@ -1,18 +1,10 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { anthropic } from "@/lib/anthropic";
-import { getGitHubClient, getPullRequest, getPullRequestDiff } from "@/lib/github";
-import { renderTemplate } from "@/lib/prompt-variables";
-import { DEFAULT_MODEL } from "@/lib/models";
-import { ReviewOutputSchema } from "@/lib/review-schema";
+import { getGitHubClient } from "@/lib/github";
 import { checkExecutionRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { LIST_LIMIT } from "@/lib/list-limits";
-import { runAiExecution } from "@/lib/run-ai-execution";
-import { embedDocuments } from "@/lib/voyage";
-import { setReviewCommentEmbedding } from "@/lib/embeddings";
-import { logError } from "@/lib/error-log";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { runRepositoryReview } from "@/lib/run-repository-review";
 
 export async function GET(
   _request: Request,
@@ -109,163 +101,20 @@ export async function POST(
     );
   }
 
-  let pullRequest;
-  let diff: string;
-  let diffTruncated: boolean;
-  try {
-    pullRequest = await getPullRequest(
-      octokit,
-      repository.owner,
-      repository.name,
-      pullRequestNumber,
-    );
-    ({ diff, truncated: diffTruncated } = await getPullRequestDiff(
-      octokit,
-      repository.owner,
-      repository.name,
-      pullRequestNumber,
-    ));
-  } catch (error) {
-    await logError({
-      source: "SERVER",
-      message: `PR#${pullRequestNumber}の取得に失敗しました(${repository.owner}/${repository.name}): ${
-        error instanceof Error ? error.message : String(error)
-      }`,
-      path: `/api/repositories/${repository.id}/reviews`,
-      userId,
-    });
-    return NextResponse.json(
-      { error: "PRの取得に失敗しました" },
-      { status: 502 },
-    );
-  }
-
-  const variables = { diff };
-  const renderedContent = renderTemplate(promptVersion.content, variables);
-
-  const outcome = await runAiExecution({
-    promptVersionId: promptVersion.id,
+  const result = await runRepositoryReview({
+    octokit,
+    repository: { id: repository.id, owner: repository.owner, name: repository.name },
     userId,
-    model: DEFAULT_MODEL,
-    variables,
-    call: async () => {
-      const response = await anthropic.messages.parse({
-        model: DEFAULT_MODEL,
-        max_tokens: 16000,
-        messages: [{ role: "user", content: renderedContent }],
-        output_config: { format: zodOutputFormat(ReviewOutputSchema) },
-      });
-
-      if (!response.parsed_output) {
-        throw new Error("構造化出力の解析に失敗しました");
-      }
-
-      return {
-        resultText: JSON.stringify(response.parsed_output),
-        promptTokens: response.usage.input_tokens,
-        completionTokens: response.usage.output_tokens,
-        result: response.parsed_output,
-      };
-    },
+    promptVersion: { id: promptVersion.id, content: promptVersion.content },
+    pullRequestNumber,
+    triggeredVia,
   });
 
-  if (outcome.status === "SUCCESS") {
-    const { findings } = outcome.result;
-
-    const review = await prisma.$transaction(async (tx) => {
-      const created = await tx.review.create({
-        data: {
-          repositoryId: repository.id,
-          userId,
-          promptVersionId: promptVersion.id,
-          executionId: outcome.execution.id,
-          pullRequestNumber: pullRequest.number,
-          pullRequestTitle: pullRequest.title,
-          pullRequestUrl: pullRequest.url,
-          headSha: pullRequest.headSha,
-          status: "SUCCESS",
-          triggeredVia,
-        },
-      });
-
-      // diffが上限で切り詰められていた場合、その旨をレビュー本文の一部として
-      // 残しておく(専用カラムを設けず既存のReviewComment構造で表現する)。
-      const commentData = [
-        ...(diffTruncated
-          ? [
-              {
-                reviewId: created.id,
-                filePath: "(PR diff)",
-                line: null,
-                severity: "WARNING" as const,
-                body: "PRの差分が大きいため、途中で切り詰めてレビューしました。切り詰められた範囲は指摘の対象外です。",
-              },
-            ]
-          : []),
-        ...findings.map((f) => ({
-          reviewId: created.id,
-          filePath: f.filePath,
-          line: f.line,
-          severity: f.severity,
-          body: f.body,
-        })),
-      ];
-
-      let comments: { id: string; body: string }[] = [];
-      if (commentData.length > 0) {
-        await tx.reviewComment.createMany({ data: commentData });
-        comments = await tx.reviewComment.findMany({
-          where: { reviewId: created.id },
-          select: { id: true, body: true },
-        });
-      }
-
-      return { review: created, comments };
-    });
-
-    // 指摘の埋め込み生成はRAG検索チャットの検索対象を増やすための副次的な処理であり、
-    // ここで失敗してもレビュー結果自体は既に作成・返却できているため、ベストエフォートで
-    // 行う(失敗しても200/201のレスポンスやReview自体には影響させない)。埋め込みが
-    // 無いままの指摘は/api/review-comments/backfill-embeddingsで後から埋められる。
-    if (review.comments.length > 0) {
-      try {
-        const embeddings = await embedDocuments(
-          review.comments.map((c) => c.body),
-        );
-        await Promise.all(
-          review.comments.map((c, i) =>
-            setReviewCommentEmbedding(c.id, embeddings[i]),
-          ),
-        );
-      } catch (error) {
-        await logError({
-          source: "SERVER",
-          message: `ReviewCommentの埋め込み生成に失敗しました: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-          path: `/api/repositories/${repository.id}/reviews`,
-          userId,
-        });
-      }
-    }
-
-    return NextResponse.json({ id: review.review.id }, { status: 201 });
+  if (result.status === "FETCH_ERROR") {
+    return NextResponse.json({ error: result.errorMessage }, { status: 502 });
   }
-
-  const review = await prisma.review.create({
-    data: {
-      repositoryId: repository.id,
-      userId,
-      promptVersionId: promptVersion.id,
-      executionId: outcome.execution.id,
-      pullRequestNumber: pullRequest.number,
-      pullRequestTitle: pullRequest.title,
-      pullRequestUrl: pullRequest.url,
-      headSha: pullRequest.headSha,
-      status: "FAILED",
-      triggeredVia,
-    },
-  });
-
-  return NextResponse.json({ id: review.id }, { status: 200 });
+  if (result.status === "SUCCESS") {
+    return NextResponse.json({ id: result.reviewId }, { status: 201 });
+  }
+  return NextResponse.json({ id: result.reviewId }, { status: 200 });
 }

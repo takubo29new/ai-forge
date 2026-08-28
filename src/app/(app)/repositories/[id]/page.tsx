@@ -12,6 +12,7 @@ import {
 } from "@/lib/review-severity";
 import { PullRequestList } from "./pull-request-list";
 import { ReviewHistory } from "./review-history";
+import { WebhookSettings } from "./webhook-settings";
 import { parsePageSize } from "@/lib/list-limits";
 import { PageSizeSelect } from "@/components/page-size-select";
 
@@ -19,6 +20,7 @@ const TABS = [
   { key: "pulls", label: "オープンなPR" },
   { key: "history", label: "レビュー履歴" },
   { key: "trends", label: "傾向" },
+  { key: "webhook", label: "Webhook設定" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -63,6 +65,8 @@ export default async function RepositoryDetailPage({
         pullsError = "オープンなPRの取得に失敗しました";
       }
     }
+  }
+  if (tab === "pulls" || tab === "webhook") {
     const promptRows = await prisma.prompt.findMany({
       where: { userId },
       include: { versions: { orderBy: { versionNumber: "desc" }, take: 1 } },
@@ -335,6 +339,15 @@ export default async function RepositoryDetailPage({
             </>
           )}
         </div>
+      )}
+
+      {tab === "webhook" && (
+        <WebhookSettings
+          repositoryId={id}
+          webhookEnabled={repository.webhookEnabled}
+          defaultPromptId={repository.defaultPromptId}
+          prompts={prompts}
+        />
       )}
     </div>
   );

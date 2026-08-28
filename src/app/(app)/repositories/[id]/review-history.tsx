@@ -10,7 +10,7 @@ type ReviewRow = {
   createdAt: string;
   status: string;
   commentCount: number;
-  triggeredVia: "UI" | "CHAT";
+  triggeredVia: "UI" | "CHAT" | "WEBHOOK";
 };
 
 // 一度に比較するのは2件までにする(3件以上の横並びはUIが複雑になるため、
@@ -80,6 +80,11 @@ export function ReviewHistory({
                 {review.triggeredVia === "CHAT" && (
                   <span className="ml-1.5 rounded bg-accent/10 px-1.5 py-0.5 text-accent">
                     チャットから実行
+                  </span>
+                )}
+                {review.triggeredVia === "WEBHOOK" && (
+                  <span className="ml-1.5 rounded bg-accent/10 px-1.5 py-0.5 text-accent">
+                    Webhookで自動実行
                   </span>
                 )}
               </p>
