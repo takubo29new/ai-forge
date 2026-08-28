@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/session";
 import { parsePageSize } from "@/lib/list-limits";
 import { PageSizeSelect } from "@/components/page-size-select";
+import { PromptImportButton } from "./prompt-import-button";
 
 export default async function PromptsPage({
   searchParams,
@@ -70,11 +71,21 @@ export default async function PromptsPage({
         </Link>
       </form>
 
-      <div className="mb-4 flex items-end justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
           {prompts.length}件
         </p>
-        <PageSizeSelect current={limit} />
+        <div className="flex items-center gap-4">
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- APIルートへのダウンロードリンクのためLink化しない */}
+          <a
+            href="/api/prompts/export"
+            className="text-sm text-accent hover:underline"
+          >
+            エクスポート
+          </a>
+          <PromptImportButton />
+          <PageSizeSelect current={limit} />
+        </div>
       </div>
 
       {prompts.length === 0 ? (
