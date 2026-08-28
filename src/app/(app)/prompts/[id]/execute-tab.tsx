@@ -61,7 +61,7 @@ export function ExecuteTab({
 
   if (versions.length === 0) {
     return (
-      <p className="py-16 text-center text-sm text-zinc-500">
+      <p className="py-16 text-center text-sm text-zinc-500 dark:text-zinc-400">
         実行するにはまず本文を保存してください。
       </p>
     );
@@ -71,7 +71,7 @@ export function ExecuteTab({
     <form onSubmit={handleExecute} className="flex flex-col gap-4">
       <div className="flex flex-col gap-4 sm:flex-row">
         <div className="flex-1">
-          <label className="mb-1 block text-xs text-zinc-500">
+          <label className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400">
             実行対象バージョン
           </label>
           <select
@@ -88,7 +88,7 @@ export function ExecuteTab({
           </select>
         </div>
         <div className="flex-1">
-          <label className="mb-1 block text-xs text-zinc-500">モデル</label>
+          <label className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400">モデル</label>
           <select
             value={model}
             onChange={(e) => setModel(e.target.value)}
@@ -105,7 +105,7 @@ export function ExecuteTab({
 
       {variableNames.length > 0 && (
         <div className="flex flex-col gap-2">
-          <p className="text-xs text-zinc-500">変数</p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">変数</p>
           {variableNames.map((name) => (
             <div key={name} className="flex items-center gap-2">
               <label className="w-32 shrink-0 text-sm">{name}</label>
@@ -125,7 +125,7 @@ export function ExecuteTab({
         </div>
       )}
 
-      <p className="text-xs text-zinc-500">Ctrl/⌘+Enterで実行できます</p>
+      <p className="text-xs text-zinc-500 dark:text-zinc-400">Ctrl/⌘+Enterで実行できます</p>
 
       <button
         type="submit"
@@ -144,7 +144,7 @@ export function ExecuteTab({
         const StatusIcon = STATUS_ICON[result.status];
         return (
           <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
-            <p className="mb-2 text-xs text-zinc-500">実行結果</p>
+            <p className="mb-2 text-xs text-zinc-500 dark:text-zinc-400">実行結果</p>
             {result.status === "SUCCESS" ? (
               <Markdown>{result.resultText ?? ""}</Markdown>
             ) : (
@@ -153,7 +153,7 @@ export function ExecuteTab({
                 {result.errorMessage}
               </p>
             )}
-            <p className="mt-3 inline-flex items-center gap-1 text-xs text-zinc-500">
+            <p className="mt-3 inline-flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
               <StatusIcon className={`h-3.5 w-3.5 ${STATUS_TEXT[result.status]}`} />
               <span className={STATUS_TEXT[result.status]}>{STATUS_LABEL[result.status]}</span>
               {result.status === "SUCCESS" &&

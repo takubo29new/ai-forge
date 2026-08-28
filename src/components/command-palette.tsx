@@ -196,12 +196,12 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
 
         <div className="mt-3 max-h-96 overflow-y-auto">
           {!query.trim() && (
-            <p className="px-1 py-6 text-center text-sm text-zinc-500">
+            <p className="px-1 py-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
               入力して検索してください
             </p>
           )}
           {query.trim() && results && flatResults.length === 0 && !loading && (
-            <p className="px-1 py-6 text-center text-sm text-zinc-500">
+            <p className="px-1 py-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
               一致する結果がありません
             </p>
           )}
@@ -209,7 +209,7 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
             if (!results || results[group].length === 0) return null;
             return (
               <div key={group} className="mb-2">
-                <p className="px-1 py-1 text-xs font-medium text-zinc-500">
+                <p className="px-1 py-1 text-xs font-medium text-zinc-500 dark:text-zinc-400">
                   {GROUP_LABELS[group]}
                 </p>
                 <ul>

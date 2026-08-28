@@ -44,11 +44,11 @@ export default async function ReviewDetailPage({
           #{review.pullRequestNumber} {review.pullRequestTitle}
         </a>
       </h1>
-      <p className="mb-4 text-sm text-zinc-500">
+      <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
         {review.repository.owner}/{review.repository.name}
       </p>
 
-      <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-zinc-500">
+      <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-zinc-500 dark:text-zinc-400">
         <span className={`inline-flex items-center gap-1 ${STATUS_TEXT[review.status]}`}>
           <StatusIcon className="h-4 w-4" />
           {STATUS_LABEL[review.status]}
@@ -58,6 +58,11 @@ export default async function ReviewDetailPage({
         {review.triggeredVia === "CHAT" && (
           <span className="rounded bg-accent/10 px-1.5 py-0.5 text-accent">
             チャットから実行
+          </span>
+        )}
+        {review.triggeredVia === "WEBHOOK" && (
+          <span className="rounded bg-accent/10 px-1.5 py-0.5 text-accent">
+            Webhookで自動実行
           </span>
         )}
         {review.status === "SUCCESS" && (
@@ -93,7 +98,7 @@ export default async function ReviewDetailPage({
       )}
 
       {review.status === "SUCCESS" && review.comments.length === 0 && (
-        <p className="py-16 text-center text-sm text-zinc-500">
+        <p className="py-16 text-center text-sm text-zinc-500 dark:text-zinc-400">
           指摘事項はありませんでした
         </p>
       )}

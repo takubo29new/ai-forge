@@ -107,7 +107,7 @@ export default async function PromptDetailPage({
             className={`px-3 py-2 text-sm ${
               tab === t.key
                 ? "border-b-2 border-foreground font-medium"
-                : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+                : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
             }`}
           >
             {t.label}
@@ -148,11 +148,11 @@ export default async function PromptDetailPage({
               <details>
                 <summary className="cursor-pointer px-4 py-3 text-sm">
                   <span className="font-medium">v{v.versionNumber}</span>{" "}
-                  <span className="text-zinc-500">
+                  <span className="text-zinc-500 dark:text-zinc-400">
                     {v.createdAt.toLocaleString("ja-JP")}
                   </span>{" "}
                   {v.note && (
-                    <span className="text-zinc-500">— {v.note}</span>
+                    <span className="text-zinc-500 dark:text-zinc-400">— {v.note}</span>
                   )}
                 </summary>
                 <pre className="whitespace-pre-wrap border-t border-zinc-200 px-4 py-3 font-mono text-xs dark:border-zinc-800">

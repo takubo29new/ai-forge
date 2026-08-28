@@ -10,7 +10,7 @@ type ReviewRow = {
   createdAt: string;
   status: string;
   commentCount: number;
-  triggeredVia: "UI" | "CHAT";
+  triggeredVia: "UI" | "CHAT" | "WEBHOOK";
 };
 
 // 一度に比較するのは2件までにする(3件以上の横並びはUIが複雑になるため、
@@ -37,7 +37,7 @@ export function ReviewHistory({
 
   if (reviews.length === 0) {
     return (
-      <p className="py-16 text-center text-sm text-zinc-500">
+      <p className="py-16 text-center text-sm text-zinc-500 dark:text-zinc-400">
         レビュー履歴はまだありません
       </p>
     );
@@ -74,12 +74,17 @@ export function ReviewHistory({
               <p className="truncate text-sm font-medium">
                 #{review.pullRequestNumber} {review.pullRequestTitle}
               </p>
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
                 {new Date(review.createdAt).toLocaleString("ja-JP")} ·{" "}
                 {review.status} · {review.commentCount}件の指摘
                 {review.triggeredVia === "CHAT" && (
                   <span className="ml-1.5 rounded bg-accent/10 px-1.5 py-0.5 text-accent">
                     チャットから実行
+                  </span>
+                )}
+                {review.triggeredVia === "WEBHOOK" && (
+                  <span className="ml-1.5 rounded bg-accent/10 px-1.5 py-0.5 text-accent">
+                    Webhookで自動実行
                   </span>
                 )}
               </p>

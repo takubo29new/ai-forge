@@ -121,3 +121,123 @@ flowchart TD
 3. ~~レビュー結果の蓄積・可視化~~ → 完了(リポジトリ単位)。`/repositories/:id`に「傾向」タブを追加し、累計指摘件数(重要度別)・直近10件のレビューの重要度内訳・指摘の多いファイルTOP8を表示。リポジトリ横断のダッシュボードはPhase 3で扱う
 
 Phase 2完了後、`Review`は以下の横断機能の対象にもなった(いずれもPhase 2固有ではなく複数ドメインにまたがる機能のため、設計の詳細は追加先のドキュメントを参照): レビュー結果の比較機能(追加機能アイデア、[`ai-dev-tool-handoff.md`](../../ai-dev-tool-handoff.md)参照)、チャットからの直接アクション実行に伴う`triggeredVia`列([`phase4-design.md`](./phase4-design.md)項目4)、共有リンク([`phase5-design.md`](./phase5-design.md)「共有リンク」)。
+
+## Webhook自動レビュー(Issue #106)
+
+対象: PRの作成・更新をGitHub Webhookで受け取り、`/repositories/:id`の「オープンなPR」タブからの手動実行と並ぶもう一つのトリガーとして、AIレビューを自動実行できるようにする。
+
+### アーキテクチャ: GitHub OAuth Appだからこそのリポジトリ単位Webhook
+
+このアプリはGitHub App(インストール単位でWebhookが一元管理される)ではなく、ユーザーごとのOAuthアクセストークン(`repo`スコープ、`src/lib/github.ts`)でGitHub APIを呼んでいる。そのため「アプリ全体で1つのWebhook」という構成は取れず、**接続済みリポジトリごとに個別のWebhookをAPI経由で作成・削除する**(`octokit.rest.repos.createWebhook`/`deleteWebhook`、既存の`repo`スコープに含まれる権限で実行可能・追加の同意は不要)。
+
+Webhookのsecretはリポジトリごとにアプリ側でランダム生成し(`crypto.randomBytes(32).toString("hex")`)、GitHubのaccess_tokenと同じ`src/lib/token-crypto.ts`の`encryptToken`で暗号化してDBに保存する。受信時はこのsecretで`X-Hub-Signature-256`を検証する。
+
+### Webhook宛先URLにRepository.idを含める
+
+`Repository`の一意制約は`[userId, githubRepoId]`であり、同じ実GitHubリポジトリを複数のai-forgeユーザーがそれぞれ個別に接続しうる。受信ペイロードの`repository.id`(GitHub側のID)だけでは対象の`Repository`レコードを一意に特定できないため、**宛先URLにai-forge内部の`Repository.id`を含めて一意に紐付ける**。
+
+```
+POST /api/webhooks/github/:repositoryId
+```
+
+公開URLの組み立ては新しい環境変数を増やさず、既存の`NEXTAUTH_URL`を再利用する(`${NEXTAUTH_URL}/api/webhooks/github/${repository.id}`)。ローカル開発環境(`http://localhost:3000`)はGitHubから到達できないため、Webhook自動レビューは実質的に公開URLを持つ本番デプロイでのみ動作する制約がある。
+
+### DB設計(Repositoryテーブルの拡張)
+
+```mermaid
+erDiagram
+    REPOSITORY ||--o| PROMPT : "defaultPrompt(nullable)"
+
+    REPOSITORY {
+        boolean webhookEnabled "default false"
+        int webhookId "nullable, GitHub側のhook id"
+        string webhookSecret "nullable, 暗号化して保存"
+        string defaultPromptId "nullable"
+    }
+```
+
+- `webhookEnabled`が`true`になるのは、GitHub側へのWebhook作成に成功し`defaultPromptId`も設定できた場合のみ(UIでも未選択のプロンプトでは有効化ボタンを押せないようにする)
+- `defaultPromptId`は`onDelete: SetNull`。プロンプト削除後にPRイベントを受けた場合は「プロンプト未設定」としてスキップし、Notificationで知らせる(後述)
+- `Prompt`側に`defaultForRepositories Repository[]`の逆参照を追加(Prismaの双方向リレーション要件)
+
+### ReviewTriggerにWEBHOOKを追加
+
+```
+enum ReviewTrigger {
+  UI
+  CHAT
+  WEBHOOK
+}
+```
+
+`/repositories/:id`のレビュー履歴・`/reviews/:id`で、既存の`UI`/`CHAT`と同様に表示する(表示ロジックの追加改修のみで済む)。
+
+### Webhook受信エンドポイントの処理フロー
+
+```mermaid
+flowchart TD
+    Recv["POST /api/webhooks/github/:repositoryId"] --> Sig{署名検証<br/>X-Hub-Signature-256}
+    Sig -- 不一致 --> R401[401]
+    Sig -- 一致 --> Event{X-GitHub-Event}
+    Event -- ping --> R200a[200 OK]
+    Event -- pull_request --> Action{action}
+    Action -- その他 --> R200b[200 OK 無視]
+    Action -- "opened / synchronize" --> Prompt{defaultPrompt<br/>設定済み?}
+    Prompt -- 未設定 --> Notify1[Notification作成のみ] --> R200c[200 OK]
+    Prompt -- 設定済み --> RateLimit{レート制限}
+    RateLimit -- 超過 --> Notify2[Notification作成のみ] --> R200d[200 OK]
+    RateLimit -- OK --> BG["scheduleBackground()で<br/>レビュー本体を実行"] --> R200e[200 OK 即時応答]
+    BG --> Done[完了時にNotification作成]
+```
+
+- 署名検証は生のリクエストボディ(`request.text()`)に対して行い、検証後に初めて`JSON.parse`する。比較は`crypto.timingSafeEqual`でタイミング攻撃を避ける
+- 対象イベントは`pull_request`の`opened`・`synchronize`のみ(re-open等その他のactionは無視して200を返す)。GitHubは配信失敗(4xx/5xx)が続くとWebhookを自動的に無効化してしまうため、署名不一致(401)以外の「ai-forge側で意図的にスキップした」ケース(プロンプト未設定・レート制限超過・対象外action)はすべて200を返す
+- レート制限は既存の`checkExecutionRateLimit`(1時間20回)をそのまま使う。手動実行と同じ"execution"カウンタを共有し、連続pushによる多重実行もこの枠で自然に抑制する
+- 実際のレビュー処理(diff取得→`runAiExecution`→Review/ReviewComment作成→埋め込み生成)は`POST /api/repositories/:id/reviews`と全く同じ内容のため、重複実装を避けて`src/lib/run-repository-review.ts`に共通処理として切り出し、既存の手動実行ルートとWebhookルートの両方から呼ぶ
+- GitHubの既定の配信タイムアウト(10秒)に収めるため、レビュー本体はAI評価(`POST /api/evaluations`)と同じ`scheduleBackground()`(`next/server`の`after()`)でバックグラウンド実行し、200を即時に返す。完了時(成功/失敗)は新設の`createReviewNotification`(`createEvaluationNotification`と同じ形)でNotificationを作成する
+
+### 画面(`/repositories/:id`に「Webhook設定」タブを追加)
+
+```
+┌──────────────────────────────────────────────────────┐
+│ [オープンなPR] [レビュー履歴] [傾向] [Webhook設定]         │
+├──────────────────────────────────────────────────────┤
+│ 自動レビュー: [ 無効 ●───○ 有効 ]                         │
+│ デフォルトプロンプト: [コードレビュー v3 ▾]                  │
+│ PRの作成・更新(open/synchronize)時に自動でレビューします    │
+└──────────────────────────────────────────────────────┘
+```
+
+- プロンプト選択は`pull-request-list.tsx`と同じ`usesDiff`(本文に`{{diff}}`を含むか)の警告表示を流用する
+- 有効化: `POST /api/repositories/:id/webhook`(body: `{ promptId }`)。GitHub側にWebhookを作成した後にDBへ保存する(GitHub側が先に失敗すればDBも更新しない)
+- デフォルトプロンプトの変更: 同じAPIを再度呼ぶ。Webhook自体(secret・宛先URL)は変わらないため、GitHub側の再作成は行わずDBの`defaultPromptId`のみ更新する
+- 無効化: `DELETE /api/repositories/:id/webhook`。GitHub側のWebhookを削除してからDBのフィールドをクリアする
+- リポジトリ接続解除(`DELETE /api/repositories/:id`)でWebhookが有効なままの場合、削除前にGitHub側のWebhook削除を試みる(失敗してもベストエフォートでリポジトリ自体の削除は継続する。孤立したWebhookが残ってもGitHub側で無害だが、可能な範囲で片付ける)
+
+### API設計
+
+| メソッド/パス | 概要 |
+| --- | --- |
+| `POST /api/repositories/:id/webhook` | Webhook自動レビューを有効化(未作成なら作成)・デフォルトプロンプトを更新 |
+| `DELETE /api/repositories/:id/webhook` | Webhook自動レビューを無効化(GitHub側のWebhookも削除) |
+| `POST /api/webhooks/github/:repositoryId` | GitHubからのWebhook受信(署名検証・`pull_request`イベント処理、セッション認証なし) |
+
+### 見送る点(v1のスコープ外)
+
+- Organization・複数リポジトリへの一括設定(まずリポジトリ単位のON/OFFのみ)
+- `pull_request_review`等、`pull_request`以外のイベント種別
+- Webhook配信ログの独自保持(GitHub側の「Recent Deliveries」で足りるため、アプリ側では持たない)
+
+### 実装状況
+
+実装完了(`feature/webhook-auto-review`ブランチ)。設計どおり以下を実装。
+
+- `Repository`に`webhookEnabled`/`webhookId`/`webhookSecret`/`defaultPromptId`を追加し、`ReviewTrigger`に`WEBHOOK`を追加するマイグレーション
+- レビュー本体の処理を`src/lib/run-repository-review.ts`に共通化し、`POST /api/repositories/:id/reviews`(手動)・`POST /api/webhooks/github/:repositoryId`(Webhook)の両方から呼ぶ形にリファクタ
+- `POST/DELETE /api/repositories/:id/webhook`(有効化・デフォルトプロンプト変更・無効化)、`POST /api/webhooks/github/:repositoryId`(署名検証・`pull_request`イベント処理)
+- `/repositories/:id`に「Webhook設定」タブを追加(`webhook-settings.tsx`)
+- リポジトリ接続解除時にGitHub側のWebhookも削除するよう`DELETE /api/repositories/:id`を拡張
+- 完了・スキップ時のNotification(`createReviewNotification`/`createReviewSkippedNotification`)
+- 単体テスト(`github-webhook.test.ts`、署名検証)・統合テスト(webhook有効化/無効化ルート、Webhook受信ルート)を追加
+
+未検証な点: 実際のGitHub Webhook配信によるE2E動作確認(ローカル環境はGitHubから到達できないため、本番デプロイ後に確認予定)。

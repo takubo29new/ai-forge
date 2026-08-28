@@ -23,7 +23,7 @@ export function PageSizeSelect({
   }
 
   return (
-    <label className="flex items-center gap-1.5 text-xs text-zinc-500">
+    <label className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
       表示件数
       <select
         value={current}

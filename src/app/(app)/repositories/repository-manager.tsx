@@ -90,7 +90,7 @@ export function RepositoryManager({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-zinc-500">
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
           {repositories.length}件のリポジトリを接続中
         </p>
         <button
@@ -109,7 +109,7 @@ export function RepositoryManager({
 
       <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
         {repositories.length === 0 && (
-          <li className="px-4 py-6 text-center text-sm text-zinc-500">
+          <li className="px-4 py-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
             接続済みのリポジトリはまだありません
           </li>
         )}
@@ -122,7 +122,7 @@ export function RepositoryManager({
               <p className="text-sm font-medium">
                 {repo.owner}/{repo.name}
               </p>
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
                 {repo.reviewCount}件のレビュー
               </p>
             </div>
@@ -156,7 +156,7 @@ export function RepositoryManager({
           </h2>
           <button
             onClick={() => setShowModal(false)}
-            className="text-sm text-zinc-500 hover:underline"
+            className="text-sm text-zinc-500 dark:text-zinc-400 hover:underline"
           >
             閉じる
           </button>
@@ -169,11 +169,11 @@ export function RepositoryManager({
         )}
 
         {loadingAvailable && (
-          <p className="text-sm text-zinc-500">読み込み中...</p>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">読み込み中...</p>
         )}
 
         {!loadingAvailable && available.length === 0 && !listError && (
-          <p className="text-sm text-zinc-500">
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">
             接続できるリポジトリがありません
           </p>
         )}
@@ -187,7 +187,7 @@ export function RepositoryManager({
               <span className="text-sm">
                 {repo.fullName}
                 {repo.private && (
-                  <span className="ml-2 text-xs text-zinc-500">
+                  <span className="ml-2 text-xs text-zinc-500 dark:text-zinc-400">
                     (private)
                   </span>
                 )}

@@ -106,6 +106,10 @@ model Prompt {
 
   versions PromptVersion[]
 
+  // Webhook自動レビュー(Issue #106)でこのプロンプトをデフォルトに指定している
+  // リポジトリ(複数可)。逆参照のみでPrompt側からは通常辿らない。
+  defaultForRepositories Repository[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -233,6 +237,16 @@ model Repository {
   reviews   Review[]
   documents Document[]
 
+  // Webhook自動レビュー(Issue #106)。webhookEnabledがtrueなのはGitHub側への
+  // Webhook作成に成功し、defaultPromptIdも設定できた場合のみ(UI側でも
+  // 未選択のプロンプトでは有効化できないよう制御する)。
+  webhookEnabled Boolean @default(false)
+  webhookId      Int? // GitHub側のhook id(削除・再設定に使う)
+  webhookSecret  String? // 暗号化して保存(token-crypto.tsのencryptToken)
+
+  defaultPromptId String?
+  defaultPrompt   Prompt? @relation(fields: [defaultPromptId], references: [id], onDelete: SetNull)
+
   connectedAt DateTime @default(now())
 
   @@unique([userId, githubRepoId])
@@ -247,10 +261,12 @@ enum ReviewStatus {
 // レビューがどこから実行されたか(Phase 4項目4「チャットからの直接アクション実行」で
 // トリガー元を区別したいという要望に対応)。UIからの実行(/repositories/:idの
 // 「オープンなPR」タブ)がこれまでの唯一の経路だったためデフォルトはUIとし、
-// 既存データは移行なしにUI扱いのままで問題ない。
+// 既存データは移行なしにUI扱いのままで問題ない。WEBHOOKはIssue #106(GitHub
+// Webhookによる自動実行)向けに追加。
 enum ReviewTrigger {
   UI
   CHAT
+  WEBHOOK
 }
 
 // PRに対するAIレビューの実行単位。実際のAI呼び出しはExecutionに委譲し、

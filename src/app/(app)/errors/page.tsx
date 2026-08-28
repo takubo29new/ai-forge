@@ -35,7 +35,7 @@ export default async function ErrorsPage({
       <div className="mt-4 mb-6 flex items-end justify-between gap-3">
         <div>
           <h1 className="mb-1 text-xl font-semibold">エラーログ</h1>
-          <p className="text-sm text-zinc-500">
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">
             アプリで発生した想定外のエラーの直近{logs.length}件
           </p>
         </div>
@@ -43,7 +43,7 @@ export default async function ErrorsPage({
       </div>
 
       {logs.length === 0 && (
-        <p className="py-16 text-center text-sm text-zinc-500">
+        <p className="py-16 text-center text-sm text-zinc-500 dark:text-zinc-400">
           記録されたエラーはありません
         </p>
       )}
@@ -54,7 +54,7 @@ export default async function ErrorsPage({
             key={log.id}
             className="rounded-lg border border-zinc-200 px-4 py-3 dark:border-zinc-800"
           >
-            <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500">
+            <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400">
               <span className={`font-medium ${SOURCE_STYLE[log.source]}`}>
                 [{log.source}]
               </span>

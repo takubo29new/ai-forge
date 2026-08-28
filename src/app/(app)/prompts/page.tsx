@@ -1,15 +1,19 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/session";
+import { parsePageSize } from "@/lib/list-limits";
+import { PageSizeSelect } from "@/components/page-size-select";
+import { PromptImportButton } from "./prompt-import-button";
 
 export default async function PromptsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ categoryId?: string; q?: string }>;
+  searchParams: Promise<{ categoryId?: string; q?: string; limit?: string }>;
 }) {
   const userId = await requireUserId();
 
-  const { categoryId, q } = await searchParams;
+  const { categoryId, q, limit: limitParam } = await searchParams;
+  const limit = parsePageSize(limitParam);
 
   const [categories, prompts] = await Promise.all([
     prisma.category.findMany({
@@ -27,6 +31,7 @@ export default async function PromptsPage({
         versions: { orderBy: { versionNumber: "desc" }, take: 1 },
       },
       orderBy: { updatedAt: "desc" },
+      take: limit,
     }),
   ]);
 
@@ -66,8 +71,26 @@ export default async function PromptsPage({
         </Link>
       </form>
 
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          {prompts.length}件
+        </p>
+        <div className="flex items-center gap-4">
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- APIルートへのダウンロードリンクのためLink化しない */}
+          <a
+            href="/api/prompts/export"
+            title="全プロンプトをJSON形式でダウンロード"
+            className="text-sm text-accent hover:underline"
+          >
+            エクスポート
+          </a>
+          <PromptImportButton />
+          <PageSizeSelect current={limit} />
+        </div>
+      </div>
+
       {prompts.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 py-16 text-center text-sm text-zinc-500">
+        <div className="flex flex-col items-center gap-3 py-16 text-center text-sm text-zinc-500 dark:text-zinc-400">
           {categoryId || q ? (
             <>
               <p>絞り込み条件に一致するプロンプトがありません</p>
@@ -96,10 +119,10 @@ export default async function PromptsPage({
                 className="block rounded-lg border border-zinc-200 p-4 hover:border-zinc-400 dark:border-zinc-800 dark:hover:border-zinc-600"
               >
                 <p className="font-medium">{prompt.title}</p>
-                <p className="mt-1 text-xs text-zinc-500">
+                <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                   カテゴリ: {prompt.category?.name ?? "未分類"}
                 </p>
-                <p className="mt-1 text-xs text-zinc-500">
+                <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                   更新: {prompt.updatedAt.toLocaleDateString("ja-JP")}
                 </p>
               </Link>

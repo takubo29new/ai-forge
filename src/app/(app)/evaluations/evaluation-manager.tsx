@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { PageSizeSelect } from "@/components/page-size-select";
+import { FileDropzone } from "@/components/file-dropzone";
 import { useApiMutation } from "@/lib/use-api-mutation";
 import { Spinner } from "@/components/spinner";
 import { useToast } from "@/components/toast-provider";
@@ -54,9 +56,11 @@ function readFileAsBase64(file: File): Promise<string> {
 export function EvaluationManager({
   initialEvaluations,
   prompts,
+  currentLimit,
 }: {
   initialEvaluations: Evaluation[];
   prompts: Prompt[];
+  currentLimit: number;
 }) {
   const router = useRouter();
   const [evaluations, setEvaluations] = useState(initialEvaluations);
@@ -87,6 +91,11 @@ export function EvaluationManager({
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (busy) return;
+
+    if (!title.trim()) {
+      setError("タイトルを入力してください");
+      return;
+    }
 
     let data: { id: string } | null;
     if (inputType === "IMAGE" || inputType === "PDF") {
@@ -167,7 +176,7 @@ export function EvaluationManager({
 
   if (prompts.length === 0) {
     return (
-      <p className="py-16 text-center text-sm text-zinc-500">
+      <p className="py-16 text-center text-sm text-zinc-500 dark:text-zinc-400">
         評価に使うプロンプトがまだありません。先にプロンプトを作成してください。
       </p>
     );
@@ -176,23 +185,23 @@ export function EvaluationManager({
   return (
     <div className="flex flex-col gap-8">
       <section>
-        <h2 className="mb-3 text-sm font-medium text-zinc-500">新規評価</h2>
+        <h2 className="mb-3 text-sm font-medium text-zinc-500 dark:text-zinc-400">新規評価</h2>
         <form
           onSubmit={handleCreate}
+          noValidate
           className="flex flex-col gap-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800"
         >
           <div>
-            <label className="mb-1 block text-xs text-zinc-500">タイトル</label>
+            <label className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400">タイトル</label>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              required
               placeholder="例: 今日の夕食"
               className="w-full rounded border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs text-zinc-500">プロンプト</label>
+            <label className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400">プロンプト</label>
             <select
               value={promptId}
               onChange={(e) => setPromptId(e.target.value)}
@@ -206,7 +215,7 @@ export function EvaluationManager({
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-xs text-zinc-500">入力形式</label>
+            <label className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400">入力形式</label>
             <div className="flex gap-4 text-sm">
               <label className="flex items-center gap-1.5">
                 <input
@@ -242,34 +251,27 @@ export function EvaluationManager({
           </div>
           {inputType === "IMAGE" ? (
             <div>
-              <label className="mb-1 block text-xs text-zinc-500">画像</label>
-              <input
-                type="file"
+              <label className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400">画像</label>
+              <FileDropzone
                 accept="image/jpeg,image/png,image/gif,image/webp"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                required
-                className="w-full text-sm"
+                file={file}
+                onChange={setFile}
+                previewImage
               />
             </div>
           ) : inputType === "PDF" ? (
             <div>
-              <label className="mb-1 block text-xs text-zinc-500">PDFファイル</label>
-              <input
-                type="file"
-                accept="application/pdf"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                required
-                className="w-full text-sm"
-              />
+              <label className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400">PDFファイル</label>
+              <FileDropzone accept="application/pdf" file={file} onChange={setFile} />
             </div>
           ) : variableNames.length > 0 ? (
             <div className="flex flex-col gap-2">
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
                 評価対象のテキスト(プロンプト本文の{"{{変数名}}"}に埋め込まれます、Ctrl/⌘+Enterで実行できます)
               </p>
               {variableNames.map((name) => (
                 <div key={name}>
-                  <label className="mb-1 block text-xs text-zinc-500">{name}</label>
+                  <label className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400">{name}</label>
                   <textarea
                     value={variableValues[name] ?? ""}
                     onChange={(e) =>
@@ -286,7 +288,7 @@ export function EvaluationManager({
               ))}
             </div>
           ) : (
-            <p className="text-xs text-zinc-500">
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
               選択したプロンプトに{"{{変数名}}"}が含まれていないため、テキストを埋め込む箇所がありません。プロンプトを編集するか、他のプロンプトを選んでください。
             </p>
           )}
@@ -305,12 +307,15 @@ export function EvaluationManager({
       </section>
 
       <section>
-        <h2 className="mb-3 text-sm font-medium text-zinc-500">
-          評価履歴({evaluations.length}件)
-        </h2>
+        <div className="mb-3 flex items-end justify-between gap-3">
+          <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+            評価履歴({evaluations.length}件)
+          </h2>
+          <PageSizeSelect current={currentLimit} />
+        </div>
         <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
           {evaluations.length === 0 && (
-            <li className="px-4 py-6 text-center text-sm text-zinc-500">
+            <li className="px-4 py-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
               評価履歴がまだありません
             </li>
           )}
@@ -326,7 +331,7 @@ export function EvaluationManager({
                 <p className="truncate text-sm font-medium hover:underline">
                   {evaluation.title}
                 </p>
-                <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-zinc-500">
+                <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-zinc-500 dark:text-zinc-400">
                   <span>{new Date(evaluation.createdAt).toLocaleString("ja-JP")}</span>
                   <span>・</span>
                   <span className="inline-flex items-center gap-1">

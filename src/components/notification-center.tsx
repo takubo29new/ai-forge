@@ -114,7 +114,7 @@ export function NotificationCenter() {
 
           <div className="max-h-96 overflow-y-auto">
             {notifications.length === 0 && (
-              <p className="px-3 py-6 text-center text-sm text-zinc-500">
+              <p className="px-3 py-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
                 通知はありません
               </p>
             )}
@@ -123,7 +123,7 @@ export function NotificationCenter() {
                 const body = (
                   <>
                     <p
-                      className={`text-sm ${n.read ? "text-zinc-500" : "font-medium"}`}
+                      className={`text-sm ${n.read ? "text-zinc-500 dark:text-zinc-400" : "font-medium"}`}
                     >
                       {n.message}
                     </p>

@@ -87,35 +87,35 @@ export default async function UsagePage() {
       </p>
 
       <section className="mb-10">
-        <h2 className="mb-3 text-sm font-medium text-zinc-500">
+        <h2 className="mb-3 text-sm font-medium text-zinc-500 dark:text-zinc-400">
           Claude(Anthropic)— トークン使用量
         </h2>
-        <p className="mb-4 text-xs text-zinc-500">
+        <p className="mb-4 text-xs text-zinc-500 dark:text-zinc-400">
           プロンプト実行・AIレビュー・AI評価(いずれも`Execution`として記録される呼び出し)のみが対象です。RAG検索チャットの回答生成・チャットからのアクション解析・プロンプト改善提案は現状トークン数を記録していないため含まれません。
         </p>
 
         <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
             <p className="text-2xl font-semibold">{executionAgg._count._all}</p>
-            <p className="text-xs text-zinc-500">実行回数(成功+失敗)</p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">実行回数(成功+失敗)</p>
           </div>
           <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
             <p className="text-2xl font-semibold">
               {totalPromptTokens.toLocaleString("ja-JP")}
             </p>
-            <p className="text-xs text-zinc-500">入力トークン合計</p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">入力トークン合計</p>
           </div>
           <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
             <p className="text-2xl font-semibold">
               {totalCompletionTokens.toLocaleString("ja-JP")}
             </p>
-            <p className="text-xs text-zinc-500">出力トークン合計</p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">出力トークン合計</p>
           </div>
         </div>
 
         {executionsByModel.length > 0 && (
           <div className="mb-6">
-            <p className="mb-2 text-xs font-medium text-zinc-500">モデル別内訳</p>
+            <p className="mb-2 text-xs font-medium text-zinc-500 dark:text-zinc-400">モデル別内訳</p>
             <ul className="flex flex-col gap-1">
               {executionsByModel.map((row) => (
                 <li
@@ -123,7 +123,7 @@ export default async function UsagePage() {
                   className="flex items-center justify-between gap-3 border-b border-zinc-100 py-1.5 text-sm last:border-0 dark:border-zinc-800/60"
                 >
                   <span className="font-mono text-xs">{row.model}</span>
-                  <span className="shrink-0 text-xs text-zinc-500">
+                  <span className="shrink-0 text-xs text-zinc-500 dark:text-zinc-400">
                     {row._count._all}回 ・ 入力{" "}
                     {(row._sum.promptTokens ?? 0).toLocaleString("ja-JP")} / 出力{" "}
                     {(row._sum.completionTokens ?? 0).toLocaleString("ja-JP")}
@@ -135,11 +135,11 @@ export default async function UsagePage() {
         )}
 
         <div>
-          <p className="mb-2 text-xs font-medium text-zinc-500">
+          <p className="mb-2 text-xs font-medium text-zinc-500 dark:text-zinc-400">
             直近{RECENT_DAYS}日のトークン使用量(入力+出力)
           </p>
           {maxDailyTokens === 0 ? (
-            <p className="text-sm text-zinc-500">直近{RECENT_DAYS}日の実行はありません</p>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">直近{RECENT_DAYS}日の実行はありません</p>
           ) : (
             <ul className="flex flex-col gap-1">
               {dailyRows.map(([date, tokens]) => (
@@ -154,7 +154,7 @@ export default async function UsagePage() {
                       width: `${maxDailyTokens > 0 ? (tokens / maxDailyTokens) * 100 : 0}%`,
                     }}
                   />
-                  <span className="relative text-zinc-500">{date}</span>
+                  <span className="relative text-zinc-500 dark:text-zinc-400">{date}</span>
                   <span className="relative shrink-0">
                     {tokens.toLocaleString("ja-JP")}
                   </span>
@@ -166,10 +166,10 @@ export default async function UsagePage() {
       </section>
 
       <section>
-        <h2 className="mb-3 text-sm font-medium text-zinc-500">
+        <h2 className="mb-3 text-sm font-medium text-zinc-500 dark:text-zinc-400">
           Voyage AI — 埋め込み件数
         </h2>
-        <p className="mb-4 text-xs text-zinc-500">
+        <p className="mb-4 text-xs text-zinc-500 dark:text-zinc-400">
           埋め込み1回あたりのトークン数は記録していないため件数のみを表示します(1件のAPI呼び出しで複数件をまとめて埋め込むことがあるため、件数=API呼び出し回数でもありません)。
         </p>
 
@@ -177,29 +177,29 @@ export default async function UsagePage() {
           <p className="text-2xl font-semibold">
             {totalEmbeddingCount.toLocaleString("ja-JP")}
           </p>
-          <p className="text-xs text-zinc-500">埋め込み済みの件数(合計)</p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">埋め込み済みの件数(合計)</p>
         </div>
 
         <ul className="flex flex-col gap-1">
           <li className="flex items-center justify-between border-b border-zinc-100 py-1.5 text-sm last:border-0 dark:border-zinc-800/60">
             <span>ドキュメントチャンク</span>
-            <span className="text-xs text-zinc-500">{documentChunkCount}件</span>
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">{documentChunkCount}件</span>
           </li>
           <li className="flex items-center justify-between border-b border-zinc-100 py-1.5 text-sm last:border-0 dark:border-zinc-800/60">
             <span>レビュー指摘</span>
-            <span className="text-xs text-zinc-500">
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">
               {reviewCommentEmbeddingCount}件
             </span>
           </li>
           <li className="flex items-center justify-between border-b border-zinc-100 py-1.5 text-sm last:border-0 dark:border-zinc-800/60">
             <span>プロンプトバージョン</span>
-            <span className="text-xs text-zinc-500">
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">
               {promptVersionEmbeddingCount}件
             </span>
           </li>
           <li className="flex items-center justify-between py-1.5 text-sm">
             <span>実行結果</span>
-            <span className="text-xs text-zinc-500">{executionEmbeddingCount}件</span>
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">{executionEmbeddingCount}件</span>
           </li>
         </ul>
       </section>

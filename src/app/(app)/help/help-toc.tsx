@@ -45,7 +45,7 @@ export function HelpToc({ sections }: { sections: Section[] }) {
 
   return (
     <nav className="flex gap-1 overflow-x-auto md:sticky md:top-6 md:flex-col md:gap-0.5 md:overflow-visible">
-      <p className="hidden text-xs font-medium text-zinc-500 md:mb-2 md:block">
+      <p className="hidden text-xs font-medium text-zinc-500 dark:text-zinc-400 md:mb-2 md:block">
         目次
       </p>
       {sections.map((s) => (

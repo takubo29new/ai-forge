@@ -285,3 +285,15 @@ REST風のAPI Routes。認証は`auth()`(NextAuth.js)によるセッション確
 | 品質・運用対応全般 | [`quality-improvements.md`](./quality-improvements.md) |
 | 自動テストの仕様 | [`test-specification.md`](./test-specification.md)(詳細は[`tests/unit-tests.md`](./tests/unit-tests.md)・[`tests/integration-tests.md`](./tests/integration-tests.md)) |
 | 手動テストチェックリスト | [`manual-test-checklist.md`](./manual-test-checklist.md) |
+
+### 9.1 計画中のPhase(未着手)
+
+次期以降の開発候補として設計を先行検討しているもの。実装順は次の通り(2026-08-27時点)。
+
+| 順序 | Phase | 概要 | 詳細設計書 |
+| --- | --- | --- | --- |
+| 1 | Phase 6 | エージェント型AI機能(AIレビューの修正diff提案) | [`phase6-design.md`](./phases/phase6-design.md) |
+| 2 | Phase 7 | 公開API・APIキー発行基盤 | [`phase7-design.md`](./phases/phase7-design.md) |
+| 3 | Phase 8 | マルチユーザー/チーム機能 | [`phase8-design.md`](./phases/phase8-design.md) |
+
+これとは別に、issue化済みの単機能の追加(#106〜#111、#113)は既存Phaseの内側で個別に対応する小粒な改善として扱う。

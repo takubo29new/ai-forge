@@ -42,7 +42,7 @@ export function ExecutionHistory({
 
   if (executions.length === 0) {
     return (
-      <p className="py-16 text-center text-sm text-zinc-500">
+      <p className="py-16 text-center text-sm text-zinc-500 dark:text-zinc-400">
         実行履歴がまだありません
       </p>
     );
@@ -79,7 +79,7 @@ export function ExecutionHistory({
             />
             <details className="min-w-0 flex-1">
               <summary className="cursor-pointer text-sm">
-                <span className="text-zinc-500">
+                <span className="text-zinc-500 dark:text-zinc-400">
                   {new Date(e.createdAt).toLocaleString("ja-JP")}
                 </span>{" "}
                 <span className="font-medium">v{e.versionNumber}</span>{" "}
@@ -87,7 +87,7 @@ export function ExecutionHistory({
                   <StatusIcon className="h-3.5 w-3.5" />
                   {STATUS_LABEL[e.status]}
                 </span>{" "}
-                <span className="text-zinc-500">{e.model}</span>
+                <span className="text-zinc-500 dark:text-zinc-400">{e.model}</span>
               </summary>
               <div className="mt-3 border-t border-zinc-200 pt-3 dark:border-zinc-800">
                 {e.status === "SUCCESS" ? (
@@ -99,7 +99,7 @@ export function ExecutionHistory({
                   </p>
                 )}
                 {e.status === "SUCCESS" && (
-                  <p className="mt-2 text-xs text-zinc-500">
+                  <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
                     tokens: {e.promptTokens}+{e.completionTokens} /{" "}
                     {e.durationMs}ms
                   </p>

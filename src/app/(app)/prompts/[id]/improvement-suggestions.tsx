@@ -67,12 +67,12 @@ export function ImprovementSuggestions({
       {result && (
         <div className="mt-4 flex flex-col gap-3">
           <div className="rounded-lg border border-zinc-200 px-4 py-3 dark:border-zinc-800">
-            <p className="mb-1 text-xs font-medium text-zinc-500">総評</p>
+            <p className="mb-1 text-xs font-medium text-zinc-500 dark:text-zinc-400">総評</p>
             <Markdown>{result.summary}</Markdown>
           </div>
 
           {result.suggestions.length === 0 && (
-            <p className="py-8 text-center text-sm text-zinc-500">
+            <p className="py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
               繰り返し発生している指摘パターンは見つかりませんでした
             </p>
           )}
@@ -84,7 +84,7 @@ export function ImprovementSuggestions({
             >
               <p className="text-sm font-medium">
                 {s.pattern}{" "}
-                <span className="ml-1 text-xs text-zinc-500">
+                <span className="ml-1 text-xs text-zinc-500 dark:text-zinc-400">
                   ({s.occurrenceCount}件)
                 </span>
               </p>

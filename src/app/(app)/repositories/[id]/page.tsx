@@ -12,6 +12,7 @@ import {
 } from "@/lib/review-severity";
 import { PullRequestList } from "./pull-request-list";
 import { ReviewHistory } from "./review-history";
+import { WebhookSettings } from "./webhook-settings";
 import { parsePageSize } from "@/lib/list-limits";
 import { PageSizeSelect } from "@/components/page-size-select";
 
@@ -19,6 +20,7 @@ const TABS = [
   { key: "pulls", label: "オープンなPR" },
   { key: "history", label: "レビュー履歴" },
   { key: "trends", label: "傾向" },
+  { key: "webhook", label: "Webhook設定" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -63,6 +65,8 @@ export default async function RepositoryDetailPage({
         pullsError = "オープンなPRの取得に失敗しました";
       }
     }
+  }
+  if (tab === "pulls" || tab === "webhook") {
     const promptRows = await prisma.prompt.findMany({
       where: { userId },
       include: { versions: { orderBy: { versionNumber: "desc" }, take: 1 } },
@@ -165,7 +169,7 @@ export default async function RepositoryDetailPage({
             className={`px-3 py-2 text-sm ${
               tab === t.key
                 ? "border-b-2 border-foreground font-medium"
-                : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+                : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
             }`}
           >
             {t.label}
@@ -181,7 +185,7 @@ export default async function RepositoryDetailPage({
             </p>
           )}
           {pulls && pulls.length === 0 && (
-            <p className="py-16 text-center text-sm text-zinc-500">
+            <p className="py-16 text-center text-sm text-zinc-500 dark:text-zinc-400">
               オープンなPRはありません
             </p>
           )}
@@ -218,13 +222,13 @@ export default async function RepositoryDetailPage({
       {tab === "trends" && severityTotals && (
         <div className="flex flex-col gap-8">
           {trendReviews.length === 0 ? (
-            <p className="py-16 text-center text-sm text-zinc-500">
+            <p className="py-16 text-center text-sm text-zinc-500 dark:text-zinc-400">
               成功したレビューがまだありません
             </p>
           ) : (
             <>
               <section>
-                <h2 className="mb-3 text-sm font-medium text-zinc-500">
+                <h2 className="mb-3 text-sm font-medium text-zinc-500 dark:text-zinc-400">
                   累計の指摘件数
                 </h2>
                 <div className="flex gap-6">
@@ -235,7 +239,7 @@ export default async function RepositoryDetailPage({
                         <p className={`text-2xl font-semibold ${SEVERITY_TEXT[s]}`}>
                           {severityTotals![s]}
                         </p>
-                        <p className="inline-flex items-center gap-1 text-xs text-zinc-500">
+                        <p className="inline-flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
                           <SevIcon className="h-3.5 w-3.5" />
                           {s}
                         </p>
@@ -261,7 +265,7 @@ export default async function RepositoryDetailPage({
               </section>
 
               <section>
-                <h2 className="mb-3 text-sm font-medium text-zinc-500">
+                <h2 className="mb-3 text-sm font-medium text-zinc-500 dark:text-zinc-400">
                   直近{trendReviews.length}件のレビュー(新しい順)
                 </h2>
                 <ul className="flex flex-col gap-2">
@@ -275,7 +279,7 @@ export default async function RepositoryDetailPage({
                           <p className="truncate text-sm font-medium">
                             #{review.pullRequestNumber} {review.pullRequestTitle}
                           </p>
-                          <p className="shrink-0 text-xs text-zinc-500">
+                          <p className="shrink-0 text-xs text-zinc-500 dark:text-zinc-400">
                             {review.createdAt.toLocaleDateString("ja-JP")} ·{" "}
                             {review.total}件
                           </p>
@@ -302,11 +306,11 @@ export default async function RepositoryDetailPage({
               </section>
 
               <section>
-                <h2 className="mb-3 text-sm font-medium text-zinc-500">
+                <h2 className="mb-3 text-sm font-medium text-zinc-500 dark:text-zinc-400">
                   指摘の多いファイル
                 </h2>
                 {topFiles.length === 0 ? (
-                  <p className="text-sm text-zinc-500">指摘はまだありません</p>
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400">指摘はまだありません</p>
                 ) : (
                   <ul className="flex flex-col gap-1">
                     {topFiles.map((f) => (
@@ -324,7 +328,7 @@ export default async function RepositoryDetailPage({
                         <span className="relative truncate font-mono text-xs">
                           {f.filePath}
                         </span>
-                        <span className="relative shrink-0 text-xs text-zinc-500">
+                        <span className="relative shrink-0 text-xs text-zinc-500 dark:text-zinc-400">
                           {f.count}件
                         </span>
                       </li>
@@ -335,6 +339,15 @@ export default async function RepositoryDetailPage({
             </>
           )}
         </div>
+      )}
+
+      {tab === "webhook" && (
+        <WebhookSettings
+          repositoryId={id}
+          webhookEnabled={repository.webhookEnabled}
+          defaultPromptId={repository.defaultPromptId}
+          prompts={prompts}
+        />
       )}
     </div>
   );
