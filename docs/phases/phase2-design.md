@@ -174,6 +174,8 @@ enum ReviewTrigger {
 
 ### Webhook受信エンドポイントの処理フロー
 
+> **2026-09-01追記**: 本番運用開始直後、`scheduleBackground()`(`after()`)によるレビュー本体の実行がVercel Hobbyプランのmax duration(60秒)を超過し無言で強制終了される事象が発生した(PR取得・埋め込み生成等の前後処理と合わせて60秒を超えうるため、Anthropic呼び出し単体へのSDK側`timeout`指定だけでは防ぎきれない)。Webhook受信とレビュー実行を別リクエストに分離するVercel Queues(Beta)への移行を試みたが、**本アカウント(Hobby)では同機能が実際には有効化されておらず**(ダッシュボードにQueues関連の管理画面が存在せず、送信したメッセージを消費するコンシューマーが呼ばれない=レビューが一切実行されなくなる重大な退行)、ロールバックした。現状は`scheduleBackground()`のまま、Anthropic呼び出しのSDK側`timeout`を35秒に短縮し前後処理の余白を厚くする暫定対応に留めている(根本解決ではなく、大きなPRでは依然タイムアウトしうる)。恒久対応としてGitHub Actionsを処理ワーカーとして使う方式(Issue #129)を採用する方針だが、まずはこの暫定対応で運用しながら様子を見る(2026-09-02、ユーザーと相談のうえ決定)。
+
 ```mermaid
 flowchart TD
     Recv["POST /api/webhooks/github/:repositoryId"] --> Sig{署名検証<br/>X-Hub-Signature-256}
@@ -193,8 +195,8 @@ flowchart TD
 - 署名検証は生のリクエストボディ(`request.text()`)に対して行い、検証後に初めて`JSON.parse`する。比較は`crypto.timingSafeEqual`でタイミング攻撃を避ける
 - 対象イベントは`pull_request`の`opened`・`synchronize`のみ(re-open等その他のactionは無視して200を返す)。GitHubは配信失敗(4xx/5xx)が続くとWebhookを自動的に無効化してしまうため、署名不一致(401)以外の「ai-forge側で意図的にスキップした」ケース(プロンプト未設定・レート制限超過・対象外action)はすべて200を返す
 - レート制限は既存の`checkExecutionRateLimit`(1時間20回)をそのまま使う。手動実行と同じ"execution"カウンタを共有し、連続pushによる多重実行もこの枠で自然に抑制する
-- 実際のレビュー処理(diff取得→`runAiExecution`→Review/ReviewComment作成→埋め込み生成)は`POST /api/repositories/:id/reviews`と全く同じ内容のため、重複実装を避けて`src/lib/run-repository-review.ts`に共通処理として切り出し、既存の手動実行ルートとWebhookルートの両方から呼ぶ
-- GitHubの既定の配信タイムアウト(10秒)に収めるため、レビュー本体はAI評価(`POST /api/evaluations`)と同じ`scheduleBackground()`(`next/server`の`after()`)でバックグラウンド実行し、200を即時に返す。完了時(成功/失敗)は新設の`createReviewNotification`(`createEvaluationNotification`と同じ形)でNotificationを作成する
+- 実際のレビュー処理(diff取得→`runAiExecution`→Review/ReviewComment作成→埋め込み生成→GitHub PRへのコメント投稿)は`POST /api/repositories/:id/reviews`と全く同じ内容のため、重複実装を避けて`src/lib/run-repository-review.ts`に共通処理として切り出し、既存の手動実行ルートとWebhookルートの両方から呼ぶ
+- GitHubの既定の配信タイムアウト(10秒)に収めるため、レビュー本体はAI評価(`POST /api/evaluations`)と同じ`scheduleBackground()`(`next/server`の`after()`)でバックグラウンド実行し、200を即時に返す。完了時(成功/失敗)は`createReviewNotification`(`createEvaluationNotification`と同じ形)でNotificationを作成する
 
 ### 画面(`/repositories/:id`に「Webhook設定」タブを追加)
 

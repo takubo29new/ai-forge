@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { useApiMutation } from "@/lib/use-api-mutation";
 import { useToast } from "@/components/toast-provider";
 import { PROMPT_TEMPLATES } from "@/lib/prompt-templates";
+import { REVIEW_PROMPT_TEMPLATES } from "@/lib/review-prompt-templates";
 import { INPUT_TYPE_LABEL, INPUT_TYPE_ICON, type EvaluationInputType } from "@/lib/evaluation-input-type";
+import { FileTextIcon } from "@/components/icons";
 
 const TEMPLATE_GROUPS: EvaluationInputType[] = ["IMAGE", "TEXT", "PDF"];
 
@@ -31,7 +33,7 @@ export function NewPromptForm({ categories }: { categories: Category[] }) {
     showToast("プロンプトを作成しました");
   }
 
-  function applyTemplate(template: (typeof PROMPT_TEMPLATES)[number]) {
+  function applyTemplate(template: { title: string; content: string }) {
     setTitle(template.title);
     setContent(template.content);
   }
@@ -43,9 +45,25 @@ export function NewPromptForm({ categories }: { categories: Category[] }) {
           テンプレートから始める(任意)
         </label>
         <p className="mb-2 text-xs text-zinc-500 dark:text-zinc-400">
-          AI評価(画像・テキスト・PDF)を試しやすくする叩き台です。選ぶとタイトル・本文が置き換わります(あとから自由に編集できます)。
+          AI評価(画像・テキスト・PDF)・AIレビュー(PRの差分)を試しやすくする叩き台です。選ぶとタイトル・本文が置き換わります(あとから自由に編集できます)。
         </p>
         <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1 text-xs text-zinc-400">
+              <FileTextIcon className="h-3.5 w-3.5" />
+              コードレビュー用:
+            </span>
+            {REVIEW_PROMPT_TEMPLATES.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => applyTemplate(t)}
+                className="rounded-full border border-zinc-300 px-3 py-1 text-xs hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900"
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
           {TEMPLATE_GROUPS.map((group) => {
             const templates = PROMPT_TEMPLATES.filter((t) => t.inputTypeHint === group);
             if (templates.length === 0) return null;
