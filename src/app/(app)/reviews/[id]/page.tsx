@@ -6,6 +6,7 @@ import { Markdown } from "@/components/markdown";
 import { SEVERITIES, SEVERITY_TEXT, SEVERITY_ICON, countBySeverity } from "@/lib/review-severity";
 import { STATUS_LABEL, STATUS_ICON, STATUS_TEXT } from "@/lib/execution-status";
 import { ShareControl } from "@/components/share-control";
+import { formatDateTimeJST } from "@/lib/format-date";
 
 export default async function ReviewDetailPage({
   params,
@@ -53,7 +54,7 @@ export default async function ReviewDetailPage({
           <StatusIcon className="h-4 w-4" />
           {STATUS_LABEL[review.status]}
         </span>
-        <span>実行: {review.createdAt.toLocaleString("ja-JP")}</span>
+        <span>実行: {formatDateTimeJST(review.createdAt)}</span>
         {review.execution && <span>{review.execution.model}</span>}
         {review.triggeredVia === "CHAT" && (
           <span className="rounded bg-accent/10 px-1.5 py-0.5 text-accent">

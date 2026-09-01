@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/session";
 import { parsePageSize } from "@/lib/list-limits";
 import { PageSizeSelect } from "@/components/page-size-select";
+import { formatDateTimeJST } from "@/lib/format-date";
 
 const SOURCE_STYLE: Record<string, string> = {
   SERVER: "text-red-600 dark:text-red-400",
@@ -58,7 +59,7 @@ export default async function ErrorsPage({
               <span className={`font-medium ${SOURCE_STYLE[log.source]}`}>
                 [{log.source}]
               </span>
-              <span>{log.createdAt.toLocaleString("ja-JP")}</span>
+              <span>{formatDateTimeJST(log.createdAt)}</span>
               {log.path && <span>{log.method ? `${log.method} ` : ""}{log.path}</span>}
               {log.digest && <span>digest: {log.digest}</span>}
             </p>

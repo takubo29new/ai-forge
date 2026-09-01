@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/session";
 import { Markdown } from "@/components/markdown";
 import { STATUS_LABEL, STATUS_ICON, STATUS_TEXT } from "@/lib/execution-status";
+import { formatDateTimeJST } from "@/lib/format-date";
 
 export default async function ExecutionComparePage({
   params,
@@ -56,7 +57,7 @@ export default async function ExecutionComparePage({
                 <span className="text-sm font-medium text-foreground">
                   v{e.promptVersion.versionNumber}
                 </span>
-                <span>{e.createdAt.toLocaleString("ja-JP")}</span>
+                <span>{formatDateTimeJST(e.createdAt)}</span>
                 <span className={`inline-flex items-center gap-1 ${STATUS_TEXT[e.status]}`}>
                   <StatusIcon className="h-3.5 w-3.5" />
                   {STATUS_LABEL[e.status]}

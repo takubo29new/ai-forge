@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { Markdown } from "@/components/markdown";
 import { SEVERITIES, SEVERITY_TEXT, SEVERITY_ICON, countBySeverity } from "@/lib/review-severity";
+import { formatDateTimeJST } from "@/lib/format-date";
 
 // ログイン不要の読み取り専用公開ページ。shareTokenが一致するレビューのみを
 // 表示し、userIdでの所有者チェックは行わない(トークン自体が公開用の鍵)。
@@ -48,7 +49,7 @@ export default async function SharedReviewPage({
       </p>
 
       <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-zinc-500 dark:text-zinc-400">
-        <span>実行: {review.createdAt.toLocaleString("ja-JP")}</span>
+        <span>実行: {formatDateTimeJST(review.createdAt)}</span>
         {review.execution && <span>{review.execution.model}</span>}
         <span className="flex gap-3">
           {SEVERITIES.map((s) => {

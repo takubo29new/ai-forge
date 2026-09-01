@@ -10,6 +10,7 @@ import { INPUT_TYPE_LABEL, INPUT_TYPE_ICON } from "@/lib/evaluation-input-type";
 import { STATUS_LABEL, STATUS_ICON, STATUS_TEXT } from "@/lib/execution-status";
 import { resolveEvaluationSummary } from "@/lib/evaluation-summary";
 import { decryptField } from "@/lib/field-crypto";
+import { formatDateTimeJST } from "@/lib/format-date";
 
 export default async function EvaluationDetailPage({
   params,
@@ -57,7 +58,7 @@ export default async function EvaluationDetailPage({
           <StatusIcon className="h-4 w-4" />
           {STATUS_LABEL[evaluation.status]}
         </span>
-        <span>実行: {evaluation.createdAt.toLocaleString("ja-JP")}</span>
+        <span>実行: {formatDateTimeJST(evaluation.createdAt)}</span>
         {evaluation.execution && <span>{evaluation.execution.model}</span>}
         {evaluation.status === "SUCCESS" && (
           <span className="flex gap-3">
