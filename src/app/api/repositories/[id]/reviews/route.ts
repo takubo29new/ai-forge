@@ -6,6 +6,13 @@ import { checkExecutionRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { LIST_LIMIT } from "@/lib/list-limits";
 import { runRepositoryReview } from "@/lib/run-repository-review";
 
+// POSTはClaude呼び出し(runRepositoryReview、SDK側にtimeout: 50_000を設定済み)を
+// 直接awaitする。明示指定が無いとVercel Hobbyプランの実際の上限が50秒未満になり得て、
+// SDK側のtimeoutより先にVercelに強制終了され「無言失敗」に戻ってしまうため、
+// Webhookルート(src/app/api/webhooks/github/[repositoryId]/route.ts)と揃えて
+// 明示する。
+export const maxDuration = 60;
+
 export async function GET(
   _request: Request,
   ctx: RouteContext<"/api/repositories/[id]/reviews">,
