@@ -1,9 +1,28 @@
 import crypto from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@vercel/queue", () => ({ send: vi.fn() }));
+vi.mock("@/lib/anthropic", () => ({
+  anthropic: { messages: { parse: vi.fn() } },
+}));
+vi.mock("@/lib/github", () => ({
+  getGitHubClient: vi.fn(),
+  getPullRequest: vi.fn(),
+  getPullRequestDiff: vi.fn(),
+  createPullRequestComment: vi.fn(),
+}));
+vi.mock("@/lib/voyage", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/voyage")>()),
+  embedDocuments: vi.fn(),
+}));
 
-import { send } from "@vercel/queue";
+import { anthropic } from "@/lib/anthropic";
+import {
+  getGitHubClient,
+  getPullRequest,
+  getPullRequestDiff,
+  createPullRequestComment,
+} from "@/lib/github";
+import { embedDocuments } from "@/lib/voyage";
 import { prisma } from "@/lib/prisma";
 import { encryptToken } from "@/lib/token-crypto";
 import { generateWebhookSecret } from "@/lib/github-webhook";
@@ -15,7 +34,12 @@ import {
   createTestUser,
 } from "@/test/db-helpers";
 
-const mockSend = vi.mocked(send);
+const mockParse = vi.mocked(anthropic.messages.parse);
+const mockGetClient = vi.mocked(getGitHubClient);
+const mockGetPR = vi.mocked(getPullRequest);
+const mockGetDiff = vi.mocked(getPullRequestDiff);
+const mockEmbedDocuments = vi.mocked(embedDocuments);
+const mockCreateComment = vi.mocked(createPullRequestComment);
 
 const SECRET = generateWebhookSecret();
 
@@ -30,17 +54,10 @@ function request(
     event = "pull_request",
     invalidSignature = false,
     noSignature = false,
-    deliveryId,
-  }: {
-    event?: string;
-    invalidSignature?: boolean;
-    noSignature?: boolean;
-    deliveryId?: string;
-  } = {},
+  }: { event?: string; invalidSignature?: boolean; noSignature?: boolean } = {},
 ) {
   const body = JSON.stringify(payload);
   const headers: Record<string, string> = { "x-github-event": event };
-  if (deliveryId) headers["x-github-delivery"] = deliveryId;
   if (!noSignature) {
     headers["x-hub-signature-256"] = invalidSignature
       ? "sha256=" + "0".repeat(64)
@@ -61,16 +78,10 @@ function pullRequestPayload(action: string, number = 42) {
   return { action, pull_request: { number } };
 }
 
-// このルートは署名検証・イベント/actionのフィルタ・デフォルトプロンプト/
-// レート制限チェックまでを担当し、実際のAI呼び出しはVercel Queues経由で
-// src/lib/process-review-job.tsに委譲する(Issue #106の非同期化、PR #125で
-// 発覚したVercel実行時間上限の無言失敗対策)。processReviewJob自体の挙動は
-// src/lib/process-review-job.integration.test.tsで検証する。
 describe("POST /api/webhooks/github/:repositoryId", () => {
   let userId: string;
   let repositoryId: string;
   let promptWithDiffId: string;
-  let promptVersionId: string;
 
   beforeEach(async () => {
     const user = await createTestUser();
@@ -81,7 +92,6 @@ describe("POST /api/webhooks/github/:repositoryId", () => {
 
     const prompt = await createTestPrompt(userId, "レビューして: {{diff}}");
     promptWithDiffId = prompt.id;
-    promptVersionId = prompt.versions[0].id;
 
     await prisma.repository.update({
       where: { id: repositoryId },
@@ -93,7 +103,20 @@ describe("POST /api/webhooks/github/:repositoryId", () => {
       },
     });
 
-    mockSend.mockReset().mockResolvedValue({ messageId: "msg_test" } as never);
+    mockParse.mockReset();
+    mockGetClient.mockReset().mockResolvedValue({} as never);
+    mockGetPR.mockReset().mockResolvedValue({
+      number: 42,
+      title: "Add feature",
+      url: "https://github.com/octo-test/repo-test/pull/42",
+      headSha: "abc123",
+    });
+    mockGetDiff.mockReset().mockResolvedValue({
+      diff: "diff --git a/x b/x",
+      truncated: false,
+    });
+    mockEmbedDocuments.mockReset().mockResolvedValue([]);
+    mockCreateComment.mockReset().mockResolvedValue(undefined);
   });
 
   afterEach(async () => {
@@ -131,7 +154,7 @@ describe("POST /api/webhooks/github/:repositoryId", () => {
       ctx(repositoryId),
     );
     expect(res.status).toBe(200);
-    expect(mockSend).not.toHaveBeenCalled();
+    expect(mockGetPR).not.toHaveBeenCalled();
   });
 
   it("pull_request以外のイベントは無視して200を返す", async () => {
@@ -140,7 +163,7 @@ describe("POST /api/webhooks/github/:repositoryId", () => {
       ctx(repositoryId),
     );
     expect(res.status).toBe(200);
-    expect(mockSend).not.toHaveBeenCalled();
+    expect(mockGetPR).not.toHaveBeenCalled();
   });
 
   it("opened/synchronize以外のactionは無視して200を返す", async () => {
@@ -149,7 +172,7 @@ describe("POST /api/webhooks/github/:repositoryId", () => {
       ctx(repositoryId),
     );
     expect(res.status).toBe(200);
-    expect(mockSend).not.toHaveBeenCalled();
+    expect(mockGetPR).not.toHaveBeenCalled();
   });
 
   it("デフォルトプロンプト未設定の場合はスキップし通知を作成する", async () => {
@@ -163,40 +186,63 @@ describe("POST /api/webhooks/github/:repositoryId", () => {
       ctx(repositoryId),
     );
     expect(res.status).toBe(200);
-    expect(mockSend).not.toHaveBeenCalled();
+    expect(mockGetPR).not.toHaveBeenCalled();
 
     const notifications = await prisma.notification.findMany({ where: { userId } });
     expect(notifications).toHaveLength(1);
     expect(notifications[0].message).toContain("スキップ");
   });
 
-  it("openedイベントでレビューをキューに積む", async () => {
+  it("openedイベントでレビューを実行しWEBHOOKとして記録する", async () => {
+    mockParse.mockResolvedValue({
+      parsed_output: {
+        findings: [
+          { filePath: "src/x.ts", line: 3, severity: "WARNING", body: "未使用の変数" },
+        ],
+      },
+      usage: { input_tokens: 100, output_tokens: 50 },
+    } as never);
+
     const res = await POST(
-      request(repositoryId, pullRequestPayload("opened"), { deliveryId: "delivery-1" }),
+      request(repositoryId, pullRequestPayload("opened")),
       ctx(repositoryId),
     );
     expect(res.status).toBe(200);
 
-    expect(mockSend).toHaveBeenCalledTimes(1);
-    const [topic, payload, options] = mockSend.mock.calls[0];
-    expect(topic).toBe("review-jobs");
-    expect(payload).toMatchObject({
-      repositoryId,
-      userId,
-      promptVersionId,
-      pullRequestNumber: 42,
-      triggeredVia: "WEBHOOK",
+    const review = await prisma.review.findFirst({
+      where: { repositoryId },
+      include: { comments: true },
     });
-    expect(options).toMatchObject({ idempotencyKey: "delivery-1" });
+    expect(review?.status).toBe("SUCCESS");
+    expect(review?.triggeredVia).toBe("WEBHOOK");
+    expect(review?.comments).toHaveLength(1);
+
+    const notifications = await prisma.notification.findMany({ where: { userId } });
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0].message).toContain("完了");
+    expect(notifications[0].link).toBe(`/reviews/${review!.id}`);
+
+    expect(mockCreateComment).toHaveBeenCalledTimes(1);
+    const [, , , pullNumberArg, bodyArg] = mockCreateComment.mock.calls[0];
+    expect(pullNumberArg).toBe(42);
+    expect(bodyArg).toContain("未使用の変数");
+    expect(bodyArg).toContain("src/x.ts:3");
   });
 
-  it("synchronizeイベントでもキューに積む", async () => {
+  it("synchronizeイベントでもレビューを実行する", async () => {
+    mockParse.mockResolvedValue({
+      parsed_output: { findings: [] },
+      usage: { input_tokens: 100, output_tokens: 10 },
+    } as never);
+
     const res = await POST(
       request(repositoryId, pullRequestPayload("synchronize")),
       ctx(repositoryId),
     );
     expect(res.status).toBe(200);
-    expect(mockSend).toHaveBeenCalledTimes(1);
+
+    const review = await prisma.review.findFirst({ where: { repositoryId } });
+    expect(review?.triggeredVia).toBe("WEBHOOK");
   });
 
   it("レート制限に達している場合はスキップし通知を作成する", async () => {
@@ -210,7 +256,7 @@ describe("POST /api/webhooks/github/:repositoryId", () => {
       ctx(repositoryId),
     );
     expect(res.status).toBe(200);
-    expect(mockSend).not.toHaveBeenCalled();
+    expect(mockGetPR).not.toHaveBeenCalled();
 
     const notifications = await prisma.notification.findMany({ where: { userId } });
     expect(notifications).toHaveLength(1);
@@ -232,6 +278,23 @@ describe("POST /api/webhooks/github/:repositoryId", () => {
       ctx(repositoryId),
     );
     expect(res.status).toBe(401);
-    expect(mockSend).not.toHaveBeenCalled();
+    expect(mockGetPR).not.toHaveBeenCalled();
+  });
+
+  it("PR取得に失敗した場合はReviewを作らずスキップ通知を作成する", async () => {
+    mockGetPR.mockRejectedValue(new Error("boom"));
+
+    const res = await POST(
+      request(repositoryId, pullRequestPayload("opened")),
+      ctx(repositoryId),
+    );
+    expect(res.status).toBe(200);
+
+    const review = await prisma.review.findFirst({ where: { repositoryId } });
+    expect(review).toBeNull();
+
+    const notifications = await prisma.notification.findMany({ where: { userId } });
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0].message).toContain("スキップ");
   });
 });
