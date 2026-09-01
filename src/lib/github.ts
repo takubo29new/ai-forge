@@ -167,6 +167,25 @@ export async function getPullRequestDiff(
   return { diff, truncated: false };
 }
 
+export async function createPullRequestComment(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  pullNumber: number,
+  body: string,
+) {
+  // PRはGitHub API上ではissueの一種なので、行に紐付かない全体コメントは
+  // issues.createCommentで投稿する(pulls側の「レビューコメント」はcommit_id・
+  // path・diff上の位置(line)の対応が必要で、古いdiffとのズレで失敗しうるため
+  // 採らない。Issue #123参照)。
+  await octokit.rest.issues.createComment({
+    owner,
+    repo,
+    issue_number: pullNumber,
+    body,
+  });
+}
+
 function isNotFoundError(error: unknown): boolean {
   return (
     typeof error === "object" &&

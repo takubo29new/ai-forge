@@ -8,6 +8,7 @@ vi.mock("@/lib/github", () => ({
   getGitHubClient: vi.fn(),
   getPullRequest: vi.fn(),
   getPullRequestDiff: vi.fn(),
+  createPullRequestComment: vi.fn(),
 }));
 vi.mock("@/lib/voyage", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/voyage")>()),
@@ -20,6 +21,7 @@ import {
   getGitHubClient,
   getPullRequest,
   getPullRequestDiff,
+  createPullRequestComment,
 } from "@/lib/github";
 import { embedDocuments } from "@/lib/voyage";
 import { prisma } from "@/lib/prisma";
@@ -42,6 +44,7 @@ const mockGetClient = vi.mocked(getGitHubClient);
 const mockGetPR = vi.mocked(getPullRequest);
 const mockGetDiff = vi.mocked(getPullRequestDiff);
 const mockEmbedDocuments = vi.mocked(embedDocuments);
+const mockCreateComment = vi.mocked(createPullRequestComment);
 
 function fakeEmbedding(seed: number) {
   return Array.from({ length: 1024 }, (_, i) => (i === 0 ? seed : 0));
@@ -87,6 +90,7 @@ describe("POST /api/repositories/:id/reviews", () => {
     });
     mockGetDiff.mockReset();
     mockEmbedDocuments.mockReset().mockResolvedValue([]);
+    mockCreateComment.mockReset().mockResolvedValue(undefined);
   });
 
   afterEach(async () => {

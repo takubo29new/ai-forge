@@ -8,6 +8,7 @@ vi.mock("@/lib/github", () => ({
   getGitHubClient: vi.fn(),
   getPullRequest: vi.fn(),
   getPullRequestDiff: vi.fn(),
+  createPullRequestComment: vi.fn(),
 }));
 vi.mock("@/lib/voyage", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/voyage")>()),
@@ -15,7 +16,12 @@ vi.mock("@/lib/voyage", async (importOriginal) => ({
 }));
 
 import { anthropic } from "@/lib/anthropic";
-import { getGitHubClient, getPullRequest, getPullRequestDiff } from "@/lib/github";
+import {
+  getGitHubClient,
+  getPullRequest,
+  getPullRequestDiff,
+  createPullRequestComment,
+} from "@/lib/github";
 import { embedDocuments } from "@/lib/voyage";
 import { prisma } from "@/lib/prisma";
 import { encryptToken } from "@/lib/token-crypto";
@@ -33,6 +39,7 @@ const mockGetClient = vi.mocked(getGitHubClient);
 const mockGetPR = vi.mocked(getPullRequest);
 const mockGetDiff = vi.mocked(getPullRequestDiff);
 const mockEmbedDocuments = vi.mocked(embedDocuments);
+const mockCreateComment = vi.mocked(createPullRequestComment);
 
 const SECRET = generateWebhookSecret();
 
@@ -109,6 +116,7 @@ describe("POST /api/webhooks/github/:repositoryId", () => {
       truncated: false,
     });
     mockEmbedDocuments.mockReset().mockResolvedValue([]);
+    mockCreateComment.mockReset().mockResolvedValue(undefined);
   });
 
   afterEach(async () => {
@@ -213,6 +221,12 @@ describe("POST /api/webhooks/github/:repositoryId", () => {
     expect(notifications).toHaveLength(1);
     expect(notifications[0].message).toContain("完了");
     expect(notifications[0].link).toBe(`/reviews/${review!.id}`);
+
+    expect(mockCreateComment).toHaveBeenCalledTimes(1);
+    const [, , , pullNumberArg, bodyArg] = mockCreateComment.mock.calls[0];
+    expect(pullNumberArg).toBe(42);
+    expect(bodyArg).toContain("未使用の変数");
+    expect(bodyArg).toContain("src/x.ts:3");
   });
 
   it("synchronizeイベントでもレビューを実行する", async () => {
