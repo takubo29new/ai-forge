@@ -231,12 +231,19 @@ export async function POST(request: Request) {
                   ]
                 : renderTemplate(promptVersion.content, variables);
 
-          const response = await anthropic.messages.parse({
-            model: DEFAULT_MODEL,
-            max_tokens: 16000,
-            messages: [{ role: "user", content }],
-            output_config: { format: zodOutputFormat(EvaluationOutputSchema) },
-          });
+          const response = await anthropic.messages.parse(
+            {
+              model: DEFAULT_MODEL,
+              max_tokens: 16000,
+              messages: [{ role: "user", content }],
+              output_config: { format: zodOutputFormat(EvaluationOutputSchema) },
+            },
+            // after()のコールバックもルートのmaxDuration(60秒)の範囲内でしか実行
+            // されないため、Vercelに無言で強制終了される前にSDK側で打ち切り、
+            // runAiExecution()のcatchでFAILEDとして記録させる
+            // (Webhookレビュー: run-repository-review.tsと同じ対策、Issue #106)。
+            { timeout: 50_000 },
+          );
 
           if (!response.parsed_output) {
             throw new Error("構造化出力の解析に失敗しました");
