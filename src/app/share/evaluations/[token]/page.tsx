@@ -6,6 +6,7 @@ import { TONES, TONE_TEXT, TONE_LABEL, TONE_ICON, countByTone } from "@/lib/eval
 import { INPUT_TYPE_LABEL, INPUT_TYPE_ICON } from "@/lib/evaluation-input-type";
 import { resolveEvaluationSummary } from "@/lib/evaluation-summary";
 import { decryptField } from "@/lib/field-crypto";
+import { formatDateTimeJST } from "@/lib/format-date";
 
 // ログイン不要の読み取り専用公開ページ。shareTokenが一致する評価のみを
 // 表示し、userIdでの所有者チェックは行わない(トークン自体が公開用の鍵)。
@@ -50,7 +51,7 @@ export default async function SharedEvaluationPage({
           <InputTypeIcon className="h-4 w-4" />
           {INPUT_TYPE_LABEL[evaluation.inputType]}
         </span>
-        <span>実行: {evaluation.createdAt.toLocaleString("ja-JP")}</span>
+        <span>実行: {formatDateTimeJST(evaluation.createdAt)}</span>
         {evaluation.execution && <span>{evaluation.execution.model}</span>}
         <span className="flex gap-3">
           {TONES.map((t) => {

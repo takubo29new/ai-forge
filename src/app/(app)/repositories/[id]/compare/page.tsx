@@ -5,6 +5,7 @@ import { requireUserId } from "@/lib/session";
 import { Markdown } from "@/components/markdown";
 import { SEVERITIES, SEVERITY_TEXT, SEVERITY_ICON, countBySeverity } from "@/lib/review-severity";
 import { STATUS_LABEL, STATUS_ICON, STATUS_TEXT } from "@/lib/execution-status";
+import { formatDateTimeJST } from "@/lib/format-date";
 
 export default async function ReviewComparePage({
   params,
@@ -60,7 +61,7 @@ export default async function ReviewComparePage({
                 </Link>
               </p>
               <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400">
-                <span>{review.createdAt.toLocaleString("ja-JP")}</span>
+                <span>{formatDateTimeJST(review.createdAt)}</span>
                 <span className={`inline-flex items-center gap-1 ${STATUS_TEXT[review.status]}`}>
                   <StatusIcon className="h-3.5 w-3.5" />
                   {STATUS_LABEL[review.status]}

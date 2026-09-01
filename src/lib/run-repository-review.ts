@@ -74,15 +74,21 @@ export async function runRepositoryReview({
     model: DEFAULT_MODEL,
     variables,
     call: async () => {
-      const response = await anthropic.messages.parse({
-        model: DEFAULT_MODEL,
-        // Webhook自動実行はVercel Hobbyプランのmax duration(60秒)内に収める必要があり、
-        // max_tokensが大きいほど生成時間が延びタイムアウトで無言失敗するリスクが上がる
-        // (Issue #106運用開始直後、実診断で16000設定時に68秒かかるケースを確認した)。
-        max_tokens: 8000,
-        messages: [{ role: "user", content: renderedContent }],
-        output_config: { format: zodOutputFormat(ReviewOutputSchema) },
-      });
+      const response = await anthropic.messages.parse(
+        {
+          model: DEFAULT_MODEL,
+          max_tokens: 16000,
+          messages: [{ role: "user", content: renderedContent }],
+          output_config: { format: zodOutputFormat(ReviewOutputSchema) },
+        },
+        // Webhook自動実行はVercel Hobbyプランのmax duration(60秒)内に収める必要がある。
+        // max_tokensを絞って生成時間を短くする案は、出力が上限に収まらない大きなPRで
+        // 構造化出力のJSONが途中で打ち切られパース失敗を招くため採らず、代わりに
+        // SDK側のtimeoutでVercelより先に打ち切ってrunAiExecution()のcatchに乗せ、
+        // 「無言失敗」ではなく記録の残るFAILEDにする(Issue #106運用開始直後、
+        // 実診断で16000設定時に68秒かかるケースを確認した)。
+        { timeout: 50_000 },
+      );
 
       if (!response.parsed_output) {
         throw new Error("構造化出力の解析に失敗しました");

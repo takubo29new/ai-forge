@@ -8,6 +8,7 @@ import { ImprovementSuggestions } from "./improvement-suggestions";
 import { ExecutionHistory } from "./execution-history";
 import { LIST_LIMIT, parsePageSize } from "@/lib/list-limits";
 import { PageSizeSelect } from "@/components/page-size-select";
+import { formatDateTimeJST } from "@/lib/format-date";
 
 const TABS = [
   { key: "edit", label: "編集" },
@@ -149,7 +150,7 @@ export default async function PromptDetailPage({
                 <summary className="cursor-pointer px-4 py-3 text-sm">
                   <span className="font-medium">v{v.versionNumber}</span>{" "}
                   <span className="text-zinc-500 dark:text-zinc-400">
-                    {v.createdAt.toLocaleString("ja-JP")}
+                    {formatDateTimeJST(v.createdAt)}
                   </span>{" "}
                   {v.note && (
                     <span className="text-zinc-500 dark:text-zinc-400">— {v.note}</span>
