@@ -174,7 +174,7 @@ enum ReviewTrigger {
 
 ### Webhook受信エンドポイントの処理フロー
 
-> **2026-09-01追記**: 当初は`scheduleBackground()`(`after()`)でレビュー本体をWebhook受信と同じリクエスト内のバックグラウンド処理として実行していたが、本番運用開始直後にVercel Hobbyプランのmax duration(60秒)を超過して無言で強制終了される事象が実際に発生した(PR取得・埋め込み生成等の前後処理と合わせて60秒を超えうるため、Anthropic呼び出し単体へのSDK側`timeout`指定だけでは防げなかった)。そのため実処理はVercel Queues(Beta)へ`send()`で積み、Webhook受信とは別リクエスト・別の60秒枠を持つ専用コンシューマー(`POST /api/queues/review-jobs`、`src/lib/process-review-job.ts`)へ移した。以下のフロー図・説明は移行後の構成。
+> **2026-09-01追記**: 本番運用開始直後、`scheduleBackground()`(`after()`)によるレビュー本体の実行がVercel Hobbyプランのmax duration(60秒)を超過し無言で強制終了される事象が発生した(PR取得・埋め込み生成等の前後処理と合わせて60秒を超えうるため、Anthropic呼び出し単体へのSDK側`timeout`指定だけでは防ぎきれない)。Webhook受信とレビュー実行を別リクエストに分離するVercel Queues(Beta)への移行を試みたが、**本アカウント(Hobby)では同機能が実際には有効化されておらず**(ダッシュボードにQueues関連の管理画面が存在せず、送信したメッセージを消費するコンシューマーが呼ばれない=レビューが一切実行されなくなる重大な退行)、ロールバックした。現状は`scheduleBackground()`のまま、Anthropic呼び出しのSDK側`timeout`を35秒に短縮し前後処理の余白を厚くする暫定対応に留めている(根本解決ではなく、大きなPRでは依然タイムアウトしうる。非同期化はVercel Queuesが実際に使えるようになった時点、またはPro プランへの移行後に再検討する)。
 
 ```mermaid
 flowchart TD
@@ -188,16 +188,15 @@ flowchart TD
     Prompt -- 未設定 --> Notify1[Notification作成のみ] --> R200c[200 OK]
     Prompt -- 設定済み --> RateLimit{レート制限}
     RateLimit -- 超過 --> Notify2[Notification作成のみ] --> R200d[200 OK]
-    RateLimit -- OK --> Send["Vercel Queuesへsend()<br/>(review-jobsトピック)"] --> R200e[200 OK 即時応答]
-    Send -.push配信.-> Consumer["POST /api/queues/review-jobs<br/>(独立した60秒枠)"] --> Done[完了時にNotification作成]
+    RateLimit -- OK --> BG["scheduleBackground()で<br/>レビュー本体を実行"] --> R200e[200 OK 即時応答]
+    BG --> Done[完了時にNotification作成]
 ```
 
 - 署名検証は生のリクエストボディ(`request.text()`)に対して行い、検証後に初めて`JSON.parse`する。比較は`crypto.timingSafeEqual`でタイミング攻撃を避ける
 - 対象イベントは`pull_request`の`opened`・`synchronize`のみ(re-open等その他のactionは無視して200を返す)。GitHubは配信失敗(4xx/5xx)が続くとWebhookを自動的に無効化してしまうため、署名不一致(401)以外の「ai-forge側で意図的にスキップした」ケース(プロンプト未設定・レート制限超過・対象外action)はすべて200を返す
 - レート制限は既存の`checkExecutionRateLimit`(1時間20回)をそのまま使う。手動実行と同じ"execution"カウンタを共有し、連続pushによる多重実行もこの枠で自然に抑制する
-- 実際のレビュー処理(diff取得→`runAiExecution`→Review/ReviewComment作成→埋め込み生成→GitHub PRへのコメント投稿)は`POST /api/repositories/:id/reviews`と共通の`src/lib/run-repository-review.ts`を使うが、呼び出し元(`processReviewJob`)はWebhookルートとは別リクエストで動く
-- GitHubの配信はWebhook受信ルートが即座に返す200のみを待てばよく、実処理の完了は待たない。GitHubの同一配信が再送された場合に同じジョブを二重に積まないよう、`X-GitHub-Delivery`ヘッダーを`send()`の`idempotencyKey`に使う
-- Vercel Queuesは失敗(例外)したメッセージを再配送しうるが、`run-repository-review.ts`の各ステップは既に個別にエラーハンドリング済みで、コンシューマー側で例外を捕捉した場合はログに残すのみで再送はさせない(PRコメント等の副作用が二重に起きるのを避けるため)
+- 実際のレビュー処理(diff取得→`runAiExecution`→Review/ReviewComment作成→埋め込み生成→GitHub PRへのコメント投稿)は`POST /api/repositories/:id/reviews`と全く同じ内容のため、重複実装を避けて`src/lib/run-repository-review.ts`に共通処理として切り出し、既存の手動実行ルートとWebhookルートの両方から呼ぶ
+- GitHubの既定の配信タイムアウト(10秒)に収めるため、レビュー本体はAI評価(`POST /api/evaluations`)と同じ`scheduleBackground()`(`next/server`の`after()`)でバックグラウンド実行し、200を即時に返す。完了時(成功/失敗)は`createReviewNotification`(`createEvaluationNotification`と同じ形)でNotificationを作成する
 
 ### 画面(`/repositories/:id`に「Webhook設定」タブを追加)
 
