@@ -1,15 +1,11 @@
 import { NextResponse } from "next/server";
+import { send } from "@vercel/queue";
 import { prisma } from "@/lib/prisma";
-import { getGitHubClient } from "@/lib/github";
 import { verifyWebhookSignature } from "@/lib/github-webhook";
 import { decryptToken } from "@/lib/token-crypto";
 import { checkExecutionRateLimit } from "@/lib/rate-limit";
-import { runRepositoryReview } from "@/lib/run-repository-review";
-import { scheduleBackground } from "@/lib/schedule-background";
-import {
-  createReviewNotification,
-  createReviewSkippedNotification,
-} from "@/lib/notifications";
+import type { ReviewJobPayload } from "@/lib/process-review-job";
+import { createReviewSkippedNotification } from "@/lib/notifications";
 import { logError } from "@/lib/error-log";
 
 // GitHubからのWebhook受信(Issue #106)。セッション認証は無く、代わりに
@@ -18,8 +14,11 @@ import { logError } from "@/lib/error-log";
 //
 // GitHubは配信失敗(4xx/5xx)が続くとWebhookを自動的に無効化するため、
 // 署名不一致(401)以外の「ai-forge側で意図的にスキップした」ケースは
-// すべて200を返す。実際のレビュー処理はGitHubの既定の配信タイムアウト
-// (10秒)に収めるため、scheduleBackground()でバックグラウンド実行する。
+// すべて200を返す。実際のAIレビュー処理(PR取得・Claude呼び出し・PRコメント
+// 投稿)はVercel Queues(src/app/api/queues/review-jobs/route.ts)に積んで
+// 別リクエストとして実行する。以前はこのリクエストのafter()内で行っていたが、
+// Webhook受信の前処理と合わせて60秒の実行時間上限を超え、Vercelに無言で
+// 強制終了されるケースが本番で確認された(2026-09-01, PR #125)。
 export const maxDuration = 60;
 
 export async function POST(
@@ -135,61 +134,29 @@ export async function POST(
     return NextResponse.json({ ok: true });
   }
 
-  await scheduleBackground(async () => {
-    try {
-      const octokit = await getGitHubClient(userId);
-      if (!octokit) {
-        await createReviewSkippedNotification({
-          userId,
-          repositoryId: repository.id,
-          pullRequestNumber,
-          reason: "GitHub連携情報が見つかりません",
-        });
-        return;
-      }
+  const jobPayload: ReviewJobPayload = {
+    repositoryId: repository.id,
+    userId,
+    promptVersionId: promptVersion.id,
+    pullRequestNumber,
+    triggeredVia: "WEBHOOK",
+  };
 
-      const result = await runRepositoryReview({
-        octokit,
-        repository: {
-          id: repository.id,
-          owner: repository.owner,
-          name: repository.name,
-        },
-        userId,
-        promptVersion: { id: promptVersion.id, content: promptVersion.content },
-        pullRequestNumber,
-        triggeredVia: "WEBHOOK",
-      });
-
-      if (result.status === "SUCCESS" || result.status === "FAILED") {
-        await createReviewNotification({
-          userId,
-          reviewId: result.reviewId,
-          pullRequestNumber,
-          status: result.status,
-        });
-      } else {
-        // FETCH_ERRORはrunRepositoryReview内で既にErrorLogへ記録済みだが、
-        // Reviewが作成されないためユーザーからは何も起きていないように
-        // 見えてしまう。他のスキップ経路と同様にNotificationでも知らせる。
-        await createReviewSkippedNotification({
-          userId,
-          repositoryId: repository.id,
-          pullRequestNumber,
-          reason: result.errorMessage,
-        });
-      }
-    } catch (error) {
-      await logError({
-        source: "SERVER",
-        message: `Webhook自動レビューのバックグラウンド実行に失敗しました: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-        path: `/api/webhooks/github/${repository.id}`,
-        userId,
-      });
-    }
-  });
+  try {
+    // GitHubの同一配信が再送された場合に同じジョブを二重に積まないよう、
+    // 配信ごとに一意なX-GitHub-Delivery IDをidempotencyKeyに使う。
+    const deliveryId = request.headers.get("x-github-delivery");
+    await send("review-jobs", jobPayload, deliveryId ? { idempotencyKey: deliveryId } : undefined);
+  } catch (error) {
+    await logError({
+      source: "SERVER",
+      message: `Webhook自動レビューのジョブ投入に失敗しました: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      path: `/api/webhooks/github/${repository.id}`,
+      userId,
+    });
+  }
 
   return NextResponse.json({ ok: true });
 }
