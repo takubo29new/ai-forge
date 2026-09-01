@@ -70,6 +70,7 @@ describe("POST /api/webhooks/github/:repositoryId", () => {
   let userId: string;
   let repositoryId: string;
   let promptWithDiffId: string;
+  let promptVersionId: string;
 
   beforeEach(async () => {
     const user = await createTestUser();
@@ -80,6 +81,7 @@ describe("POST /api/webhooks/github/:repositoryId", () => {
 
     const prompt = await createTestPrompt(userId, "レビューして: {{diff}}");
     promptWithDiffId = prompt.id;
+    promptVersionId = prompt.versions[0].id;
 
     await prisma.repository.update({
       where: { id: repositoryId },
@@ -181,7 +183,7 @@ describe("POST /api/webhooks/github/:repositoryId", () => {
     expect(payload).toMatchObject({
       repositoryId,
       userId,
-      promptVersionId: promptWithDiffId,
+      promptVersionId,
       pullRequestNumber: 42,
       triggeredVia: "WEBHOOK",
     });

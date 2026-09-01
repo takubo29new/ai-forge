@@ -45,7 +45,7 @@ const mockCreateComment = vi.mocked(createPullRequestComment);
 describe("processReviewJob", () => {
   let userId: string;
   let repositoryId: string;
-  let promptWithDiffId: string;
+  let promptVersionId: string;
 
   beforeEach(async () => {
     const user = await createTestUser();
@@ -55,7 +55,7 @@ describe("processReviewJob", () => {
     repositoryId = repo.id;
 
     const prompt = await createTestPrompt(userId, "レビューして: {{diff}}");
-    promptWithDiffId = prompt.id;
+    promptVersionId = prompt.versions[0].id;
 
     mockParse.mockReset();
     mockGetClient.mockReset().mockResolvedValue({} as never);
@@ -81,7 +81,7 @@ describe("processReviewJob", () => {
     return {
       repositoryId,
       userId,
-      promptVersionId: promptWithDiffId,
+      promptVersionId,
       pullRequestNumber: 42,
       triggeredVia: "WEBHOOK",
       ...overrides,
