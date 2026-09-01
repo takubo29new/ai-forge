@@ -76,7 +76,10 @@ export async function runRepositoryReview({
     call: async () => {
       const response = await anthropic.messages.parse({
         model: DEFAULT_MODEL,
-        max_tokens: 16000,
+        // Webhook自動実行はVercel Hobbyプランのmax duration(60秒)内に収める必要があり、
+        // max_tokensが大きいほど生成時間が延びタイムアウトで無言失敗するリスクが上がる
+        // (Issue #106運用開始直後、実診断で16000設定時に68秒かかるケースを確認した)。
+        max_tokens: 8000,
         messages: [{ role: "user", content: renderedContent }],
         output_config: { format: zodOutputFormat(ReviewOutputSchema) },
       });
