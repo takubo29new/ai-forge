@@ -175,6 +175,10 @@ Vercelへのデプロイを想定した構成になっている(実際にv1.0.0�
    `DATABASE_URL` / `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` / `NEXTAUTH_SECRET` / `NEXTAUTH_URL`(本番ドメイン) / `ANTHROPIC_API_KEY` / `VOYAGE_API_KEY` / `TOKEN_ENCRYPTION_KEY`
    - **`DATABASE_URL`は「Sensitive」にしないこと**。Sensitiveな環境変数はFunctionの実行時にしか渡されず、ビルド時に実行される`prisma migrate deploy`から見えなくなり`Connection url is empty`エラーになる。他の変数(ビルド時に使わないもの)はSensitiveのままで問題ない
 4. デプロイを実行する。ビルドコマンドは[`vercel.json`](./vercel.json)で`prisma migrate deploy && next build`に設定済みのため、デプロイのたびにDBマイグレーションが自動適用される(初回はpgvector拡張の有効化・HNSWインデックス作成を含む)。`ignoreCommand`により、`main`以外のブランチへのpushではビルド自体をスキップする(Previewデプロイを作らない)設定にしている
+5. **Webhook自動レビューを使う場合、GitHub Actions Secretsを登録する**: Webhook受信で作成される`Review`(status: PENDING)は、このリポジトリの`.github/workflows/process-pending-reviews.yml`(5分おきcron)が処理する([設計の詳細](./docs/phases/phase2-design.md)「Webhook自動レビューの非同期化」参照)。リポジトリの Settings → Secrets and variables → Actions に、Vercelに設定したものと同じ値で以下を登録する:
+   `DATABASE_URL` / `TOKEN_ENCRYPTION_KEY` / `ANTHROPIC_API_KEY` / `VOYAGE_API_KEY` / `NEXTAUTH_URL` / `GH_OAUTH_CLIENT_ID`(値は`GITHUB_CLIENT_ID`と同じ) / `GH_OAUTH_CLIENT_SECRET`(値は`GITHUB_CLIENT_SECRET`と同じ)
+   - GitHub Actionsは`GITHUB_`で始まる名前でSecretsを作成できないため、OAuth Appの2つだけ別名で登録し、ワークフロー側で`GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET`という環境変数名にマッピングしている
+   - 未登録のままでもWebhook受信自体(`Review`をPENDINGで作成するところまで)は動くが、ワーカーが処理できずレビューが完了しない
 
 ## ブランチ運用
 
