@@ -1,15 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getGitHubClient } from "@/lib/github";
 import { verifyWebhookSignature } from "@/lib/github-webhook";
 import { decryptToken } from "@/lib/token-crypto";
 import { checkExecutionRateLimit } from "@/lib/rate-limit";
-import { runRepositoryReview } from "@/lib/run-repository-review";
-import { scheduleBackground } from "@/lib/schedule-background";
-import {
-  createReviewNotification,
-  createReviewSkippedNotification,
-} from "@/lib/notifications";
+import { createPendingReview } from "@/lib/run-repository-review";
+import { createReviewSkippedNotification } from "@/lib/notifications";
 import { logError } from "@/lib/error-log";
 
 // GitHubからのWebhook受信(Issue #106)。セッション認証は無く、代わりに
@@ -18,9 +13,12 @@ import { logError } from "@/lib/error-log";
 //
 // GitHubは配信失敗(4xx/5xx)が続くとWebhookを自動的に無効化するため、
 // 署名不一致(401)以外の「ai-forge側で意図的にスキップした」ケースは
-// すべて200を返す。実際のレビュー処理はGitHubの既定の配信タイムアウト
-// (10秒)に収めるため、scheduleBackground()でバックグラウンド実行する。
-export const maxDuration = 60;
+// すべて200を返す。
+//
+// 実際のAIレビュー処理はここでは行わず、Review行をstatus: PENDINGで
+// 作成するだけに留める(Issue #129)。処理はGitHub Actionsの定期実行
+// ワーカー(scripts/process-pending-reviews.mts → src/lib/process-pending-reviews.ts)
+// が別途拾って行うため、Vercelの実行時間上限(旧: max duration 60秒)の影響を受けない。
 
 export async function POST(
   request: Request,
@@ -86,15 +84,33 @@ export async function POST(
     return NextResponse.json({ ok: true });
   }
 
-  const pullRequestNumber =
-    typeof payload === "object" &&
-    payload !== null &&
-    "pull_request" in payload &&
-    typeof (payload as { pull_request?: { number?: unknown } }).pull_request
-      ?.number === "number"
-      ? (payload as { pull_request: { number: number } }).pull_request.number
+  const pullRequestPayload =
+    typeof payload === "object" && payload !== null && "pull_request" in payload
+      ? (
+          payload as {
+            pull_request?: {
+              number?: unknown;
+              title?: unknown;
+              html_url?: unknown;
+              head?: { sha?: unknown };
+            };
+          }
+        ).pull_request
       : null;
-  if (pullRequestNumber === null) {
+  const pullRequestNumber =
+    typeof pullRequestPayload?.number === "number" ? pullRequestPayload.number : null;
+  const pullRequestTitle =
+    typeof pullRequestPayload?.title === "string" ? pullRequestPayload.title : null;
+  const pullRequestUrl =
+    typeof pullRequestPayload?.html_url === "string" ? pullRequestPayload.html_url : null;
+  const headSha =
+    typeof pullRequestPayload?.head?.sha === "string" ? pullRequestPayload.head.sha : null;
+  if (
+    pullRequestNumber === null ||
+    pullRequestTitle === null ||
+    pullRequestUrl === null ||
+    headSha === null
+  ) {
     return NextResponse.json({ ok: true });
   }
 
@@ -135,61 +151,29 @@ export async function POST(
     return NextResponse.json({ ok: true });
   }
 
-  await scheduleBackground(async () => {
-    try {
-      const octokit = await getGitHubClient(userId);
-      if (!octokit) {
-        await createReviewSkippedNotification({
-          userId,
-          repositoryId: repository.id,
-          pullRequestNumber,
-          reason: "GitHub連携情報が見つかりません",
-        });
-        return;
-      }
-
-      const result = await runRepositoryReview({
-        octokit,
-        repository: {
-          id: repository.id,
-          owner: repository.owner,
-          name: repository.name,
-        },
-        userId,
-        promptVersion: { id: promptVersion.id, content: promptVersion.content },
-        pullRequestNumber,
-        triggeredVia: "WEBHOOK",
-      });
-
-      if (result.status === "SUCCESS" || result.status === "FAILED") {
-        await createReviewNotification({
-          userId,
-          reviewId: result.reviewId,
-          pullRequestNumber,
-          status: result.status,
-        });
-      } else {
-        // FETCH_ERRORはrunRepositoryReview内で既にErrorLogへ記録済みだが、
-        // Reviewが作成されないためユーザーからは何も起きていないように
-        // 見えてしまう。他のスキップ経路と同様にNotificationでも知らせる。
-        await createReviewSkippedNotification({
-          userId,
-          repositoryId: repository.id,
-          pullRequestNumber,
-          reason: result.errorMessage,
-        });
-      }
-    } catch (error) {
-      await logError({
-        source: "SERVER",
-        message: `Webhook自動レビューのバックグラウンド実行に失敗しました: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-        path: `/api/webhooks/github/${repository.id}`,
-        userId,
-      });
-    }
-  });
+  try {
+    await createPendingReview({
+      repository: { id: repository.id },
+      userId,
+      promptVersionId: promptVersion.id,
+      pullRequest: {
+        number: pullRequestNumber,
+        title: pullRequestTitle,
+        url: pullRequestUrl,
+        headSha,
+      },
+      triggeredVia: "WEBHOOK",
+    });
+  } catch (error) {
+    await logError({
+      source: "SERVER",
+      message: `Webhook自動レビューのReview作成(PENDING)に失敗しました: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      path: `/api/webhooks/github/${repository.id}`,
+      userId,
+    });
+  }
 
   return NextResponse.json({ ok: true });
 }

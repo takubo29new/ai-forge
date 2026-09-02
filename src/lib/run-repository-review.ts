@@ -51,11 +51,48 @@ export type RunRepositoryReviewResult =
   | { status: "FAILED"; reviewId: string }
   | { status: "FETCH_ERROR"; errorMessage: string };
 
+// Webhook受信時点でReviewをstatus: PENDINGとして先に作っておくための最小限の作成処理
+// (Issue #129)。GitHubのWebhookペイロードに含まれるPR情報だけで作成でき、octokit呼び出しは
+// 不要。実際のAIレビュー処理はGitHub Actionsのワーカーがこの行をPROCESSINGにclaimしてから
+// runRepositoryReview()にexistingReviewIdとして渡す(src/app/api/webhooks/github/[repositoryId]/route.ts、
+// src/lib/process-pending-reviews.ts参照)。
+export async function createPendingReview({
+  repository,
+  userId,
+  promptVersionId,
+  pullRequest,
+  triggeredVia,
+}: {
+  repository: { id: string };
+  userId: string;
+  promptVersionId: string;
+  pullRequest: { number: number; title: string; url: string; headSha: string };
+  triggeredVia: ReviewTrigger;
+}) {
+  return prisma.review.create({
+    data: {
+      repositoryId: repository.id,
+      userId,
+      promptVersionId,
+      pullRequestNumber: pullRequest.number,
+      pullRequestTitle: pullRequest.title,
+      pullRequestUrl: pullRequest.url,
+      headSha: pullRequest.headSha,
+      status: "PENDING",
+      triggeredVia,
+    },
+  });
+}
+
 // PR取得→AIレビュー実行→Review/ReviewComment作成→埋め込み生成までの一連の処理。
-// 手動実行(POST /api/repositories/:id/reviews)とWebhook自動実行
-// (POST /api/webhooks/github/:repositoryId)の両方から呼ばれる共通処理
+// 手動実行(POST /api/repositories/:id/reviews)とGitHub Actionsのワーカー
+// (src/lib/process-pending-reviews.ts、Issue #129)の両方から呼ばれる共通処理
 // (docs/phases/phase2-design.md「Webhook自動レビュー」参照)。呼び出し元は
 // レート制限チェック・GitHub連携確認・プロンプト解決を済ませてから呼ぶこと。
+//
+// existingReviewIdを渡すと、新規にReviewを作る代わりに既存行(createPendingReview()で
+// PENDING→ワーカーがPROCESSINGにclaim済みのもの)をSUCCESS/FAILEDに更新する。
+// 未指定(手動実行)の場合は従来通り処理完了時にReviewを新規作成する。
 export async function runRepositoryReview({
   octokit,
   repository,
@@ -63,6 +100,7 @@ export async function runRepositoryReview({
   promptVersion,
   pullRequestNumber,
   triggeredVia,
+  existingReviewId,
 }: {
   octokit: Octokit;
   repository: { id: string; owner: string; name: string };
@@ -70,6 +108,7 @@ export async function runRepositoryReview({
   promptVersion: { id: string; content: string };
   pullRequestNumber: number;
   triggeredVia: ReviewTrigger;
+  existingReviewId?: string;
 }): Promise<RunRepositoryReviewResult> {
   let pullRequest;
   let diff: string;
@@ -96,6 +135,14 @@ export async function runRepositoryReview({
       path: `/api/repositories/${repository.id}/reviews`,
       userId,
     });
+    // PENDING/PROCESSINGのまま放置すると永遠に処理待ちに見えてしまうため、
+    // 既存行があればここでFAILEDにしておく。
+    if (existingReviewId) {
+      await prisma.review.update({
+        where: { id: existingReviewId },
+        data: { status: "FAILED" },
+      });
+    }
     return { status: "FETCH_ERROR", errorMessage: "PRの取得に失敗しました" };
   }
 
@@ -115,25 +162,18 @@ export async function runRepositoryReview({
           messages: [{ role: "user", content: renderedContent }],
           output_config: { format: zodOutputFormat(ReviewOutputSchema) },
         },
-        // Webhook自動実行はVercel Hobbyプランのmax duration(60秒)内に収める必要がある。
-        // max_tokensを絞って生成時間を短くする案は、出力が上限に収まらない大きなPRで
-        // 構造化出力のJSONが途中で打ち切られパース失敗を招くため採らず、代わりに
-        // SDK側のtimeoutでVercelより先に打ち切ってrunAiExecution()のcatchに乗せ、
-        // 「無言失敗」ではなく記録の残るFAILEDにする(Issue #106運用開始直後、
-        // 実診断で16000設定時に68秒かかるケースを確認した)。
+        // 手動実行(POST /api/repositories/:id/reviews)はVercel Hobbyプランのmax
+        // duration(60秒)内に収める必要があり、SDK側のtimeoutでVercelより先に
+        // 打ち切ってrunAiExecution()のcatchに乗せ、「無言失敗」ではなく記録の
+        // 残るFAILEDにする(実診断で16000トークン出力時に68秒かかるケースを
+        // 確認しており、PR取得・埋め込み生成等の前後処理の余白を厚めに取るため
+        // 35秒としている)。
         //
-        // 当初timeout: 50_000で運用したが、PR取得・埋め込み生成等の前後処理と
-        // 合算すると60秒を超えるケースが再発した(このAnthropic呼び出し自体の
-        // 時間だけがVercelの実行時間上限の対象ではないため)。Webhook受信と
-        // レビュー実行を別リクエストに分離するVercel Queues(Beta)への移行を
-        // 試みたが、本アカウントでは同機能が実際には有効化されておらず
-        // (ダッシュボードにQueues関連UIが存在せず、送信したメッセージを消費する
-        // コンシューマーが呼ばれない=レビューが一切実行されなくなる重大な退行)
-        // ロールバックした。前後処理の余白を厚めに取るため35秒に短縮している
-        // (根本解決には至っておらず、大きなPRでは依然タイムアウトしうる)。
-        // TODO(#129): GitHub Actionsを処理ワーカーにした非同期化が実現したら、
-        // Vercelの実行時間上限そのものから解放されるためこの制約は撤廃する。
-        { timeout: 35_000 },
+        // Webhook自動実行はGitHub Actionsのワーカー(src/lib/process-pending-reviews.ts、
+        // Issue #129)から呼ばれる(existingReviewIdが渡る)ため、Vercelの実行時間上限を
+        // 受けない。とはいえ無限に待つと1件のハングでワーカーの1回の実行枠を専有して
+        // しまうため、安全弁として長めのtimeoutを設定する。
+        { timeout: existingReviewId ? 300_000 : 35_000 },
       );
 
       if (!response.parsed_output) {
@@ -153,20 +193,21 @@ export async function runRepositoryReview({
     const { findings } = outcome.result;
 
     const review = await prisma.$transaction(async (tx) => {
-      const created = await tx.review.create({
-        data: {
-          repositoryId: repository.id,
-          userId,
-          promptVersionId: promptVersion.id,
-          executionId: outcome.execution.id,
-          pullRequestNumber: pullRequest.number,
-          pullRequestTitle: pullRequest.title,
-          pullRequestUrl: pullRequest.url,
-          headSha: pullRequest.headSha,
-          status: "SUCCESS",
-          triggeredVia,
-        },
-      });
+      const data = {
+        repositoryId: repository.id,
+        userId,
+        promptVersionId: promptVersion.id,
+        executionId: outcome.execution.id,
+        pullRequestNumber: pullRequest.number,
+        pullRequestTitle: pullRequest.title,
+        pullRequestUrl: pullRequest.url,
+        headSha: pullRequest.headSha,
+        status: "SUCCESS" as const,
+        triggeredVia,
+      };
+      const created = existingReviewId
+        ? await tx.review.update({ where: { id: existingReviewId }, data })
+        : await tx.review.create({ data });
 
       // diffが上限で切り詰められていた場合、その旨をレビュー本文の一部として
       // 残しておく(専用カラムを設けず既存のReviewComment構造で表現する)。
@@ -266,20 +307,21 @@ export async function runRepositoryReview({
     return { status: "SUCCESS", reviewId: review.review.id };
   }
 
-  const review = await prisma.review.create({
-    data: {
-      repositoryId: repository.id,
-      userId,
-      promptVersionId: promptVersion.id,
-      executionId: outcome.execution.id,
-      pullRequestNumber: pullRequest.number,
-      pullRequestTitle: pullRequest.title,
-      pullRequestUrl: pullRequest.url,
-      headSha: pullRequest.headSha,
-      status: "FAILED",
-      triggeredVia,
-    },
-  });
+  const failedData = {
+    repositoryId: repository.id,
+    userId,
+    promptVersionId: promptVersion.id,
+    executionId: outcome.execution.id,
+    pullRequestNumber: pullRequest.number,
+    pullRequestTitle: pullRequest.title,
+    pullRequestUrl: pullRequest.url,
+    headSha: pullRequest.headSha,
+    status: "FAILED" as const,
+    triggeredVia,
+  };
+  const review = existingReviewId
+    ? await prisma.review.update({ where: { id: existingReviewId }, data: failedData })
+    : await prisma.review.create({ data: failedData });
 
   return { status: "FAILED", reviewId: review.id };
 }

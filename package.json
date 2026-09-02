@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.mts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "process-pending-reviews": "tsx scripts/process-pending-reviews.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.120.0",
@@ -36,12 +37,14 @@
     "eslint-config-next": "16.3.2",
     "prisma": "^7.9.1",
     "tailwindcss": "^4",
+    "tsx": "^4.23.13",
     "typescript": "^5",
     "vitest": "^4.1.11"
   },
   "allowScripts": {
     "@prisma/engines@7.9.1": true,
     "prisma@7.9.1": true,
-    "unrs-resolver@1.12.2": true
+    "unrs-resolver@1.12.2": true,
+    "esbuild@0.28.2": true
   }
 }

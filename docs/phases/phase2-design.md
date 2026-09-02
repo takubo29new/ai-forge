@@ -175,6 +175,8 @@ enum ReviewTrigger {
 ### Webhook受信エンドポイントの処理フロー
 
 > **2026-09-01追記**: 本番運用開始直後、`scheduleBackground()`(`after()`)によるレビュー本体の実行がVercel Hobbyプランのmax duration(60秒)を超過し無言で強制終了される事象が発生した(PR取得・埋め込み生成等の前後処理と合わせて60秒を超えうるため、Anthropic呼び出し単体へのSDK側`timeout`指定だけでは防ぎきれない)。Webhook受信とレビュー実行を別リクエストに分離するVercel Queues(Beta)への移行を試みたが、**本アカウント(Hobby)では同機能が実際には有効化されておらず**(ダッシュボードにQueues関連の管理画面が存在せず、送信したメッセージを消費するコンシューマーが呼ばれない=レビューが一切実行されなくなる重大な退行)、ロールバックした。現状は`scheduleBackground()`のまま、Anthropic呼び出しのSDK側`timeout`を35秒に短縮し前後処理の余白を厚くする暫定対応に留めている(根本解決ではなく、大きなPRでは依然タイムアウトしうる)。恒久対応としてGitHub Actionsを処理ワーカーとして使う方式(Issue #129)を採用する方針だが、まずはこの暫定対応で運用しながら様子を見る(2026-09-02、ユーザーと相談のうえ決定)。
+>
+> **2026-09-02追記(Issue #129実装)**: 上記の暫定対応(35秒timeout)はVercelの実行時間上限そのものを回避できておらず、下記の設計へ置き換えた。詳細は次節「Webhook自動レビューの非同期化(GitHub Actionsワーカー、Issue #129)」を参照。
 
 ```mermaid
 flowchart TD
@@ -188,15 +190,39 @@ flowchart TD
     Prompt -- 未設定 --> Notify1[Notification作成のみ] --> R200c[200 OK]
     Prompt -- 設定済み --> RateLimit{レート制限}
     RateLimit -- 超過 --> Notify2[Notification作成のみ] --> R200d[200 OK]
-    RateLimit -- OK --> BG["scheduleBackground()で<br/>レビュー本体を実行"] --> R200e[200 OK 即時応答]
-    BG --> Done[完了時にNotification作成]
+    RateLimit -- OK --> Pending["Reviewをstatus: PENDINGで作成"] --> R200e[200 OK 即時応答]
+    Pending -.->|GitHub Actionsが<br/>別途拾って処理| Worker[（後述）]
 ```
 
 - 署名検証は生のリクエストボディ(`request.text()`)に対して行い、検証後に初めて`JSON.parse`する。比較は`crypto.timingSafeEqual`でタイミング攻撃を避ける
 - 対象イベントは`pull_request`の`opened`・`synchronize`のみ(re-open等その他のactionは無視して200を返す)。GitHubは配信失敗(4xx/5xx)が続くとWebhookを自動的に無効化してしまうため、署名不一致(401)以外の「ai-forge側で意図的にスキップした」ケース(プロンプト未設定・レート制限超過・対象外action)はすべて200を返す
 - レート制限は既存の`checkExecutionRateLimit`(1時間20回)をそのまま使う。手動実行と同じ"execution"カウンタを共有し、連続pushによる多重実行もこの枠で自然に抑制する
-- 実際のレビュー処理(diff取得→`runAiExecution`→Review/ReviewComment作成→埋め込み生成→GitHub PRへのコメント投稿)は`POST /api/repositories/:id/reviews`と全く同じ内容のため、重複実装を避けて`src/lib/run-repository-review.ts`に共通処理として切り出し、既存の手動実行ルートとWebhookルートの両方から呼ぶ
-- GitHubの既定の配信タイムアウト(10秒)に収めるため、レビュー本体はAI評価(`POST /api/evaluations`)と同じ`scheduleBackground()`(`next/server`の`after()`)でバックグラウンド実行し、200を即時に返す。完了時(成功/失敗)は`createReviewNotification`(`createEvaluationNotification`と同じ形)でNotificationを作成する
+- 実際のレビュー処理(diff取得→`runAiExecution`→Review/ReviewComment作成→埋め込み生成→GitHub PRへのコメント投稿)を行う`runRepositoryReview()`(`src/lib/run-repository-review.ts`)は`POST /api/repositories/:id/reviews`(手動実行)と共通。Webhook経路では下記のGitHub Actionsワーカーから`existingReviewId`付きで呼ばれ、Vercel上では実行しない(2026-09-02、Issue #129実装以降)
+
+### Webhook自動レビューの非同期化(GitHub Actionsワーカー、Issue #129)
+
+Vercel Hobbyプランのmax duration(60秒)そのものから解放するため、**レビュー処理本体(PR取得→Claude呼び出し→DB書き込み→PRコメント投稿)をVercel上では実行せず、GitHub Actionsのジョブ内で完結させる**。単にGitHub ActionsからVercelのAPIエンドポイントを呼び出すだけでは、呼び出された先が結局Vercelのサーバーレス関数である限り同じ60秒制限に縛られたままで根本解決にならない、という点が設計上の要点(Issue #129本文参照)。
+
+```mermaid
+flowchart LR
+    subgraph Vercel
+        Webhook["POST /api/webhooks/github/:repositoryId"] -->|"Review作成<br/>status: PENDING"| DB[(Postgres)]
+    end
+    subgraph "GitHub Actions(5分おきcron)"
+        Cron["process-pending-reviews.yml"] -->|"npm run process-pending-reviews"| Worker["scripts/process-pending-reviews.mts<br/>→ src/lib/process-pending-reviews.ts"]
+    end
+    Worker -->|"PENDING 1件をPROCESSINGへ<br/>原子的にclaim"| DB
+    Worker -->|"getGitHubClient→diff取得→<br/>Claude呼び出し→PRコメント投稿"| GitHub[GitHub API / Anthropic API]
+    Worker -->|"SUCCESS/FAILEDへ更新"| DB
+```
+
+- **PENDING→PROCESSINGのclaim**: `UPDATE Review SET status = 'PROCESSING' WHERE id = ? AND status = 'PENDING'`相当の条件付き更新(Prismaの`updateMany`+`where: { status: "PENDING" }`)で、対象行が既に他の実行にclaimされていれば0件更新となり、次の候補へスキップする。`ReviewStatus`に`PENDING`/`SUCCESS`/`FAILED`に加え`PROCESSING`を追加した
+- **多重実行防止**: ワークフロー自体は`concurrency: { group: process-pending-reviews, cancel-in-progress: false }`で同時実行を防ぐ(前回実行中は次のcronをスキップし待たせない。取りこぼしは次の5分後の実行で処理される)。上記のclaimは手動re-run等で万一重なった場合の保険
+- **トークン復号**: GitHubアクセストークンの暗号化(`src/lib/token-crypto.ts`)は全ユーザー共通の単一鍵(`TOKEN_ENCRYPTION_KEY`、SHA-256でAES-256鍵に変換)のため、GitHub Actions Secretsに1つ登録するだけで復号できる(ユーザーごとの鍵管理は不要)
+- **実行頻度と予算**: このリポジトリはPublicのため、GitHub Actionsの実行時間は無料枠の制約を受けない(Privateなら月2,000分)。5分おきのcronで運用する。GitHubのscheduled workflowは仕様上「厳密な時刻に実行される保証がない」(数分〜十数分の遅延がありうる)ため、Webhook受信からレビュー完了までのタイムラグはこの範囲で発生しうる
+- **1回の実行で処理する件数の上限**: `BATCH_LIMIT`(20件)を設け、無制限に処理し続けて次のcronと重なることを防ぐ
+- **手動実行は対象外**: `POST /api/repositories/:id/reviews`(UIからの手動実行・チャットからの直接実行)は即時性が求められるため、引き続きVercel側で同期実行のまま(`runRepositoryReview()`を`existingReviewId`無しで直接呼ぶ)。SDK側`timeout`(35秒)によるFAILED化もこの経路にのみ残す
+- **必要なGitHub Actions Secrets**: `DATABASE_URL`・`TOKEN_ENCRYPTION_KEY`・`ANTHROPIC_API_KEY`・`VOYAGE_API_KEY`・`GH_OAUTH_CLIENT_ID`/`GH_OAUTH_CLIENT_SECRET`(GitHubアクセストークンのリフレッシュ用、Actionsの予約プレフィックス`GITHUB_`を避けた別名で登録し、ワークフロー内で`GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET`にマッピングする)・`NEXTAUTH_URL`(PRコメントに載せる共有リンクの組み立て用)。値はVercelの本番環境変数と同じものをリポジトリのActions Secretsに個別登録する必要がある(手動作業、READMEに手順を記載)
 
 ### 画面(`/repositories/:id`に「Webhook設定」タブを追加)
 

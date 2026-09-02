@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/session";
+import { estimateCostUsd, formatUsd } from "@/lib/model-pricing";
 
 const RECENT_DAYS = 14;
 
@@ -72,6 +73,20 @@ export default async function UsagePage() {
   const totalPromptTokens = executionAgg._sum.promptTokens ?? 0;
   const totalCompletionTokens = executionAgg._sum.completionTokens ?? 0;
 
+  // モデルごとの概算コストを計算する。料金テーブルに無いモデル(過去に使われて
+  // いたが現在は選択肢に無いもの等)はnullになるため、合計から除外しつつ
+  // 「一部含まれていない」旨をUIで明示する。
+  const costByModel = executionsByModel.map((row) => ({
+    model: row.model,
+    cost: estimateCostUsd(
+      row.model,
+      row._sum.promptTokens ?? 0,
+      row._sum.completionTokens ?? 0,
+    ),
+  }));
+  const totalCostUsd = costByModel.reduce((sum, r) => sum + (r.cost ?? 0), 0);
+  const hasUnpricedModel = costByModel.some((r) => r.cost === null);
+
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-8">
       <Link
@@ -83,7 +98,8 @@ export default async function UsagePage() {
       <h1 className="mt-2 mb-2 text-xl font-semibold">利用状況</h1>
       <p className="mb-8 text-sm text-zinc-600 dark:text-zinc-400">
         Claude(Anthropic)のトークン使用量とVoyage
-        AIの埋め込み件数を確認できます。金額換算は行っていません(モデルごとの正確な現行料金をこの場で確認できないため、不確かな数値を表示しないようにしています)。
+        AIの埋め込み件数を確認できます。金額はAnthropic公式の現行料金表(2026-06-24時点)からの概算です。プロンプトキャッシュ・バッチAPI等の割引は考慮していないため、実際の請求額とは一致しません。Voyage
+        AIの埋め込みコストは含まれません(トークン数を記録していないため)。
       </p>
 
       <section className="mb-10">
@@ -94,7 +110,7 @@ export default async function UsagePage() {
           プロンプト実行・AIレビュー・AI評価(いずれも`Execution`として記録される呼び出し)のみが対象です。RAG検索チャットの回答生成・チャットからのアクション解析・プロンプト改善提案は現状トークン数を記録していないため含まれません。
         </p>
 
-        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
           <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
             <p className="text-2xl font-semibold">{executionAgg._count._all}</p>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">実行回数(成功+失敗)</p>
@@ -111,25 +127,36 @@ export default async function UsagePage() {
             </p>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">出力トークン合計</p>
           </div>
+          <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+            <p className="text-2xl font-semibold">{formatUsd(totalCostUsd)}</p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              概算コスト{hasUnpricedModel ? "(一部モデル未反映)" : ""}
+            </p>
+          </div>
         </div>
 
         {executionsByModel.length > 0 && (
           <div className="mb-6">
             <p className="mb-2 text-xs font-medium text-zinc-500 dark:text-zinc-400">モデル別内訳</p>
             <ul className="flex flex-col gap-1">
-              {executionsByModel.map((row) => (
-                <li
-                  key={row.model}
-                  className="flex items-center justify-between gap-3 border-b border-zinc-100 py-1.5 text-sm last:border-0 dark:border-zinc-800/60"
-                >
-                  <span className="font-mono text-xs">{row.model}</span>
-                  <span className="shrink-0 text-xs text-zinc-500 dark:text-zinc-400">
-                    {row._count._all}回 ・ 入力{" "}
-                    {(row._sum.promptTokens ?? 0).toLocaleString("ja-JP")} / 出力{" "}
-                    {(row._sum.completionTokens ?? 0).toLocaleString("ja-JP")}
-                  </span>
-                </li>
-              ))}
+              {executionsByModel.map((row) => {
+                const cost = costByModel.find((c) => c.model === row.model)?.cost ?? null;
+                return (
+                  <li
+                    key={row.model}
+                    className="flex items-center justify-between gap-3 border-b border-zinc-100 py-1.5 text-sm last:border-0 dark:border-zinc-800/60"
+                  >
+                    <span className="font-mono text-xs">{row.model}</span>
+                    <span className="shrink-0 text-xs text-zinc-500 dark:text-zinc-400">
+                      {row._count._all}回 ・ 入力{" "}
+                      {(row._sum.promptTokens ?? 0).toLocaleString("ja-JP")} / 出力{" "}
+                      {(row._sum.completionTokens ?? 0).toLocaleString("ja-JP")}
+                      {" ・ "}
+                      {cost === null ? "料金情報なし" : formatUsd(cost)}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         )}
