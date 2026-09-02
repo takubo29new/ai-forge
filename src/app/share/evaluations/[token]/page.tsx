@@ -5,7 +5,7 @@ import { Markdown } from "@/components/markdown";
 import { TONES, TONE_TEXT, TONE_LABEL, TONE_ICON, countByTone } from "@/lib/evaluation-tone";
 import { INPUT_TYPE_LABEL, INPUT_TYPE_ICON } from "@/lib/evaluation-input-type";
 import { resolveEvaluationSummary } from "@/lib/evaluation-summary";
-import { decryptField } from "@/lib/field-crypto";
+import { decryptFieldSafe } from "@/lib/field-crypto";
 import { formatDateTimeJST } from "@/lib/format-date";
 
 // ログイン不要の読み取り専用公開ページ。shareTokenが一致する評価のみを
@@ -99,7 +99,7 @@ export default async function SharedEvaluationPage({
                   )}
                 </p>
                 <div className="mt-1">
-                  <Markdown>{decryptField(f.body)}</Markdown>
+                  <Markdown>{decryptFieldSafe(f.body)}</Markdown>
                 </div>
               </li>
             );

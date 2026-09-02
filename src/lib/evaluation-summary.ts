@@ -1,4 +1,4 @@
-import { decryptField } from "@/lib/field-crypto";
+import { decryptFieldSafe } from "@/lib/field-crypto";
 import { EvaluationOutputSchema } from "@/lib/evaluation-schema";
 
 // Evaluation.summary列を追加する前に作成された評価にはこの列の値が無いため、
@@ -11,7 +11,7 @@ export function resolveEvaluationSummary(evaluation: {
   execution: { resultText: string | null } | null;
 }): string | null {
   if (evaluation.summary) {
-    return decryptField(evaluation.summary);
+    return decryptFieldSafe(evaluation.summary);
   }
   if (!evaluation.execution?.resultText) return null;
   try {
