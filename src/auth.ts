@@ -30,6 +30,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       clientSecret: process.env.GITHUB_CLIENT_SECRET,
       // Phase 2のリポジトリ連携・PR取得のため repo スコープを追加する
       authorization: { params: { scope: "read:user user:email repo" } },
+      // このアプリの認証プロバイダはGitHubのみのため、「別プロバイダでメール
+      // アドレスを詐称してアカウントを乗っ取る」というこのオプションが本来
+      // 警戒する攻撃は構造的に成立しない。TOKEN_ENCRYPTION_KEYローテーション後、
+      // Accountだけ削除してUserを残した状態(データ本体を保持するため)で再連携
+      // する際、Auth.jsが既定でOAuthAccountNotLinkedを返し再ログインをブロック
+      // するのを防ぐために必要(2026-09-02)。
+      allowDangerousEmailAccountLinking: true,
     }),
   ],
   secret: process.env.NEXTAUTH_SECRET,
