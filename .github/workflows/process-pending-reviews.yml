@@ -18,6 +18,12 @@ concurrency:
   group: process-pending-reviews
   cancel-in-progress: false
 
+# このワークフローはGitHub API呼び出し(PR取得・コメント投稿)をユーザーごとの
+# GitHubアクセストークン(DBに保存済み)で行い、GITHUB_TOKEN(このワークフロー用に
+# 自動発行されるトークン)は使わない。最小権限の原則でread-onlyに絞る。
+permissions:
+  contents: read
+
 jobs:
   process:
     runs-on: ubuntu-latest
