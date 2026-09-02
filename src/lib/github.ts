@@ -63,10 +63,25 @@ export async function getGitHubClient(userId: string) {
     !isEncryptedToken(account.access_token) ||
     (account.refresh_token !== null && !isEncryptedToken(account.refresh_token));
 
-  const accessToken = decryptToken(account.access_token);
-  const refreshToken = account.refresh_token
-    ? decryptToken(account.refresh_token)
-    : null;
+  // TOKEN_ENCRYPTION_KEYのローテーション等で復号に失敗しうる(AES-GCMの認証タグ
+  // 検証エラーは例外を投げる)。ここで捕まえず伝播させるとページ・APIが500になる
+  // ため、「連携情報が見つからない」場合と同じnullを返し、呼び出し元の既存の
+  // 「ログアウトして再度ログインしてください」という案内にそのまま乗せる。
+  let accessToken: string;
+  let refreshToken: string | null;
+  try {
+    accessToken = decryptToken(account.access_token);
+    refreshToken = account.refresh_token ? decryptToken(account.refresh_token) : null;
+  } catch (error) {
+    await logError({
+      source: "SERVER",
+      message: `GitHubアクセストークンの復号に失敗しました: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      userId,
+    });
+    return null;
+  }
 
   if (needsMigration) {
     await prisma.account.update({
