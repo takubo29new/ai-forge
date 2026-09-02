@@ -9,7 +9,7 @@ import { ShareControl } from "@/components/share-control";
 import { INPUT_TYPE_LABEL, INPUT_TYPE_ICON } from "@/lib/evaluation-input-type";
 import { STATUS_LABEL, STATUS_ICON, STATUS_TEXT } from "@/lib/execution-status";
 import { resolveEvaluationSummary } from "@/lib/evaluation-summary";
-import { decryptField } from "@/lib/field-crypto";
+import { decryptFieldSafe } from "@/lib/field-crypto";
 import { formatDateTimeJST } from "@/lib/format-date";
 
 export default async function EvaluationDetailPage({
@@ -135,7 +135,7 @@ export default async function EvaluationDetailPage({
                   )}
                 </p>
                 <div className="mt-1">
-                  <Markdown>{decryptField(f.body)}</Markdown>
+                  <Markdown>{decryptFieldSafe(f.body)}</Markdown>
                 </div>
               </li>
             );

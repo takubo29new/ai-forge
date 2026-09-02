@@ -8,3 +8,17 @@ export {
   decryptToken as decryptField,
   isEncryptedToken,
 } from "./token-crypto";
+
+import { decryptToken } from "./token-crypto";
+
+// TOKEN_ENCRYPTION_KEYのローテーション等で復号に失敗しうる(AES-GCMの認証タグ
+// 検証エラーは例外を投げる)。評価結果の表示(一覧・詳細・共有ページ)は
+// サーバーコンポーネント内で直接呼ぶため、ここで捕まえないとページ全体が
+// 500になる。共有ページは非ログインの第三者にも公開されるため特に影響が大きい。
+export function decryptFieldSafe(value: string): string {
+  try {
+    return decryptToken(value);
+  } catch {
+    return "(暗号化キーのローテーションにより表示できません)";
+  }
+}
