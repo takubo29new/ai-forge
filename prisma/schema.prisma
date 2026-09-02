@@ -253,7 +253,8 @@ model Repository {
 }
 
 enum ReviewStatus {
-  PENDING
+  PENDING // Webhook受信直後、GitHub Actionsのワーカーがまだ処理していない状態(Issue #129)
+  PROCESSING // ワーカーがPENDINGからclaimして処理中(多重実行防止のため経由する)
   SUCCESS
   FAILED
 }

@@ -1,0 +1,45 @@
+name: Process pending reviews
+
+# Webhook自動レビューの非同期ワーカー(Issue #129)。GitHubの受信ルート
+# (src/app/api/webhooks/github/[repositoryId]/route.ts)はReviewをPENDINGで
+# 作るだけに留めており、実際のPR取得→Claude呼び出し→DB書き込み→PRコメント投稿は
+# ここで完結させる。GitHub Actionsのジョブ実行時間はVercelよりはるかに長く
+# (無料枠でも1ジョブ最大6時間)、Vercelの実行時間上限を受けない。
+#
+# concurrencyでこのワークフロー自体の重複実行を防ぐ(cancel-in-progress: false =
+# 前回実行中は次のcronをスキップし、待たせず捨てる。次の5分後にまた実行されるため
+# 取りこぼしにはならない)。
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: process-pending-reviews
+  cancel-in-progress: false
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      TOKEN_ENCRYPTION_KEY: ${{ secrets.TOKEN_ENCRYPTION_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+      GITHUB_CLIENT_ID: ${{ secrets.GH_OAUTH_CLIENT_ID }}
+      GITHUB_CLIENT_SECRET: ${{ secrets.GH_OAUTH_CLIENT_SECRET }}
+      NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm run process-pending-reviews
