@@ -7,6 +7,7 @@ import { SEVERITIES, SEVERITY_TEXT, SEVERITY_ICON, countBySeverity } from "@/lib
 import { STATUS_LABEL, STATUS_ICON, STATUS_TEXT } from "@/lib/execution-status";
 import { ShareControl } from "@/components/share-control";
 import { formatDateTimeJST } from "@/lib/format-date";
+import { ReviewAutoRefresh } from "@/components/review-auto-refresh";
 
 export default async function ReviewDetailPage({
   params,
@@ -34,6 +35,7 @@ export default async function ReviewDetailPage({
 
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-8">
+      <ReviewAutoRefresh status={review.status} />
       <Link
         href={`/repositories/${review.repositoryId}?tab=history`}
         className="text-sm text-zinc-500 hover:underline dark:text-zinc-400"
@@ -89,6 +91,13 @@ export default async function ReviewDetailPage({
             initialShareToken={review.shareToken}
           />
         </div>
+      )}
+
+      {(review.status === "PENDING" || review.status === "PROCESSING") && (
+        <p className="flex items-start gap-2 rounded-lg border border-zinc-200 px-4 py-3 text-sm text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
+          <StatusIcon className="mt-0.5 h-4 w-4 shrink-0" />
+          レビューを処理しています。しばらくすると自動的に結果が表示されます。
+        </p>
       )}
 
       {review.status === "FAILED" && (

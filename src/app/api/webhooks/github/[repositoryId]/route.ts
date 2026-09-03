@@ -6,6 +6,8 @@ import { checkExecutionRateLimit } from "@/lib/rate-limit";
 import { createPendingReview } from "@/lib/run-repository-review";
 import { createReviewSkippedNotification } from "@/lib/notifications";
 import { logError } from "@/lib/error-log";
+import { getGitHubClient } from "@/lib/github";
+import { triggerReviewWorker } from "@/lib/trigger-review-worker";
 
 // GitHubからのWebhook受信(Issue #106)。セッション認証は無く、代わりに
 // リポジトリごとに生成したsecretでX-Hub-Signature-256を検証する
@@ -164,6 +166,11 @@ export async function POST(
       },
       triggeredVia: "WEBHOOK",
     });
+
+    const octokit = await getGitHubClient(userId);
+    if (octokit) {
+      await triggerReviewWorker(octokit, userId);
+    }
   } catch (error) {
     await logError({
       source: "SERVER",
