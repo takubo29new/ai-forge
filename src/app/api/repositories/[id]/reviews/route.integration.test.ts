@@ -1,29 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 
 vi.mock("@/auth", () => ({ auth: vi.fn() }));
-vi.mock("@/lib/anthropic", () => ({
-  anthropic: { messages: { parse: vi.fn() } },
-}));
 vi.mock("@/lib/github", () => ({
   getGitHubClient: vi.fn(),
   getPullRequest: vi.fn(),
-  getPullRequestDiff: vi.fn(),
-  createPullRequestComment: vi.fn(),
 }));
-vi.mock("@/lib/voyage", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/voyage")>()),
-  embedDocuments: vi.fn(),
+vi.mock("@/lib/trigger-review-worker", () => ({
+  triggerReviewWorker: vi.fn(),
 }));
 
 import { auth } from "@/auth";
-import { anthropic } from "@/lib/anthropic";
-import {
-  getGitHubClient,
-  getPullRequest,
-  getPullRequestDiff,
-  createPullRequestComment,
-} from "@/lib/github";
-import { embedDocuments } from "@/lib/voyage";
+import { getGitHubClient, getPullRequest } from "@/lib/github";
+import { triggerReviewWorker } from "@/lib/trigger-review-worker";
 import { prisma } from "@/lib/prisma";
 import { POST } from "./route";
 import {
@@ -39,16 +27,9 @@ import {
 const mockAuth = vi.mocked(auth) as unknown as Mock<
   () => Promise<{ user: { id: string } } | null>
 >;
-const mockParse = vi.mocked(anthropic.messages.parse);
 const mockGetClient = vi.mocked(getGitHubClient);
 const mockGetPR = vi.mocked(getPullRequest);
-const mockGetDiff = vi.mocked(getPullRequestDiff);
-const mockEmbedDocuments = vi.mocked(embedDocuments);
-const mockCreateComment = vi.mocked(createPullRequestComment);
-
-function fakeEmbedding(seed: number) {
-  return Array.from({ length: 1024 }, (_, i) => (i === 0 ? seed : 0));
-}
+const mockTriggerWorker = vi.mocked(triggerReviewWorker);
 
 function request(body: unknown) {
   return new Request("http://localhost/api/repositories/x/reviews", {
@@ -61,6 +42,11 @@ function ctx(id: string) {
   return { params: Promise.resolve({ id }) };
 }
 
+// このルートはPR取得(GitHub API呼び出し)までしか行わず、Reviewをstatus: PENDINGで
+// 作成してGitHub Actionsワーカーの即時起動(triggerReviewWorker)を呼ぶだけに留める
+// (Vercel Hobbyプランのmax duration内にClaude呼び出しが収まらないケースがあった
+// ため)。AIレビュー自体の内容(指摘の作成・diff切り詰め警告・埋め込み生成等)は
+// runRepositoryReview()側のテスト(../../../../lib/run-repository-review.integration.test.ts)で検証する。
 describe("POST /api/repositories/:id/reviews", () => {
   let userId: string;
   let repositoryId: string;
@@ -80,7 +66,6 @@ describe("POST /api/repositories/:id/reviews", () => {
     promptWithoutDiffId = withoutDiff.id;
 
     mockAuth.mockReset().mockResolvedValue({ user: { id: userId } } as never);
-    mockParse.mockReset();
     mockGetClient.mockReset().mockResolvedValue({} as never);
     mockGetPR.mockReset().mockResolvedValue({
       number: 42,
@@ -88,9 +73,7 @@ describe("POST /api/repositories/:id/reviews", () => {
       url: "https://github.com/octo-test/repo-test/pull/42",
       headSha: "abc123",
     });
-    mockGetDiff.mockReset();
-    mockEmbedDocuments.mockReset().mockResolvedValue([]);
-    mockCreateComment.mockReset().mockResolvedValue(undefined);
+    mockTriggerWorker.mockReset().mockResolvedValue(undefined);
   });
 
   afterEach(async () => {
@@ -114,55 +97,42 @@ describe("POST /api/repositories/:id/reviews", () => {
     expect(res.status).toBe(400);
   });
 
-  it("成功時はClaudeの指摘どおりにReviewCommentを作成し201を返す", async () => {
-    mockGetDiff.mockResolvedValue({
-      diff: "diff --git a/x b/x",
-      truncated: false,
-    });
-    mockParse.mockResolvedValue({
-      parsed_output: {
-        findings: [
-          { filePath: "src/x.ts", line: 3, severity: "WARNING", body: "未使用の変数" },
-        ],
-      },
-      usage: { input_tokens: 100, output_tokens: 50 },
-    } as never);
-    mockEmbedDocuments.mockResolvedValue([fakeEmbedding(1)]);
-
+  it("GitHub連携情報が見つからない場合は400を返す", async () => {
+    mockGetClient.mockResolvedValue(null);
     const res = await POST(
       request({ pullRequestNumber: 42, promptId: promptWithDiffId }),
       ctx(repositoryId),
     );
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(400);
+    expect(mockGetPR).not.toHaveBeenCalled();
+  });
+
+  it("PR取得に失敗した場合は502を返す", async () => {
+    mockGetPR.mockRejectedValue(new Error("boom"));
+    const res = await POST(
+      request({ pullRequestNumber: 42, promptId: promptWithDiffId }),
+      ctx(repositoryId),
+    );
+    expect(res.status).toBe(502);
+  });
+
+  it("成功時はPENDINGなReviewを作成し202を返し、ワーカーを起動する", async () => {
+    const res = await POST(
+      request({ pullRequestNumber: 42, promptId: promptWithDiffId }),
+      ctx(repositoryId),
+    );
+    expect(res.status).toBe(202);
     const { id: reviewId } = await res.json();
 
-    const review = await prisma.review.findUnique({
-      where: { id: reviewId },
-      include: { comments: true },
-    });
-    expect(review?.status).toBe("SUCCESS");
+    const review = await prisma.review.findUnique({ where: { id: reviewId } });
+    expect(review?.status).toBe("PENDING");
     expect(review?.triggeredVia).toBe("UI");
-    expect(review?.comments).toHaveLength(1);
-    expect(review?.comments[0].filePath).toBe("src/x.ts");
+    expect(review?.pullRequestTitle).toBe("Add feature");
 
-    // 新規に作成された指摘には都度埋め込みが生成される(RAG検索チャットの検索対象)
-    const embedded = await prisma.$queryRaw<{ id: string }[]>`
-      SELECT "reviewCommentId" AS id FROM "ReviewCommentEmbedding"
-      WHERE "reviewCommentId" = ${review!.comments[0].id}
-    `;
-    expect(embedded).toHaveLength(1);
+    expect(mockTriggerWorker).toHaveBeenCalledTimes(1);
   });
 
   it("triggeredVia: CHATを指定するとチャット実行として記録される(Phase 4項目4)", async () => {
-    mockGetDiff.mockResolvedValue({
-      diff: "diff --git a/x b/x",
-      truncated: false,
-    });
-    mockParse.mockResolvedValue({
-      parsed_output: { findings: [] },
-      usage: { input_tokens: 100, output_tokens: 10 },
-    } as never);
-
     const res = await POST(
       request({
         pullRequestNumber: 42,
@@ -171,7 +141,7 @@ describe("POST /api/repositories/:id/reviews", () => {
       }),
       ctx(repositoryId),
     );
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(202);
     const { id: reviewId } = await res.json();
 
     const review = await prisma.review.findUnique({ where: { id: reviewId } });
@@ -179,15 +149,6 @@ describe("POST /api/repositories/:id/reviews", () => {
   });
 
   it("triggeredViaに不正な値を指定してもUIとして扱われる", async () => {
-    mockGetDiff.mockResolvedValue({
-      diff: "diff --git a/x b/x",
-      truncated: false,
-    });
-    mockParse.mockResolvedValue({
-      parsed_output: { findings: [] },
-      usage: { input_tokens: 100, output_tokens: 10 },
-    } as never);
-
     const res = await POST(
       request({
         pullRequestNumber: 42,
@@ -200,47 +161,5 @@ describe("POST /api/repositories/:id/reviews", () => {
 
     const review = await prisma.review.findUnique({ where: { id: reviewId } });
     expect(review?.triggeredVia).toBe("UI");
-  });
-
-  it("diffが切り詰められた場合はReviewCommentに警告を残す", async () => {
-    mockGetDiff.mockResolvedValue({
-      diff: "diff --git a/x b/x (clipped)",
-      truncated: true,
-    });
-    mockParse.mockResolvedValue({
-      parsed_output: { findings: [] },
-      usage: { input_tokens: 100, output_tokens: 10 },
-    } as never);
-
-    const res = await POST(
-      request({ pullRequestNumber: 42, promptId: promptWithDiffId }),
-      ctx(repositoryId),
-    );
-    const { id: reviewId } = await res.json();
-
-    const comments = await prisma.reviewComment.findMany({
-      where: { reviewId },
-    });
-    expect(comments).toHaveLength(1);
-    expect(comments[0].filePath).toBe("(PR diff)");
-    expect(comments[0].severity).toBe("WARNING");
-  });
-
-  it("AI呼び出し失敗時はReviewをFAILEDで作成し200を返す(201にしない)", async () => {
-    mockGetDiff.mockResolvedValue({
-      diff: "diff --git a/x b/x",
-      truncated: false,
-    });
-    mockParse.mockRejectedValue(new Error("upstream boom"));
-
-    const res = await POST(
-      request({ pullRequestNumber: 42, promptId: promptWithDiffId }),
-      ctx(repositoryId),
-    );
-    expect(res.status).toBe(200);
-
-    const { id: reviewId } = await res.json();
-    const review = await prisma.review.findUnique({ where: { id: reviewId } });
-    expect(review?.status).toBe("FAILED");
   });
 });

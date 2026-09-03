@@ -1,17 +1,18 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { getGitHubClient } from "@/lib/github";
+import { getGitHubClient, getPullRequest } from "@/lib/github";
 import { checkExecutionRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { LIST_LIMIT } from "@/lib/list-limits";
-import { runRepositoryReview } from "@/lib/run-repository-review";
+import { createPendingReview } from "@/lib/run-repository-review";
+import { triggerReviewWorker } from "@/lib/trigger-review-worker";
 
-// POSTはClaude呼び出し(runRepositoryReview、SDK側にtimeout: 50_000を設定済み)を
-// 直接awaitする。明示指定が無いとVercel Hobbyプランの実際の上限が50秒未満になり得て、
-// SDK側のtimeoutより先にVercelに強制終了され「無言失敗」に戻ってしまうため、
-// Webhookルート(src/app/api/webhooks/github/[repositoryId]/route.ts)と揃えて
-// 明示する。
-export const maxDuration = 60;
+// POSTはPR取得(GitHub API呼び出し)までしか行わない。以前はClaude呼び出しまで
+// 直接awaitしていたが、Vercel Hobbyプランのmax duration(60秒)内に収まらない
+// ケース(16000トークン出力時に実測68秒)があり、無視できない頻度でタイムアウト
+// 失敗していた。WebhookルートやGitHub Actionsワーカーと同じPENDING作成方式に
+// 統一し、実処理(AIレビュー・PRコメント投稿)はtriggerReviewWorker()で即時起動
+// するGitHub Actions側(src/lib/process-pending-reviews.ts)に任せる。
 
 export async function GET(
   _request: Request,
@@ -108,20 +109,27 @@ export async function POST(
     );
   }
 
-  const result = await runRepositoryReview({
-    octokit,
-    repository: { id: repository.id, owner: repository.owner, name: repository.name },
+  let pullRequest;
+  try {
+    pullRequest = await getPullRequest(
+      octokit,
+      repository.owner,
+      repository.name,
+      pullRequestNumber,
+    );
+  } catch {
+    return NextResponse.json({ error: "PRの取得に失敗しました" }, { status: 502 });
+  }
+
+  const review = await createPendingReview({
+    repository: { id: repository.id },
     userId,
-    promptVersion: { id: promptVersion.id, content: promptVersion.content },
-    pullRequestNumber,
+    promptVersionId: promptVersion.id,
+    pullRequest,
     triggeredVia,
   });
 
-  if (result.status === "FETCH_ERROR") {
-    return NextResponse.json({ error: result.errorMessage }, { status: 502 });
-  }
-  if (result.status === "SUCCESS") {
-    return NextResponse.json({ id: result.reviewId }, { status: 201 });
-  }
-  return NextResponse.json({ id: result.reviewId }, { status: 200 });
+  await triggerReviewWorker(octokit, userId);
+
+  return NextResponse.json({ id: review.id }, { status: 202 });
 }

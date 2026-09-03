@@ -6,12 +6,17 @@ name: Process pending reviews
 # ここで完結させる。GitHub Actionsのジョブ実行時間はVercelよりはるかに長く
 # (無料枠でも1ジョブ最大6時間)、Vercelの実行時間上限を受けない。
 #
+# 実処理のトリガーはWebhook受信・手動レビュー要求のたびにVercel側から直接叩く
+# workflow_dispatch(src/lib/trigger-review-worker.ts)に寄せている。scheduleの
+# 実行タイミングはGitHub側で保証されておらず数十分〜数時間遅延することがあるため、
+# こちらはdispatch呼び出し自体が失敗した場合の保険としてのみ低頻度で残す。
+#
 # concurrencyでこのワークフロー自体の重複実行を防ぐ(cancel-in-progress: false =
-# 前回実行中は次のcronをスキップし、待たせず捨てる。次の5分後にまた実行されるため
-# 取りこぼしにはならない)。
+# 前回実行中は次のcronをスキップし、待たせず捨てる。次の実行タイミングでまた
+# 実行されるため取りこぼしにはならない)。
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "*/30 * * * *"
   workflow_dispatch:
 
 concurrency:
