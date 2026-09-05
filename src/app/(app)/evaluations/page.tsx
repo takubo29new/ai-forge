@@ -49,6 +49,7 @@ export default async function EvaluationsPage({
           inputType: e.inputType,
           findingCount: e._count.findings,
           createdAt: e.createdAt.toISOString(),
+          batchId: e.batchId,
         }))}
         prompts={promptRows.map((p) => ({
           id: p.id,

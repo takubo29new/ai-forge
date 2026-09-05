@@ -10,6 +10,10 @@ import { renderTemplate } from "@/lib/prompt-variables";
 import { runAiExecution } from "@/lib/run-ai-execution";
 import { scheduleBackground } from "@/lib/schedule-background";
 import { createEvaluationNotification } from "@/lib/notifications";
+import {
+  recordBatchItemCompleted,
+  recordBatchItemSkipped,
+} from "@/lib/evaluation-batch";
 import { encryptField } from "@/lib/field-crypto";
 import { logError } from "@/lib/error-log";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
@@ -75,6 +79,23 @@ async function notifyEvaluationOutcomeBestEffort(
   }
 }
 
+// バッチAI評価(Issue #108)に属する場合は個別のEvaluation単位では通知せず、
+// バッチ全体の完了カウンタを進める(通知センターがバッチのファイル数分埋まる
+// のを避けるため)。単独の評価はこれまでどおり1件ずつ通知する。
+async function finishEvaluationBestEffort(
+  userId: string,
+  evaluationId: string,
+  title: string,
+  status: "SUCCESS" | "FAILED",
+  batchId: string | null,
+) {
+  if (batchId) {
+    await recordBatchItemCompleted(batchId);
+    return;
+  }
+  await notifyEvaluationOutcomeBestEffort(userId, evaluationId, title, status);
+}
+
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) {
@@ -98,217 +119,276 @@ export async function POST(request: Request) {
   }
   const userId = session.user.id;
 
-  const body = await request.json();
-  const title = typeof body.title === "string" ? body.title.trim() : "";
-  const promptId = typeof body.promptId === "string" ? body.promptId : null;
-  // inputTypeは"TEXT"/"PDF"を明示した場合のみそれぞれの評価、それ以外
-  // (未指定含む)は既存の画像評価として扱う(後方互換)。
-  const inputType =
-    body.inputType === "TEXT"
-      ? "TEXT"
-      : body.inputType === "PDF"
-        ? "PDF"
-        : "IMAGE";
+  // バッチAI評価(Issue #108)。fail()やレート制限分岐は明示的なバリデーション/
+  // 制限超過(400/429)だけをカバーしており、不正なJSON・DBエラー等の想定外の
+  // 例外はここに含まれない。それらを未処理のまま5xxにしてしまうと、batchIdが
+  // 判明していても完了カウンタが進まず、バッチが永久に完了しなくなる
+  // (通知も飛ばず、詳細画面のポーリングも止まらない)。evaluation.create()
+  // までの区間全体をtry/catchで包み、想定外の例外もbatchId判明後なら必ず
+  // recordBatchItemSkippedを経由させる(create()成功後はEvaluation行が
+  // 存在するため、以降はscheduleBackground内の既存catchが終端状態を保証する)。
+  let batchId: string | null = null;
+  try {
+    const body = await request.json();
+    const title = typeof body.title === "string" ? body.title.trim() : "";
+    const promptId = typeof body.promptId === "string" ? body.promptId : null;
+    // inputTypeは"TEXT"/"PDF"を明示した場合のみそれぞれの評価、それ以外
+    // (未指定含む)は既存の画像評価として扱う(後方互換)。
+    const inputType =
+      body.inputType === "TEXT"
+        ? "TEXT"
+        : body.inputType === "PDF"
+          ? "PDF"
+          : "IMAGE";
 
-  if (!title || !promptId) {
-    return NextResponse.json(
-      { error: "タイトル・プロンプトを指定してください" },
-      { status: 400 },
-    );
-  }
+    // TEXTは対象外(variablesベースのバッチはUI上想定していないため、指定
+    // されても無視する)。batchIdは他ユーザーのバッチを誤って/不正にカウント
+    // しないよう、所有権を確認できたものだけを以降で使う。
+    const rawBatchId =
+      typeof body.batchId === "string" &&
+      (inputType === "IMAGE" || inputType === "PDF")
+        ? body.batchId
+        : null;
+    if (rawBatchId) {
+      const batch = await prisma.evaluationBatch.findFirst({
+        where: { id: rawBatchId, userId },
+      });
+      if (!batch) {
+        return NextResponse.json(
+          { error: "バッチが見つかりません" },
+          { status: 400 },
+        );
+      }
+      batchId = batch.id;
+    }
 
-  const imageBase64 =
-    typeof body.imageBase64 === "string" ? body.imageBase64 : null;
-  const imageMediaType =
-    typeof body.imageMediaType === "string" ? body.imageMediaType : null;
-  const pdfBase64 = typeof body.pdfBase64 === "string" ? body.pdfBase64 : null;
-  // テキスト評価は既存のプロンプト実行と同じ{{変数名}}展開を使う
-  // (docs/phases/phase5-design.md「対応する入力形式」参照)。
-  const variables: Record<string, string> = {};
+    // バリデーションで弾かれるとEvaluation行自体が作られないため、バッチに
+    // 属するリクエストの場合はここで完了カウンタを進めておかないと、その
+    // バッチがいつまでもtotalに到達せずまとめ通知が送られなくなる。
+    const fail = async (status: number, error: string) => {
+      if (batchId) await recordBatchItemSkipped(batchId);
+      return NextResponse.json({ error }, { status });
+    };
 
-  if (inputType === "IMAGE") {
-    if (!imageBase64 || !imageMediaType) {
-      return NextResponse.json(
-        { error: "画像を指定してください" },
-        { status: 400 },
-      );
+    if (!title || !promptId) {
+      return await fail(400, "タイトル・プロンプトを指定してください");
     }
-    if (!isImageMediaType(imageMediaType)) {
-      return NextResponse.json(
-        { error: "対応していない画像形式です(jpeg/png/gif/webpのみ)" },
-        { status: 400 },
-      );
-    }
-    if (imageBase64.length > MAX_IMAGE_BASE64_LENGTH) {
-      return NextResponse.json(
-        { error: "画像サイズが大きすぎます(5MB以下にしてください)" },
-        { status: 400 },
-      );
-    }
-  } else if (inputType === "PDF") {
-    if (!pdfBase64) {
-      return NextResponse.json(
-        { error: "PDFファイルを指定してください" },
-        { status: 400 },
-      );
-    }
-    if (pdfBase64.length > MAX_PDF_BASE64_LENGTH) {
-      return NextResponse.json(
-        { error: "PDFサイズが大きすぎます(20MB以下にしてください)" },
-        { status: 400 },
-      );
-    }
-  } else {
-    const rawVariables = body.variables;
-    if (typeof rawVariables === "object" && rawVariables !== null) {
-      for (const [key, value] of Object.entries(rawVariables)) {
-        if (typeof value === "string") variables[key] = value;
+
+    const imageBase64 =
+      typeof body.imageBase64 === "string" ? body.imageBase64 : null;
+    const imageMediaType =
+      typeof body.imageMediaType === "string" ? body.imageMediaType : null;
+    const pdfBase64 =
+      typeof body.pdfBase64 === "string" ? body.pdfBase64 : null;
+    // テキスト評価は既存のプロンプト実行と同じ{{変数名}}展開を使う
+    // (docs/phases/phase5-design.md「対応する入力形式」参照)。
+    const variables: Record<string, string> = {};
+
+    if (inputType === "IMAGE") {
+      if (!imageBase64 || !imageMediaType) {
+        return fail(400, "画像を指定してください");
+      }
+      if (!isImageMediaType(imageMediaType)) {
+        return fail(400, "対応していない画像形式です(jpeg/png/gif/webpのみ)");
+      }
+      if (imageBase64.length > MAX_IMAGE_BASE64_LENGTH) {
+        return fail(400, "画像サイズが大きすぎます(5MB以下にしてください)");
+      }
+    } else if (inputType === "PDF") {
+      if (!pdfBase64) {
+        return fail(400, "PDFファイルを指定してください");
+      }
+      if (pdfBase64.length > MAX_PDF_BASE64_LENGTH) {
+        return fail(400, "PDFサイズが大きすぎます(20MB以下にしてください)");
+      }
+    } else {
+      const rawVariables = body.variables;
+      if (typeof rawVariables === "object" && rawVariables !== null) {
+        for (const [key, value] of Object.entries(rawVariables)) {
+          if (typeof value === "string") variables[key] = value;
+        }
       }
     }
-  }
 
-  const promptVersion = await prisma.promptVersion.findFirst({
-    where: { prompt: { id: promptId, userId } },
-    orderBy: { versionNumber: "desc" },
-  });
-  if (!promptVersion) {
-    return NextResponse.json(
-      { error: "プロンプトが見つかりません" },
-      { status: 400 },
-    );
-  }
+    const promptVersion = await prisma.promptVersion.findFirst({
+      where: { prompt: { id: promptId, userId } },
+      orderBy: { versionNumber: "desc" },
+    });
+    if (!promptVersion) {
+      return fail(400, "プロンプトが見つかりません");
+    }
 
-  const rateLimit = await checkEvaluationRateLimit(userId);
-  if (!rateLimit.allowed) {
-    return rateLimitResponse(rateLimit.limit);
-  }
+    const rateLimit = await checkEvaluationRateLimit(userId);
+    if (!rateLimit.allowed) {
+      if (batchId) await recordBatchItemSkipped(batchId);
+      return rateLimitResponse(rateLimit.limit);
+    }
 
-  // Claude Vision呼び出しはレイテンシが大きいため、先にPENDINGなEvaluationを
-  // 作って即座に返し、実際のAI呼び出し・結果の書き込みはバックグラウンドで行う
-  // (Phase 5「バックグラウンド処理」、docs/phases/phase5-design.md参照)。
-  const evaluation = await prisma.evaluation.create({
-    data: {
-      userId,
-      promptVersionId: promptVersion.id,
-      inputType,
-      title,
-      status: "PENDING",
-    },
-  });
-
-  await scheduleBackground(async () => {
-    try {
-      const outcome = await runAiExecution({
-        promptVersionId: promptVersion.id,
+    // Claude Vision呼び出しはレイテンシが大きいため、先にPENDINGなEvaluationを
+    // 作って即座に返し、実際のAI呼び出し・結果の書き込みはバックグラウンドで行う
+    // (Phase 5「バックグラウンド処理」、docs/phases/phase5-design.md参照)。
+    const evaluation = await prisma.evaluation.create({
+      data: {
         userId,
-        model: DEFAULT_MODEL,
-        variables,
-        call: async () => {
-          const content =
-            inputType === "IMAGE"
-              ? [
-                  {
-                    type: "image" as const,
-                    source: {
-                      type: "base64" as const,
-                      media_type: imageMediaType!,
-                      data: imageBase64!,
-                    },
-                  },
-                  { type: "text" as const, text: promptVersion.content },
-                ]
-              : inputType === "PDF"
+        promptVersionId: promptVersion.id,
+        inputType,
+        title,
+        status: "PENDING",
+        batchId,
+      },
+    });
+
+    await scheduleBackground(async () => {
+      try {
+        const outcome = await runAiExecution({
+          promptVersionId: promptVersion.id,
+          userId,
+          model: DEFAULT_MODEL,
+          variables,
+          call: async () => {
+            const content =
+              inputType === "IMAGE"
                 ? [
                     {
-                      type: "document" as const,
+                      type: "image" as const,
                       source: {
                         type: "base64" as const,
-                        media_type: "application/pdf" as const,
-                        data: pdfBase64!,
+                        media_type: imageMediaType!,
+                        data: imageBase64!,
                       },
                     },
                     { type: "text" as const, text: promptVersion.content },
                   ]
-                : renderTemplate(promptVersion.content, variables);
+                : inputType === "PDF"
+                  ? [
+                      {
+                        type: "document" as const,
+                        source: {
+                          type: "base64" as const,
+                          media_type: "application/pdf" as const,
+                          data: pdfBase64!,
+                        },
+                      },
+                      { type: "text" as const, text: promptVersion.content },
+                    ]
+                  : renderTemplate(promptVersion.content, variables);
 
-          const response = await anthropic.messages.parse(
-            {
-              model: DEFAULT_MODEL,
-              max_tokens: 16000,
-              messages: [{ role: "user", content }],
-              output_config: { format: zodOutputFormat(EvaluationOutputSchema) },
-            },
-            // after()のコールバックもルートのmaxDuration(60秒)の範囲内でしか実行
-            // されないため、Vercelに無言で強制終了される前にSDK側で打ち切り、
-            // runAiExecution()のcatchでFAILEDとして記録させる
-            // (Webhookレビュー: run-repository-review.tsと同じ対策、Issue #106)。
-            { timeout: 50_000 },
-          );
+            const response = await anthropic.messages.parse(
+              {
+                model: DEFAULT_MODEL,
+                max_tokens: 16000,
+                messages: [{ role: "user", content }],
+                output_config: {
+                  format: zodOutputFormat(EvaluationOutputSchema),
+                },
+              },
+              // after()のコールバックもルートのmaxDuration(60秒)の範囲内でしか実行
+              // されないため、Vercelに無言で強制終了される前にSDK側で打ち切り、
+              // runAiExecution()のcatchでFAILEDとして記録させる
+              // (Webhookレビュー: run-repository-review.tsと同じ対策、Issue #106)。
+              { timeout: 50_000 },
+            );
 
-          if (!response.parsed_output) {
-            throw new Error("構造化出力の解析に失敗しました");
-          }
+            if (!response.parsed_output) {
+              throw new Error("構造化出力の解析に失敗しました");
+            }
 
-          return {
-            resultText: EVALUATION_RESULT_PLACEHOLDER,
-            promptTokens: response.usage.input_tokens,
-            completionTokens: response.usage.output_tokens,
-            result: response.parsed_output,
-          };
-        },
-      });
-
-      if (outcome.status === "SUCCESS") {
-        const { summary, findings } = outcome.result;
-        await prisma.$transaction(async (tx) => {
-          await tx.evaluation.update({
-            where: { id: evaluation.id },
-            data: {
-              status: "SUCCESS",
-              executionId: outcome.execution.id,
-              summary: encryptField(summary),
-            },
-          });
-          if (findings.length > 0) {
-            await tx.evaluationFinding.createMany({
-              data: findings.map((f) => ({
-                evaluationId: evaluation.id,
-                label: f.label,
-                tone: f.tone,
-                score: f.score,
-                body: encryptField(f.body),
-              })),
-            });
-          }
+            return {
+              resultText: EVALUATION_RESULT_PLACEHOLDER,
+              promptTokens: response.usage.input_tokens,
+              completionTokens: response.usage.output_tokens,
+              result: response.parsed_output,
+            };
+          },
         });
-        await notifyEvaluationOutcomeBestEffort(userId, evaluation.id, title, "SUCCESS");
-        return;
+
+        if (outcome.status === "SUCCESS") {
+          const { summary, findings } = outcome.result;
+          await prisma.$transaction(async (tx) => {
+            await tx.evaluation.update({
+              where: { id: evaluation.id },
+              data: {
+                status: "SUCCESS",
+                executionId: outcome.execution.id,
+                summary: encryptField(summary),
+              },
+            });
+            if (findings.length > 0) {
+              await tx.evaluationFinding.createMany({
+                data: findings.map((f) => ({
+                  evaluationId: evaluation.id,
+                  label: f.label,
+                  tone: f.tone,
+                  score: f.score,
+                  body: encryptField(f.body),
+                })),
+              });
+            }
+          });
+          await finishEvaluationBestEffort(
+            userId,
+            evaluation.id,
+            title,
+            "SUCCESS",
+            batchId,
+          );
+          return;
+        }
+
+        await prisma.evaluation.update({
+          where: { id: evaluation.id },
+          data: { status: "FAILED", executionId: outcome.execution.id },
+        });
+        await finishEvaluationBestEffort(
+          userId,
+          evaluation.id,
+          title,
+          "FAILED",
+          batchId,
+        );
+      } catch (error) {
+        // runAiExecution自体は失敗時も例外を投げないが、その後のDB書き込みが
+        // 失敗した場合にEvaluationがPENDINGのまま残り続けるのを防ぐため、
+        // ここで確実にFAILEDへ倒す(ベストエフォート。これ自体が失敗しても
+        // ErrorLogには記録済みなので調査はできる)。
+        await logError({
+          source: "SERVER",
+          message: `評価のバックグラウンド実行に失敗しました: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+          path: "/api/evaluations",
+          userId,
+        });
+        await prisma.evaluation
+          .update({ where: { id: evaluation.id }, data: { status: "FAILED" } })
+          .catch(() => {});
+        await finishEvaluationBestEffort(
+          userId,
+          evaluation.id,
+          title,
+          "FAILED",
+          batchId,
+        );
       }
+    });
 
-      await prisma.evaluation.update({
-        where: { id: evaluation.id },
-        data: { status: "FAILED", executionId: outcome.execution.id },
-      });
-      await notifyEvaluationOutcomeBestEffort(userId, evaluation.id, title, "FAILED");
-    } catch (error) {
-      // runAiExecution自体は失敗時も例外を投げないが、その後のDB書き込みが
-      // 失敗した場合にEvaluationがPENDINGのまま残り続けるのを防ぐため、
-      // ここで確実にFAILEDへ倒す(ベストエフォート。これ自体が失敗しても
-      // ErrorLogには記録済みなので調査はできる)。
-      await logError({
-        source: "SERVER",
-        message: `評価のバックグラウンド実行に失敗しました: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-        path: "/api/evaluations",
-        userId,
-      });
-      await prisma.evaluation
-        .update({ where: { id: evaluation.id }, data: { status: "FAILED" } })
-        .catch(() => {});
-      await notifyEvaluationOutcomeBestEffort(userId, evaluation.id, title, "FAILED");
-    }
-  });
-
-  return NextResponse.json({ id: evaluation.id, status: "PENDING" }, { status: 202 });
+    return NextResponse.json(
+      { id: evaluation.id, status: "PENDING" },
+      { status: 202 },
+    );
+  } catch (error) {
+    if (batchId) await recordBatchItemSkipped(batchId);
+    await logError({
+      source: "SERVER",
+      message: `評価作成リクエストの処理に失敗しました: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      path: "/api/evaluations",
+      userId,
+    });
+    return NextResponse.json(
+      { error: "評価の作成に失敗しました" },
+      { status: 500 },
+    );
+  }
 }

@@ -104,4 +104,37 @@ describe("GET/DELETE /api/evaluations/:id", () => {
     });
     expect(findings).toHaveLength(0);
   });
+
+  it("DELETE: バッチに属するPENDING項目を削除すると完了カウンタが進み、totalに達すればまとめ通知が作られる", async () => {
+    const prompt = await createTestPrompt(userId, "batch");
+    const promptVersion = await prisma.promptVersion.findFirstOrThrow({
+      where: { promptId: prompt.id },
+    });
+    const batch = await prisma.evaluationBatch.create({
+      data: { userId, total: 1 },
+    });
+    const pending = await prisma.evaluation.create({
+      data: {
+        userId,
+        promptVersionId: promptVersion.id,
+        inputType: "IMAGE",
+        title: "削除される項目",
+        status: "PENDING",
+        batchId: batch.id,
+      },
+    });
+
+    const res = await DELETE(new Request("http://localhost"), ctx(pending.id));
+    expect(res.status).toBe(204);
+
+    const updatedBatch = await prisma.evaluationBatch.findUniqueOrThrow({
+      where: { id: batch.id },
+    });
+    expect(updatedBatch.completedCount).toBe(1);
+
+    const notifications = await prisma.notification.findMany({
+      where: { userId, link: `/evaluations/batches/${batch.id}` },
+    });
+    expect(notifications).toHaveLength(1);
+  });
 });

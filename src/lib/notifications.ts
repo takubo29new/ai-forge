@@ -26,6 +26,30 @@ export async function createEvaluationNotification({
   });
 }
 
+// バッチAI評価(Issue #108)の完了通知。バッチに属する個々のEvaluationは
+// createEvaluationNotificationを呼ばず(通知センターがバッチのファイル数分
+// 埋まってしまうのを避けるため)、バッチ全体が終端状態に達した時点でこちらを
+// 1回だけ呼ぶ(src/lib/evaluation-batch.tsのrecordBatchItemCompleted/Skipped参照)。
+export async function createBatchEvaluationNotification({
+  userId,
+  batchId,
+  total,
+  successCount,
+}: {
+  userId: string;
+  batchId: string;
+  total: number;
+  successCount: number;
+}) {
+  await prisma.notification.create({
+    data: {
+      userId,
+      message: `バッチ評価(${total}件)が完了しました(成功${successCount}件)`,
+      link: `/evaluations/batches/${batchId}`,
+    },
+  });
+}
+
 // Webhook自動レビュー(Issue #106)の完了通知。手動実行はUI側で結果を
 // 直接表示するため通知しないが、Webhookはユーザーが操作していないタイミングで
 // バックグラウンド実行されるため、完了をNotificationで知らせる。
