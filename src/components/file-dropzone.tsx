@@ -135,13 +135,20 @@ export function MultiFileDropzone({
 
   function handleFiles(fileList: FileList | null) {
     if (!fileList) return;
+    // <input accept>はクリックで開くファイル選択ダイアログには効くが、
+    // ドラッグ&ドロップ経路ではMIMEチェックが効かないため、ここで明示的に
+    // 絞り込む(絞らないと型違いのファイルが混ざり、送信後にサーバー400→
+    // skipカウントという遠回りな失敗になる)。
+    const allowedTypes = accept.split(",").map((s) => s.trim());
     // 同じファイルを追加選択したときに重複しないよう、既存分は名前+サイズ+
     // 更新日時で除外する(名前とサイズだけだと、たまたま同名・同サイズの
     // 別ファイルまで誤って弾いてしまうため)。
     const existingKeys = new Set(files.map((f) => `${f.name}:${f.size}:${f.lastModified}`));
-    const added = Array.from(fileList).filter(
-      (f) => !existingKeys.has(`${f.name}:${f.size}:${f.lastModified}`),
-    );
+    const added = Array.from(fileList)
+      .filter((f) => allowedTypes.includes(f.type))
+      .filter(
+        (f) => !existingKeys.has(`${f.name}:${f.size}:${f.lastModified}`),
+      );
     onFilesChange([...files, ...added]);
   }
 

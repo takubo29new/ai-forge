@@ -31,11 +31,19 @@ export default async function EvaluationBatchPage({
     orderBy: { createdAt: "asc" },
   });
 
-  const stillPending = evaluations.some((e) => e.status === "PENDING");
+  // 「完了したか」はEvaluation行の有無(stillPending)ではなく、権威ある
+  // completedCount/totalで判定する。クライアントはBATCH_CONCURRENCY件ずつ
+  // 逐次送信するため、まだ送信していない項目がある段階でこの画面を開くと
+  // (履歴一覧の「バッチの一部」バッジ等から)、その時点でDBに存在するのは
+  // 一部だけでPENDING行も無い、という状態がありうる。その場合をstillPending
+  // だけで判定すると「まだ送信されていない分」を「弾かれて除外された分」と
+  // 誤認して表示してしまう。
+  const finished = batch.completedCount >= batch.total;
+  const stillPending = !finished || evaluations.some((e) => e.status === "PENDING");
   // バリデーション/レート制限/クライアント側の送信失敗で弾かれた項目は
   // Evaluation行自体が作られないため、一覧には現れない(バッチの完了カウンタ
-  // 側では終端扱い済み)。件数の食い違いだけ利用者に説明する。
-  const missingCount = batch.total - evaluations.length;
+  // 側では終端扱い済み)。件数の食い違いだけ利用者に説明する(finished確定後のみ)。
+  const missingCount = finished ? batch.total - evaluations.length : 0;
 
   return (
     <div className="mx-auto w-full max-w-4xl px-6 py-8">
@@ -58,9 +66,9 @@ export default async function EvaluationBatchPage({
         </>
       )}
 
-      {!stillPending && missingCount > 0 && (
+      {missingCount > 0 && (
         <p className="mb-6 flex items-start gap-2 rounded-lg border border-amber-200 px-4 py-3 text-sm text-amber-700 dark:border-amber-900 dark:text-amber-400">
-          {missingCount}件はファイルの検証エラーや通信エラーにより送信できず、バッチから除外されました。
+          {missingCount}件はファイルの検証エラー・実行回数の上限・通信エラーのいずれかにより送信されず、バッチから除外されました。
         </p>
       )}
 

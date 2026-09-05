@@ -21,12 +21,16 @@ export function EvaluationBatchGrid({ evaluations }: { evaluations: GridEvaluati
       {evaluations.map((evaluation) => {
         const StatusIcon = STATUS_ICON[evaluation.status];
         return (
-          <Link
+          <div
             key={evaluation.id}
-            href={`/evaluations/${evaluation.id}`}
-            className="flex flex-col gap-2 rounded-lg border border-zinc-200 px-4 py-3 hover:border-zinc-300 dark:border-zinc-800 dark:hover:border-zinc-700"
+            className="flex flex-col gap-2 rounded-lg border border-zinc-200 px-4 py-3 dark:border-zinc-800"
           >
-            <p className="truncate text-sm font-medium">{evaluation.title}</p>
+            <Link
+              href={`/evaluations/${evaluation.id}`}
+              className="truncate text-sm font-medium hover:underline"
+            >
+              {evaluation.title}
+            </Link>
             <span
               className={`inline-flex w-fit items-center gap-1 text-xs ${STATUS_TEXT[evaluation.status]}`}
             >
@@ -34,6 +38,10 @@ export function EvaluationBatchGrid({ evaluations }: { evaluations: GridEvaluati
               {STATUS_LABEL[evaluation.status]}
             </span>
             {evaluation.status === "SUCCESS" && evaluation.summary && (
+              // summaryはAI生成テキストのため、Markdownがリンクを含む出力を
+              // 返す可能性がある。カード全体をLinkにすると<a>の入れ子になり
+              // 不正なDOM(ハイドレーション不一致・クリック挙動の不定)を招くため、
+              // Linkはタイトルのみに限定し、この部分は素のテキストとして表示する。
               <div className="line-clamp-4 text-xs text-zinc-600 dark:text-zinc-400">
                 <Markdown>{evaluation.summary}</Markdown>
               </div>
@@ -56,7 +64,7 @@ export function EvaluationBatchGrid({ evaluations }: { evaluations: GridEvaluati
                 })}
               </ul>
             )}
-          </Link>
+          </div>
         );
       })}
     </div>

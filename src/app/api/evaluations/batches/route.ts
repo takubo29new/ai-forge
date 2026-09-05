@@ -14,8 +14,9 @@ export async function POST(request: Request) {
   }
   const userId = session.user.id;
 
-  const body = await request.json();
-  const total = typeof body.total === "number" ? Math.trunc(body.total) : NaN;
+  const body = await request.json().catch(() => null);
+  const total =
+    typeof body?.total === "number" ? Math.trunc(body.total) : NaN;
 
   if (!Number.isFinite(total) || total < 2 || total > MAX_BATCH_SIZE) {
     return NextResponse.json(
@@ -24,6 +25,10 @@ export async function POST(request: Request) {
     );
   }
 
+  // このエンドポイントは軽量なカウンタ行(EvaluationBatch)を作るだけで実際の
+  // AI呼び出しを行わないため、専用のレート制限は設けていない。実コストが
+  // かかる呼び出しは既存のcheckEvaluationRateLimit(POST /api/evaluations側、
+  // 1件ずつ)で制限される。
   const batch = await prisma.evaluationBatch.create({
     data: { userId, total },
   });
