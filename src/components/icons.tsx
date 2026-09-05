@@ -164,6 +164,26 @@ export function FileIcon({ className = "h-4 w-4" }: IconProps) {
   );
 }
 
+// 入力形式: 音声(Issue #117)
+export function MusicIcon({ className = "h-4 w-4" }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M9 18V5l12-2v13" />
+      <circle cx="6" cy="18" r="3" />
+      <circle cx="18" cy="16" r="3" />
+    </svg>
+  );
+}
+
 // 重要度: CRITICAL(八角形に×)
 export function AlertOctagonIcon({ className = "h-4 w-4" }: IconProps) {
   return (

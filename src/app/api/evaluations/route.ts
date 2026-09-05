@@ -14,6 +14,7 @@ import {
   recordBatchItemCompleted,
   recordBatchItemSkipped,
 } from "@/lib/evaluation-batch";
+import { extractAudioFeatureSummary } from "@/lib/audio-features";
 import { encryptField } from "@/lib/field-crypto";
 import { logError } from "@/lib/error-log";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
@@ -46,6 +47,13 @@ const MAX_IMAGE_BASE64_LENGTH = Math.ceil(MAX_IMAGE_BYTES / 3) * 4;
 // 上限に絞る(リクエストサイズ・レート制限あたりのコストを抑えるため)。
 const MAX_PDF_BYTES = 20 * 1024 * 1024;
 const MAX_PDF_BASE64_LENGTH = Math.ceil(MAX_PDF_BYTES / 3) * 4;
+
+// 音声(Issue #117)。Vercelのサーバーレス関数はリクエスト本体が4.5MB固定
+// (設定で変更不可)なため、クライアント側でモノラル・8kHzにダウンサンプリング
+// した後のWAVを前提に上限を決めている(8kHz・16bit・モノラルで約1.83MB/分、
+// base64で約2.44MB/分。安全マージンを取って約3分相当の4MBを上限とする)。
+const MAX_AUDIO_BYTES = 4 * 1024 * 1024;
+const MAX_AUDIO_BASE64_LENGTH = Math.ceil(MAX_AUDIO_BYTES / 3) * 4;
 
 // Execution.resultTextは複数の実行系(プロンプト実行・AIレビュー・AI評価)で
 // 共有される列だが、AI評価の総評・観点別コメントはEvaluation.summary/
@@ -132,14 +140,16 @@ export async function POST(request: Request) {
     const body = await request.json();
     const title = typeof body.title === "string" ? body.title.trim() : "";
     const promptId = typeof body.promptId === "string" ? body.promptId : null;
-    // inputTypeは"TEXT"/"PDF"を明示した場合のみそれぞれの評価、それ以外
+    // inputTypeは"TEXT"/"PDF"/"AUDIO"を明示した場合のみそれぞれの評価、それ以外
     // (未指定含む)は既存の画像評価として扱う(後方互換)。
     const inputType =
       body.inputType === "TEXT"
         ? "TEXT"
         : body.inputType === "PDF"
           ? "PDF"
-          : "IMAGE";
+          : body.inputType === "AUDIO"
+            ? "AUDIO"
+            : "IMAGE";
 
     // TEXTは対象外(variablesベースのバッチはUI上想定していないため、指定
     // されても無視する)。batchIdは他ユーザーのバッチを誤って/不正にカウント
@@ -180,6 +190,8 @@ export async function POST(request: Request) {
       typeof body.imageMediaType === "string" ? body.imageMediaType : null;
     const pdfBase64 =
       typeof body.pdfBase64 === "string" ? body.pdfBase64 : null;
+    const audioBase64 =
+      typeof body.audioBase64 === "string" ? body.audioBase64 : null;
     // テキスト評価は既存のプロンプト実行と同じ{{変数名}}展開を使う
     // (docs/phases/phase5-design.md「対応する入力形式」参照)。
     const variables: Record<string, string> = {};
@@ -200,6 +212,16 @@ export async function POST(request: Request) {
       }
       if (pdfBase64.length > MAX_PDF_BASE64_LENGTH) {
         return fail(400, "PDFサイズが大きすぎます(20MB以下にしてください)");
+      }
+    } else if (inputType === "AUDIO") {
+      if (!audioBase64) {
+        return fail(400, "音声ファイルを指定してください");
+      }
+      if (audioBase64.length > MAX_AUDIO_BASE64_LENGTH) {
+        return fail(
+          400,
+          `音声サイズが大きすぎます(ダウンサンプリング後で${(MAX_AUDIO_BYTES / 1024 / 1024).toFixed(0)}MB以下にしてください)`,
+        );
       }
     } else {
       const rawVariables = body.variables;
@@ -271,7 +293,12 @@ export async function POST(request: Request) {
                       },
                       { type: "text" as const, text: promptVersion.content },
                     ]
-                  : renderTemplate(promptVersion.content, variables);
+                  : inputType === "AUDIO"
+                    ? // Claude Messages APIには音声content blockが無いため、
+                      // meydaで抽出した音響特徴の説明文をプロンプト本文に付け加えた
+                      // プレーンな文字列として渡す(TEXT分岐と同じcontent形状)。
+                      `${promptVersion.content}\n\n[音響特徴データ]\n${extractAudioFeatureSummary(audioBase64!)}`
+                    : renderTemplate(promptVersion.content, variables);
 
             const response = await anthropic.messages.parse(
               {
