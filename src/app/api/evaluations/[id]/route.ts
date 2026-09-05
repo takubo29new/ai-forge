@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { recordBatchItemCompleted } from "@/lib/evaluation-batch";
 
 export async function GET(
   _request: Request,
@@ -49,6 +50,13 @@ export async function DELETE(
   }
 
   await prisma.evaluation.delete({ where: { id } });
+
+  // バッチAI評価(Issue #108)。まだPENDINGのバッチ項目を削除すると、その項目は
+  // 二度と終端状態(SUCCESS/FAILED)に達しないため、削除時点で完了カウンタを
+  // 進めておかないとバッチが永遠にtotalへ到達せずまとめ通知が送られない。
+  if (evaluation.batchId && evaluation.status === "PENDING") {
+    await recordBatchItemCompleted(evaluation.batchId);
+  }
 
   return new NextResponse(null, { status: 204 });
 }

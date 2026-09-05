@@ -37,6 +37,27 @@ describe("evaluation-batch", () => {
     expect(notifications).toHaveLength(1);
   });
 
+  it("重複呼び出しがあってもcompletedCountはtotalを超えない", async () => {
+    const batch = await prisma.evaluationBatch.create({
+      data: { userId, total: 2 },
+    });
+
+    // リクエストの重複/リプレイを想定し、実際のtotalより多く呼び出す。
+    await Promise.all(
+      Array.from({ length: 5 }, () => recordBatchItemCompleted(batch.id)),
+    );
+
+    const updated = await prisma.evaluationBatch.findUniqueOrThrow({
+      where: { id: batch.id },
+    });
+    expect(updated.completedCount).toBe(2);
+
+    const notifications = await prisma.notification.findMany({
+      where: { userId, link: `/evaluations/batches/${batch.id}` },
+    });
+    expect(notifications).toHaveLength(1);
+  });
+
   it("バリデーションで弾かれた件数(skipped)もtotalに到達させる", async () => {
     const batch = await prisma.evaluationBatch.create({
       data: { userId, total: 2 },

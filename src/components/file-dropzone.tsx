@@ -135,10 +135,12 @@ export function MultiFileDropzone({
 
   function handleFiles(fileList: FileList | null) {
     if (!fileList) return;
-    // 同じファイルを追加選択したときに重複しないよう、既存分は名前+サイズで除外する。
-    const existingKeys = new Set(files.map((f) => `${f.name}:${f.size}`));
+    // 同じファイルを追加選択したときに重複しないよう、既存分は名前+サイズ+
+    // 更新日時で除外する(名前とサイズだけだと、たまたま同名・同サイズの
+    // 別ファイルまで誤って弾いてしまうため)。
+    const existingKeys = new Set(files.map((f) => `${f.name}:${f.size}:${f.lastModified}`));
     const added = Array.from(fileList).filter(
-      (f) => !existingKeys.has(`${f.name}:${f.size}`),
+      (f) => !existingKeys.has(`${f.name}:${f.size}:${f.lastModified}`),
     );
     onFilesChange([...files, ...added]);
   }

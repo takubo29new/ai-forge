@@ -32,6 +32,10 @@ export default async function EvaluationBatchPage({
   });
 
   const stillPending = evaluations.some((e) => e.status === "PENDING");
+  // バリデーション/レート制限/クライアント側の送信失敗で弾かれた項目は
+  // Evaluation行自体が作られないため、一覧には現れない(バッチの完了カウンタ
+  // 側では終端扱い済み)。件数の食い違いだけ利用者に説明する。
+  const missingCount = batch.total - evaluations.length;
 
   return (
     <div className="mx-auto w-full max-w-4xl px-6 py-8">
@@ -52,6 +56,12 @@ export default async function EvaluationBatchPage({
           </p>
           <BatchPendingRefresher />
         </>
+      )}
+
+      {!stillPending && missingCount > 0 && (
+        <p className="mb-6 flex items-start gap-2 rounded-lg border border-amber-200 px-4 py-3 text-sm text-amber-700 dark:border-amber-900 dark:text-amber-400">
+          {missingCount}件はファイルの検証エラーや通信エラーにより送信できず、バッチから除外されました。
+        </p>
       )}
 
       <ul className="mb-6 flex flex-col gap-2">

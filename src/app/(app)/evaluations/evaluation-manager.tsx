@@ -162,13 +162,25 @@ export function EvaluationManager({
               ),
             });
             if (!res.ok) {
+              // サーバーに届いた上でのバリデーション/レート制限エラーは、
+              // route.ts側のfail()が既に完了カウンタを進めているため、
+              // ここで重ねて進める必要はない。
               failedNames.push(f.name);
               continue;
             }
-            const created: { id: string } = await res.json();
-            registerPending(created.id);
+            // バッチ項目は個別のトースト通知を出さない(完了時のまとめ通知と
+            // このバッチ結果画面の進捗表示だけで足りるため、registerPendingは
+            // 呼ばない)。
+            await res.json();
           } catch {
+            // ファイル読み込み失敗やネットワーク断でリクエスト自体がサーバーに
+            // 届かなかった場合、サーバーはこの項目の存在を一切知らないため、
+            // ベストエフォートで明示的に完了カウンタを進めてもらう
+            // (これをしないとバッチが永遠にtotalへ到達しない)。
             failedNames.push(f.name);
+            await fetch(`/api/evaluations/batches/${batchId}/skip`, {
+              method: "POST",
+            }).catch(() => {});
           }
         }
       }

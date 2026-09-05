@@ -154,7 +154,7 @@ export async function POST(request: Request) {
   // リクエストの場合はここで完了カウンタを進めておかないと、そのバッチが
   // いつまでもtotalに到達せずまとめ通知が送られなくなる。
   async function fail(status: number, error: string) {
-    if (batchId) await recordBatchItemSkipped(batchId).catch(() => {});
+    if (batchId) await recordBatchItemSkipped(batchId);
     return NextResponse.json({ error }, { status });
   }
 
@@ -207,7 +207,7 @@ export async function POST(request: Request) {
 
   const rateLimit = await checkEvaluationRateLimit(userId);
   if (!rateLimit.allowed) {
-    if (batchId) await recordBatchItemSkipped(batchId).catch(() => {});
+    if (batchId) await recordBatchItemSkipped(batchId);
     return rateLimitResponse(rateLimit.limit);
   }
 
