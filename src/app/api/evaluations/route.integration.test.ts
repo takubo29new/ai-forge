@@ -315,6 +315,113 @@ describe("POST /api/evaluations", () => {
     expect(content.some((b) => b.type === "text")).toBe(true);
   });
 
+  it("batchIdを指定すると個別通知の代わりにバッチ完了時のまとめ通知が1回だけ作られる", async () => {
+    const batch = await prisma.evaluationBatch.create({
+      data: { userId, total: 2 },
+    });
+
+    mockParse.mockResolvedValue({
+      parsed_output: { summary: "ok", findings: [] },
+      usage: { input_tokens: 1, output_tokens: 1 },
+    } as never);
+
+    const res1 = await POST(
+      request({
+        title: "1件目",
+        promptId,
+        imageBase64: TINY_PNG_BASE64,
+        imageMediaType: "image/png",
+        batchId: batch.id,
+      }),
+    );
+    const { id: id1 } = await res1.json();
+
+    const res2 = await POST(
+      request({
+        title: "2件目",
+        promptId,
+        imageBase64: TINY_PNG_BASE64,
+        imageMediaType: "image/png",
+        batchId: batch.id,
+      }),
+    );
+    const { id: id2 } = await res2.json();
+
+    // バッチに属する個々のEvaluationは通知センターを埋めないよう、個別通知を作らない。
+    expect(
+      await prisma.notification.findFirst({ where: { userId, link: `/evaluations/${id1}` } }),
+    ).toBeNull();
+    expect(
+      await prisma.notification.findFirst({ where: { userId, link: `/evaluations/${id2}` } }),
+    ).toBeNull();
+
+    const batchNotifications = await prisma.notification.findMany({
+      where: { userId, link: `/evaluations/batches/${batch.id}` },
+    });
+    expect(batchNotifications).toHaveLength(1);
+    expect(batchNotifications[0].message).toBe("バッチ評価(2件)が完了しました(成功2件)");
+  });
+
+  it("バッチ内の1件が失敗しても、まとめ通知は成功件数を正しく報告する", async () => {
+    const batch = await prisma.evaluationBatch.create({
+      data: { userId, total: 2 },
+    });
+
+    mockParse
+      .mockResolvedValueOnce({
+        parsed_output: { summary: "ok", findings: [] },
+        usage: { input_tokens: 1, output_tokens: 1 },
+      } as never)
+      .mockRejectedValueOnce(new Error("upstream boom"));
+
+    await POST(
+      request({
+        title: "成功分",
+        promptId,
+        imageBase64: TINY_PNG_BASE64,
+        imageMediaType: "image/png",
+        batchId: batch.id,
+      }),
+    );
+    await POST(
+      request({
+        title: "失敗分",
+        promptId,
+        imageBase64: TINY_PNG_BASE64,
+        imageMediaType: "image/png",
+        batchId: batch.id,
+      }),
+    );
+
+    const batchNotification = await prisma.notification.findFirst({
+      where: { userId, link: `/evaluations/batches/${batch.id}` },
+    });
+    expect(batchNotification?.message).toBe("バッチ評価(2件)が完了しました(成功1件)");
+  });
+
+  it("他ユーザーのbatchIdを指定すると400を返す", async () => {
+    const otherUser = await prisma.user.create({
+      data: { email: `other-${Date.now()}@example.test` },
+    });
+    const otherBatch = await prisma.evaluationBatch.create({
+      data: { userId: otherUser.id, total: 2 },
+    });
+
+    const res = await POST(
+      request({
+        title: "夕食",
+        promptId,
+        imageBase64: TINY_PNG_BASE64,
+        imageMediaType: "image/png",
+        batchId: otherBatch.id,
+      }),
+    );
+    expect(res.status).toBe(400);
+
+    await prisma.evaluationBatch.deleteMany({ where: { userId: otherUser.id } });
+    await prisma.user.delete({ where: { id: otherUser.id } });
+  });
+
   it("評価系レート制限の上限に達すると429を返す", async () => {
     mockParse.mockResolvedValue({
       parsed_output: { summary: "ok", findings: [] },

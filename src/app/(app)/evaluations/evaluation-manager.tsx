@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { PageSizeSelect } from "@/components/page-size-select";
-import { FileDropzone } from "@/components/file-dropzone";
+import { FileDropzone, MultiFileDropzone } from "@/components/file-dropzone";
 import { useApiMutation } from "@/lib/use-api-mutation";
 import { Spinner } from "@/components/spinner";
 import { useToast } from "@/components/toast-provider";
@@ -15,6 +15,7 @@ import { submitOnModEnter } from "@/lib/keyboard-shortcuts";
 import { ImageIcon, FileTextIcon, FileIcon } from "@/components/icons";
 import { INPUT_TYPE_LABEL, INPUT_TYPE_ICON, type EvaluationInputType } from "@/lib/evaluation-input-type";
 import { STATUS_LABEL, STATUS_ICON, STATUS_TEXT, type FlowStatus } from "@/lib/execution-status";
+import { MAX_BATCH_SIZE } from "@/lib/evaluation-batch-limits";
 
 type EvaluationStatus = FlowStatus;
 type InputType = EvaluationInputType;
@@ -26,6 +27,7 @@ type Evaluation = {
   inputType: InputType;
   findingCount: number;
   createdAt: string;
+  batchId: string | null;
 };
 
 type Prompt = { id: string; title: string; content: string };
@@ -68,16 +70,19 @@ export function EvaluationManager({
   const [promptId, setPromptId] = useState(prompts[0]?.id ?? "");
   const [inputType, setInputType] = useState<InputType>("IMAGE");
   const [file, setFile] = useState<File | null>(null);
+  const [batchMode, setBatchMode] = useState(false);
+  const [batchFiles, setBatchFiles] = useState<File[]>([]);
   const [variableValues, setVariableValues] = useState<Record<string, string>>({});
   const [deleteTarget, setDeleteTarget] = useState<Evaluation | null>(null);
   const [reading, setReading] = useState(false);
+  const [batchSubmitting, setBatchSubmitting] = useState(false);
   const { mutate, pending, error, setError } = useApiMutation();
   const del = useApiMutation();
   const { showToast } = useToast();
   const { registerPending } = usePendingEvaluations();
   // pendingはmutate()呼び出し以降しかtrueにならないため、それより前段の
   // ファイル読み込み中もあわせてガードしないと二重送信を防げない。
-  const busy = pending || reading;
+  const busy = pending || reading || batchSubmitting;
 
   const selectedPrompt = prompts.find((p) => p.id === promptId);
   // テキスト評価は既存のプロンプト実行(execute-tab.tsx)と同じ{{変数名}}展開を
@@ -88,12 +93,110 @@ export function EvaluationManager({
     [selectedPrompt],
   );
 
+  // バッチAI評価(Issue #108)。実際のAI呼び出しは既存のPOST /api/evaluationsを
+  // クライアントが1件ずつ呼ぶ(client-orchestrated)。Vercel Hobbyの60秒上限に
+  // 対して1件のClaude呼び出しだけで50秒近く使う既存の設計上、1リクエストで
+  // 複数件を逐次処理することはできないため、サーバー側にバッチ用ワーカーは
+  // 設けず、ブラウザ側で小さめの同時実行数に絞ってPOSTを繰り返す。
+  const BATCH_CONCURRENCY = 2;
+
+  async function submitBatch() {
+    if (batchFiles.length < 2) {
+      setError("バッチには2件以上のファイルを選択してください");
+      return;
+    }
+    if (batchFiles.length > MAX_BATCH_SIZE) {
+      setError(`バッチは${MAX_BATCH_SIZE}件までです`);
+      return;
+    }
+    const maxBytes = inputType === "IMAGE" ? MAX_IMAGE_BYTES : MAX_PDF_BYTES;
+    const oversized = batchFiles.find((f) => f.size > maxBytes);
+    if (oversized) {
+      setError(
+        (inputType === "IMAGE"
+          ? "画像サイズが大きすぎます(5MB以下にしてください): "
+          : "PDFサイズが大きすぎます(20MB以下にしてください): ") + oversized.name,
+      );
+      return;
+    }
+
+    setBatchSubmitting(true);
+    setError(null);
+    try {
+      const batchRes = await mutate<{ batchId: string }>(
+        "/api/evaluations/batches",
+        { method: "POST", body: { total: batchFiles.length } },
+        "バッチの作成に失敗しました",
+      );
+      if (!batchRes) return;
+      const { batchId } = batchRes;
+
+      const failedNames: string[] = [];
+      let cursor = 0;
+
+      async function worker() {
+        while (cursor < batchFiles.length) {
+          const f = batchFiles[cursor++];
+          try {
+            const base64 = await readFileAsBase64(f);
+            const res = await fetch("/api/evaluations", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(
+                inputType === "IMAGE"
+                  ? {
+                      title: `${title}(${f.name})`,
+                      promptId,
+                      inputType: "IMAGE",
+                      imageBase64: base64,
+                      imageMediaType: f.type,
+                      batchId,
+                    }
+                  : {
+                      title: `${title}(${f.name})`,
+                      promptId,
+                      inputType: "PDF",
+                      pdfBase64: base64,
+                      batchId,
+                    },
+              ),
+            });
+            if (!res.ok) {
+              failedNames.push(f.name);
+              continue;
+            }
+            const created: { id: string } = await res.json();
+            registerPending(created.id);
+          } catch {
+            failedNames.push(f.name);
+          }
+        }
+      }
+
+      await Promise.all(
+        Array.from({ length: Math.min(BATCH_CONCURRENCY, batchFiles.length) }, worker),
+      );
+
+      if (failedNames.length > 0) {
+        showToast(`一部のファイルの送信に失敗しました: ${failedNames.join("、")}`);
+      }
+      router.push(`/evaluations/batches/${batchId}`);
+    } finally {
+      setBatchSubmitting(false);
+    }
+  }
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (busy) return;
 
     if (!title.trim()) {
       setError("タイトルを入力してください");
+      return;
+    }
+
+    if (batchMode && (inputType === "IMAGE" || inputType === "PDF")) {
+      await submitBatch();
       return;
     }
 
@@ -158,6 +261,9 @@ export function EvaluationManager({
   function handleInputTypeChange(next: InputType) {
     setInputType(next);
     setFile(null);
+    setBatchFiles([]);
+    // TEXTはバッチ対象外(variablesベースのバッチはUI上想定していない)。
+    if (next === "TEXT") setBatchMode(false);
   }
 
   async function handleDelete() {
@@ -249,20 +355,50 @@ export function EvaluationManager({
               </label>
             </div>
           </div>
+          {(inputType === "IMAGE" || inputType === "PDF") && (
+            <label className="flex items-center gap-1.5 text-sm">
+              <input
+                type="checkbox"
+                checked={batchMode}
+                onChange={(e) => {
+                  setBatchMode(e.target.checked);
+                  setFile(null);
+                  setBatchFiles([]);
+                }}
+              />
+              複数ファイルをまとめて評価する(バッチ、最大{MAX_BATCH_SIZE}件・1時間あたりの実行回数を1件ごとに消費します)
+            </label>
+          )}
           {inputType === "IMAGE" ? (
             <div>
               <label className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400">画像</label>
-              <FileDropzone
-                accept="image/jpeg,image/png,image/gif,image/webp"
-                file={file}
-                onChange={setFile}
-                previewImage
-              />
+              {batchMode ? (
+                <MultiFileDropzone
+                  accept="image/jpeg,image/png,image/gif,image/webp"
+                  files={batchFiles}
+                  onFilesChange={setBatchFiles}
+                />
+              ) : (
+                <FileDropzone
+                  accept="image/jpeg,image/png,image/gif,image/webp"
+                  file={file}
+                  onChange={setFile}
+                  previewImage
+                />
+              )}
             </div>
           ) : inputType === "PDF" ? (
             <div>
               <label className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400">PDFファイル</label>
-              <FileDropzone accept="application/pdf" file={file} onChange={setFile} />
+              {batchMode ? (
+                <MultiFileDropzone
+                  accept="application/pdf"
+                  files={batchFiles}
+                  onFilesChange={setBatchFiles}
+                />
+              ) : (
+                <FileDropzone accept="application/pdf" file={file} onChange={setFile} />
+              )}
             </div>
           ) : variableNames.length > 0 ? (
             <div className="flex flex-col gap-2">
@@ -298,7 +434,11 @@ export function EvaluationManager({
             className="inline-flex items-center gap-1.5 self-start rounded bg-accent transition-opacity hover:opacity-90 px-4 py-1.5 text-sm font-medium text-white disabled:opacity-50"
           >
             {busy && <Spinner className="h-4 w-4" />}
-            {busy ? "評価中..." : "評価を実行"}
+            {busy
+              ? "評価中..."
+              : batchMode
+                ? `${batchFiles.length || ""}件を評価`
+                : "評価を実行"}
           </button>
           {error && !deleteTarget && (
             <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
@@ -348,6 +488,14 @@ export function EvaluationManager({
                   )}
                 </p>
               </Link>
+              {evaluation.batchId && (
+                <Link
+                  href={`/evaluations/batches/${evaluation.batchId}`}
+                  className="shrink-0 rounded border border-zinc-300 px-2 py-1 text-xs text-zinc-500 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                >
+                  バッチの一部
+                </Link>
+              )}
               <button
                 onClick={() => setDeleteTarget(evaluation)}
                 disabled={del.pending}

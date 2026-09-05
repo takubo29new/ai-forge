@@ -10,6 +10,7 @@ import { renderTemplate } from "@/lib/prompt-variables";
 import { runAiExecution } from "@/lib/run-ai-execution";
 import { scheduleBackground } from "@/lib/schedule-background";
 import { createEvaluationNotification } from "@/lib/notifications";
+import { recordBatchItemCompleted, recordBatchItemSkipped } from "@/lib/evaluation-batch";
 import { encryptField } from "@/lib/field-crypto";
 import { logError } from "@/lib/error-log";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
@@ -75,6 +76,23 @@ async function notifyEvaluationOutcomeBestEffort(
   }
 }
 
+// バッチAI評価(Issue #108)に属する場合は個別のEvaluation単位では通知せず、
+// バッチ全体の完了カウンタを進める(通知センターがバッチのファイル数分埋まる
+// のを避けるため)。単独の評価はこれまでどおり1件ずつ通知する。
+async function finishEvaluationBestEffort(
+  userId: string,
+  evaluationId: string,
+  title: string,
+  status: "SUCCESS" | "FAILED",
+  batchId: string | null,
+) {
+  if (batchId) {
+    await recordBatchItemCompleted(batchId);
+    return;
+  }
+  await notifyEvaluationOutcomeBestEffort(userId, evaluationId, title, status);
+}
+
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) {
@@ -110,11 +128,38 @@ export async function POST(request: Request) {
         ? "PDF"
         : "IMAGE";
 
+  // バッチAI評価(Issue #108)。TEXTは対象外(variablesベースのバッチはUI上
+  // 想定していないため、指定されても無視する)。batchIdは他ユーザーのバッチを
+  // 誤って/不正にカウントしないよう、所有権を確認できたものだけを以降で使う。
+  const rawBatchId =
+    typeof body.batchId === "string" &&
+    (inputType === "IMAGE" || inputType === "PDF")
+      ? body.batchId
+      : null;
+  let batchId: string | null = null;
+  if (rawBatchId) {
+    const batch = await prisma.evaluationBatch.findFirst({
+      where: { id: rawBatchId, userId },
+    });
+    if (!batch) {
+      return NextResponse.json(
+        { error: "バッチが見つかりません" },
+        { status: 400 },
+      );
+    }
+    batchId = batch.id;
+  }
+
+  // バリデーションで弾かれるとEvaluation行自体が作られないため、バッチに属する
+  // リクエストの場合はここで完了カウンタを進めておかないと、そのバッチが
+  // いつまでもtotalに到達せずまとめ通知が送られなくなる。
+  async function fail(status: number, error: string) {
+    if (batchId) await recordBatchItemSkipped(batchId).catch(() => {});
+    return NextResponse.json({ error }, { status });
+  }
+
   if (!title || !promptId) {
-    return NextResponse.json(
-      { error: "タイトル・プロンプトを指定してください" },
-      { status: 400 },
-    );
+    return fail(400, "タイトル・プロンプトを指定してください");
   }
 
   const imageBase64 =
@@ -128,35 +173,20 @@ export async function POST(request: Request) {
 
   if (inputType === "IMAGE") {
     if (!imageBase64 || !imageMediaType) {
-      return NextResponse.json(
-        { error: "画像を指定してください" },
-        { status: 400 },
-      );
+      return fail(400, "画像を指定してください");
     }
     if (!isImageMediaType(imageMediaType)) {
-      return NextResponse.json(
-        { error: "対応していない画像形式です(jpeg/png/gif/webpのみ)" },
-        { status: 400 },
-      );
+      return fail(400, "対応していない画像形式です(jpeg/png/gif/webpのみ)");
     }
     if (imageBase64.length > MAX_IMAGE_BASE64_LENGTH) {
-      return NextResponse.json(
-        { error: "画像サイズが大きすぎます(5MB以下にしてください)" },
-        { status: 400 },
-      );
+      return fail(400, "画像サイズが大きすぎます(5MB以下にしてください)");
     }
   } else if (inputType === "PDF") {
     if (!pdfBase64) {
-      return NextResponse.json(
-        { error: "PDFファイルを指定してください" },
-        { status: 400 },
-      );
+      return fail(400, "PDFファイルを指定してください");
     }
     if (pdfBase64.length > MAX_PDF_BASE64_LENGTH) {
-      return NextResponse.json(
-        { error: "PDFサイズが大きすぎます(20MB以下にしてください)" },
-        { status: 400 },
-      );
+      return fail(400, "PDFサイズが大きすぎます(20MB以下にしてください)");
     }
   } else {
     const rawVariables = body.variables;
@@ -172,14 +202,12 @@ export async function POST(request: Request) {
     orderBy: { versionNumber: "desc" },
   });
   if (!promptVersion) {
-    return NextResponse.json(
-      { error: "プロンプトが見つかりません" },
-      { status: 400 },
-    );
+    return fail(400, "プロンプトが見つかりません");
   }
 
   const rateLimit = await checkEvaluationRateLimit(userId);
   if (!rateLimit.allowed) {
+    if (batchId) await recordBatchItemSkipped(batchId).catch(() => {});
     return rateLimitResponse(rateLimit.limit);
   }
 
@@ -193,6 +221,7 @@ export async function POST(request: Request) {
       inputType,
       title,
       status: "PENDING",
+      batchId,
     },
   });
 
@@ -281,7 +310,7 @@ export async function POST(request: Request) {
             });
           }
         });
-        await notifyEvaluationOutcomeBestEffort(userId, evaluation.id, title, "SUCCESS");
+        await finishEvaluationBestEffort(userId, evaluation.id, title, "SUCCESS", batchId);
         return;
       }
 
@@ -289,7 +318,7 @@ export async function POST(request: Request) {
         where: { id: evaluation.id },
         data: { status: "FAILED", executionId: outcome.execution.id },
       });
-      await notifyEvaluationOutcomeBestEffort(userId, evaluation.id, title, "FAILED");
+      await finishEvaluationBestEffort(userId, evaluation.id, title, "FAILED", batchId);
     } catch (error) {
       // runAiExecution自体は失敗時も例外を投げないが、その後のDB書き込みが
       // 失敗した場合にEvaluationがPENDINGのまま残り続けるのを防ぐため、
@@ -306,7 +335,7 @@ export async function POST(request: Request) {
       await prisma.evaluation
         .update({ where: { id: evaluation.id }, data: { status: "FAILED" } })
         .catch(() => {});
-      await notifyEvaluationOutcomeBestEffort(userId, evaluation.id, title, "FAILED");
+      await finishEvaluationBestEffort(userId, evaluation.id, title, "FAILED", batchId);
     }
   });
 

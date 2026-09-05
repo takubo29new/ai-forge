@@ -23,18 +23,19 @@ model User {
   emailVerified DateTime?
   image         String?
 
-  accounts         Account[]
-  sessions         Session[]
-  categories       Category[]
-  prompts          Prompt[]
-  executions       Execution[]
-  repositories     Repository[]
-  reviews          Review[]
-  rateLimitBuckets RateLimitBucket[]
-  errorLogs        ErrorLog[]
-  documents        Document[]
-  evaluations      Evaluation[]
-  notifications    Notification[]
+  accounts          Account[]
+  sessions          Session[]
+  categories        Category[]
+  prompts           Prompt[]
+  executions        Execution[]
+  repositories      Repository[]
+  reviews           Review[]
+  rateLimitBuckets  RateLimitBucket[]
+  errorLogs         ErrorLog[]
+  documents         Document[]
+  evaluations       Evaluation[]
+  evaluationBatches EvaluationBatch[]
+  notifications     Notification[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -174,6 +175,38 @@ model Execution {
   createdAt DateTime @default(now())
 
   @@index([promptVersionId])
+  @@index([userId])
+}
+
+// 複数ファイルを1つの論理的な「バッチ」としてまとめて評価する際の完了カウンタ
+// (バッチAI評価、Issue #108)。実際のAI呼び出しは1件ずつ既存のEvaluation作成フロー
+// (POST /api/evaluations)をクライアントが繰り返し呼ぶ形(client-orchestrated)を
+// 使い回すため、サーバー側は「あと何件残っているか」「まとめ通知を送るのは誰の
+// 役目か」だけをこの1行で原子的に管理する(completedCountのincrementはRateLimitBucket
+// と同じくPostgres側でアトミック、notifiedAtのclaimはReviewのPENDING→PROCESSING
+// claim-loop [updateMany]と同じ考え方)。
+model EvaluationBatch {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // クライアントが送信を予定しているファイル数。POST /api/evaluations/batches
+  // 作成時に確定し、以降は変更しない。
+  total Int
+
+  // 終端状態(SUCCESS/FAILED)に達した、またはバリデーション/レート制限で
+  // Evaluation行自体が作られずに弾かれた件数の合計。totalに達した瞬間がバッチ完了。
+  completedCount Int @default(0)
+
+  // まとめ通知を実際に送ろうとしたタイミング。null→非nullへの更新はupdateManyの
+  // WHERE条件により一度しか成功しないため、これを「通知を送る権利のclaim」として使う。
+  notifiedAt DateTime?
+
+  evaluations Evaluation[]
+
+  createdAt DateTime @default(now())
+
   @@index([userId])
 }
 
@@ -484,11 +517,19 @@ model Evaluation {
 
   createdAt DateTime @default(now())
 
+  // バッチAI評価(Issue #108)。複数ファイルをまとめて評価した際、同じバッチに
+  // 属するEvaluationがこの列を共有する(IMAGE/PDFのみ、TEXTは対象外)。
+  // バッチ自体を削除する経路は無いが、EvaluationBatch側からのCascadeで個々の
+  // Evaluationが消えるのは望ましくないためSetNullにする。
+  batchId String?
+  batch   EvaluationBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+
   // Reviewと同じ設計の読み取り専用公開共有リンク用トークン。
   shareToken String?   @unique
   sharedAt   DateTime?
 
   @@index([userId])
+  @@index([batchId])
 }
 
 enum EvaluationTone {
@@ -511,7 +552,7 @@ model EvaluationFinding {
   // AES-256-GCMで暗号化して保存する(src/lib/field-crypto.ts)。この列の暗号化を
   // 導入する前に作成された行は平文のままで、読み取り時にそのまま扱われる
   // (GitHubトークン暗号化と同じ後方互換の考え方)。
-  body String @db.Text
+  body  String         @db.Text
 
   createdAt DateTime @default(now())
 
