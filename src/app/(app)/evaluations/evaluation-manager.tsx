@@ -12,10 +12,11 @@ import { useToast } from "@/components/toast-provider";
 import { usePendingEvaluations } from "@/components/pending-evaluations-context";
 import { extractVariableNames } from "@/lib/prompt-variables";
 import { submitOnModEnter } from "@/lib/keyboard-shortcuts";
-import { ImageIcon, FileTextIcon, FileIcon } from "@/components/icons";
+import { ImageIcon, FileTextIcon, FileIcon, MusicIcon } from "@/components/icons";
 import { INPUT_TYPE_LABEL, INPUT_TYPE_ICON, type EvaluationInputType } from "@/lib/evaluation-input-type";
 import { STATUS_LABEL, STATUS_ICON, STATUS_TEXT, type FlowStatus } from "@/lib/execution-status";
 import { MAX_BATCH_SIZE } from "@/lib/evaluation-batch-limits";
+import { downsampleAudioToWavBase64 } from "@/lib/audio-downsample";
 
 type EvaluationStatus = FlowStatus;
 type InputType = EvaluationInputType;
@@ -36,6 +37,9 @@ type Prompt = { id: string; title: string; content: string };
 // 判定に委ね、ここでは明らかに大きすぎるファイルを早期に弾くだけに留める。
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_PDF_BYTES = 20 * 1024 * 1024;
+// 音声はダウンサンプリング後(モノラル・8kHz・16bit)のWAVサイズに対する上限。
+// route.ts側のMAX_AUDIO_BYTESと一致させる。
+const MAX_AUDIO_BYTES = 4 * 1024 * 1024;
 
 function readFileAsBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -252,6 +256,31 @@ export function EvaluationManager({
         },
         "評価の実行に失敗しました",
       );
+    } else if (inputType === "AUDIO") {
+      if (!file) {
+        setError("音声ファイルを選択してください");
+        return;
+      }
+
+      setReading(true);
+      let base64: string;
+      try {
+        base64 = await downsampleAudioToWavBase64(file, MAX_AUDIO_BYTES);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "音声の読み込みに失敗しました");
+        setReading(false);
+        return;
+      }
+      setReading(false);
+
+      data = await mutate<{ id: string }>(
+        "/api/evaluations",
+        {
+          method: "POST",
+          body: { title, promptId, inputType: "AUDIO", audioBase64: base64 },
+        },
+        "評価の実行に失敗しました",
+      );
     } else {
       data = await mutate<{ id: string }>(
         "/api/evaluations",
@@ -276,8 +305,9 @@ export function EvaluationManager({
     setInputType(next);
     setFile(null);
     setBatchFiles([]);
-    // TEXTはバッチ対象外(variablesベースのバッチはUI上想定していない)。
-    if (next === "TEXT") setBatchMode(false);
+    // TEXT/AUDIOはバッチ対象外(variablesベースのバッチはUI上想定していない、
+    // 音声は#108のバッチ対応を見送っている)。
+    if (next === "TEXT" || next === "AUDIO") setBatchMode(false);
   }
 
   async function handleDelete() {
@@ -367,6 +397,16 @@ export function EvaluationManager({
                 <FileIcon className="h-4 w-4" />
                 PDF
               </label>
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="radio"
+                  name="inputType"
+                  checked={inputType === "AUDIO"}
+                  onChange={() => handleInputTypeChange("AUDIO")}
+                />
+                <MusicIcon className="h-4 w-4" />
+                音声
+              </label>
             </div>
           </div>
           {(inputType === "IMAGE" || inputType === "PDF") && (
@@ -413,6 +453,14 @@ export function EvaluationManager({
               ) : (
                 <FileDropzone accept="application/pdf" file={file} onChange={setFile} />
               )}
+            </div>
+          ) : inputType === "AUDIO" ? (
+            <div>
+              <label className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400">音声ファイル</label>
+              <FileDropzone accept="audio/*" file={file} onChange={setFile} />
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                送信前にブラウザ側でモノラル・低音質にダウンサンプリングします(音量・音高・音色の傾向を分析、テンポ/BPMは非対応)。長さの目安は3分程度までです。
+              </p>
             </div>
           ) : variableNames.length > 0 ? (
             <div className="flex flex-col gap-2">

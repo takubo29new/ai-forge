@@ -479,6 +479,11 @@ enum EvaluationInputType {
   IMAGE
   TEXT
   PDF
+  // 音声(Issue #117)。Claude Messages APIが音声content blockを持たないため、
+  // サーバー側でmeydaにより抽出した音響特徴(音量・明るさ・ノイズ感・音高分布等)を
+  // 日本語の説明文に変換し、TEXT分岐と同じ「contentは文字列」の形でClaudeに渡す
+  // (専用のcontent block種別は追加しない)。バッチAI評価(#108)は対象外。
+  AUDIO
 }
 
 enum EvaluationStatus {
