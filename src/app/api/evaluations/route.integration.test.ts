@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
+import * as wav from "node-wav";
 
 vi.mock("@/auth", () => ({ auth: vi.fn() }));
 vi.mock("@/lib/anthropic", () => ({
@@ -26,6 +27,17 @@ const mockParse = vi.mocked(anthropic.messages.parse);
 
 const TINY_PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+
+// 2秒・440Hzの正弦波(モノラル・8kHz・16bit)。audio-downsample.tsがブラウザで
+// 生成するのと同じ形のWAV。
+function sineWaveWavBase64(durationSeconds = 2, sampleRate = 8000) {
+  const n = sampleRate * durationSeconds;
+  const samples = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    samples[i] = Math.sin((2 * Math.PI * 440 * i) / sampleRate) * 0.5;
+  }
+  return wav.encode([samples], { sampleRate, bitDepth: 16 }).toString("base64");
+}
 
 function request(body: unknown) {
   return new Request("http://localhost/api/evaluations", {
@@ -313,6 +325,65 @@ describe("POST /api/evaluations", () => {
     const documentBlock = content.find((b) => b.type === "document");
     expect(documentBlock?.source?.media_type).toBe("application/pdf");
     expect(content.some((b) => b.type === "text")).toBe(true);
+  });
+
+  it("inputType: AUDIOで音声を指定しないと400を返す", async () => {
+    const res = await POST(
+      request({ title: "自作曲", promptId, inputType: "AUDIO" }),
+    );
+    expect(res.status).toBe(400);
+    expect(mockParse).not.toHaveBeenCalled();
+  });
+
+  it("音声サイズの上限(base64換算)を超えると400を返す", async () => {
+    const oversized = "A".repeat(Math.ceil((4 * 1024 * 1024) / 3) * 4 + 4);
+    const res = await POST(
+      request({
+        title: "自作曲",
+        promptId,
+        inputType: "AUDIO",
+        audioBase64: oversized,
+      }),
+    );
+    expect(res.status).toBe(400);
+    expect(mockParse).not.toHaveBeenCalled();
+  });
+
+  it("inputType: AUDIOを指定すると音響特徴の説明文をプロンプト本文に付け加えた文字列としてClaudeに渡す", async () => {
+    mockParse.mockResolvedValue({
+      parsed_output: {
+        summary: "落ち着いた雰囲気の楽曲です",
+        findings: [{ label: "音高", tone: "POSITIVE", score: null, body: "..." }],
+      },
+      usage: { input_tokens: 100, output_tokens: 50 },
+    } as never);
+
+    const res = await POST(
+      request({
+        title: "自作曲",
+        promptId,
+        inputType: "AUDIO",
+        audioBase64: sineWaveWavBase64(),
+      }),
+    );
+    expect(res.status).toBe(202);
+    const { id: evaluationId } = await res.json();
+
+    const evaluation = await prisma.evaluation.findUnique({
+      where: { id: evaluationId },
+      include: { findings: true },
+    });
+    expect(evaluation?.status).toBe("SUCCESS");
+    expect(evaluation?.inputType).toBe("AUDIO");
+    expect(evaluation?.findings).toHaveLength(1);
+
+    // Claude Messages APIには音声content blockが無いため、TEXT分岐と同じく
+    // contentは配列ではなくプレーンな文字列として渡っている。
+    const call = mockParse.mock.calls[0][0];
+    expect(typeof call.messages[0].content).toBe("string");
+    expect(call.messages[0].content as string).toContain("この画像を評価してください");
+    expect(call.messages[0].content as string).toContain("[音響特徴データ]");
+    expect(call.messages[0].content as string).toContain("主要な音高");
   });
 
   it("batchIdを指定すると個別通知の代わりにバッチ完了時のまとめ通知が1回だけ作られる", async () => {
