@@ -41,22 +41,7 @@ function encodeWav(samples: Float32Array, sampleRate: number): ArrayBuffer {
   return buffer;
 }
 
-function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result;
-      if (typeof result !== "string") {
-        reject(new Error("音声データの変換に失敗しました"));
-        return;
-      }
-      const commaIndex = result.indexOf(",");
-      resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
-    };
-    reader.onerror = () => reject(new Error("音声データの変換に失敗しました"));
-    reader.readAsDataURL(blob);
-  });
-}
+import { blobToBase64 } from "@/lib/blob-to-base64";
 
 // ファイルをモノラル・8kHz・16bit PCMのWAVにダウンサンプリングし、base64化して返す。
 // maxBytesを超えた場合は例外を投げる(冒頭だけを黙って評価すると誤解を招くため、
@@ -66,18 +51,26 @@ export async function downsampleAudioToWavBase64(
   maxBytes: number,
 ): Promise<string> {
   const arrayBuffer = await file.arrayBuffer();
-  const AudioContextCtor =
-    window.AudioContext ||
-    (window as unknown as { webkitAudioContext: typeof AudioContext })
-      .webkitAudioContext;
-  const audioContext = new AudioContextCtor();
   let decoded: AudioBuffer;
+  let audioContext: AudioContext | undefined;
   try {
+    const AudioContextCtor =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext })
+        .webkitAudioContext;
+    audioContext = new AudioContextCtor();
     decoded = await audioContext.decodeAudioData(arrayBuffer);
   } catch {
     throw new Error("音声ファイルの読み込みに失敗しました");
   } finally {
-    await audioContext.close();
+    await audioContext?.close();
+  }
+
+  // サーバー側(audio-features.ts)の1秒未満エラーと同じ基準。ここで弾いて
+  // おかないと、次のOfflineAudioContextの生成が長さ0で呼ばれて例外になる
+  // (仕様上、長さ0のOfflineAudioContextは作成できない)。
+  if (decoded.duration < 1) {
+    throw new Error("音声が短すぎます(1秒以上にしてください)");
   }
 
   const targetLength = Math.ceil(decoded.duration * TARGET_SAMPLE_RATE);

@@ -17,6 +17,8 @@ import { INPUT_TYPE_LABEL, INPUT_TYPE_ICON, type EvaluationInputType } from "@/l
 import { STATUS_LABEL, STATUS_ICON, STATUS_TEXT, type FlowStatus } from "@/lib/execution-status";
 import { MAX_BATCH_SIZE } from "@/lib/evaluation-batch-limits";
 import { downsampleAudioToWavBase64 } from "@/lib/audio-downsample";
+import { MAX_AUDIO_BYTES, MAX_ORIGINAL_AUDIO_BYTES } from "@/lib/evaluation-audio-limits";
+import { blobToBase64 as readFileAsBase64 } from "@/lib/blob-to-base64";
 
 type EvaluationStatus = FlowStatus;
 type InputType = EvaluationInputType;
@@ -37,27 +39,6 @@ type Prompt = { id: string; title: string; content: string };
 // 判定に委ね、ここでは明らかに大きすぎるファイルを早期に弾くだけに留める。
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_PDF_BYTES = 20 * 1024 * 1024;
-// 音声はダウンサンプリング後(モノラル・8kHz・16bit)のWAVサイズに対する上限。
-// route.ts側のMAX_AUDIO_BYTESと一致させる。
-const MAX_AUDIO_BYTES = 4 * 1024 * 1024;
-
-function readFileAsBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result;
-      if (typeof result !== "string") {
-        reject(new Error("ファイルの読み込みに失敗しました"));
-        return;
-      }
-      // data:image/png;base64,xxxx... のうちbase64本体だけを取り出す
-      const commaIndex = result.indexOf(",");
-      resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
-    };
-    reader.onerror = () => reject(new Error("ファイルの読み込みに失敗しました"));
-    reader.readAsDataURL(file);
-  });
-}
 
 export function EvaluationManager({
   initialEvaluations,
@@ -259,6 +240,15 @@ export function EvaluationManager({
     } else if (inputType === "AUDIO") {
       if (!file) {
         setError("音声ファイルを選択してください");
+        return;
+      }
+      // ダウンサンプリング後のサイズ(MAX_AUDIO_BYTES)とは別に、明らかに
+      // 大きすぎる元ファイル(IMAGE/PDFと同じく早期に弾くだけの簡易チェック)を
+      // ブラウザでのデコード(AudioContext.decodeAudioData)前に弾く。
+      if (file.size > MAX_ORIGINAL_AUDIO_BYTES) {
+        setError(
+          `音声ファイルが大きすぎます(${(MAX_ORIGINAL_AUDIO_BYTES / 1024 / 1024).toFixed(0)}MB以下にしてください)`,
+        );
         return;
       }
 

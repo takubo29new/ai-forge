@@ -15,6 +15,7 @@ import {
   recordBatchItemSkipped,
 } from "@/lib/evaluation-batch";
 import { extractAudioFeatureSummary } from "@/lib/audio-features";
+import { MAX_AUDIO_BYTES } from "@/lib/evaluation-audio-limits";
 import { encryptField } from "@/lib/field-crypto";
 import { logError } from "@/lib/error-log";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
@@ -48,11 +49,8 @@ const MAX_IMAGE_BASE64_LENGTH = Math.ceil(MAX_IMAGE_BYTES / 3) * 4;
 const MAX_PDF_BYTES = 20 * 1024 * 1024;
 const MAX_PDF_BASE64_LENGTH = Math.ceil(MAX_PDF_BYTES / 3) * 4;
 
-// 音声(Issue #117)。Vercelのサーバーレス関数はリクエスト本体が4.5MB固定
-// (設定で変更不可)なため、クライアント側でモノラル・8kHzにダウンサンプリング
-// した後のWAVを前提に上限を決めている(8kHz・16bit・モノラルで約1.83MB/分、
-// base64で約2.44MB/分。安全マージンを取って約3分相当の4MBを上限とする)。
-const MAX_AUDIO_BYTES = 4 * 1024 * 1024;
+// 音声(Issue #117)。クライアント側(evaluation-manager.tsx)と同じ上限を
+// src/lib/evaluation-audio-limits.tsに集約している。
 const MAX_AUDIO_BASE64_LENGTH = Math.ceil(MAX_AUDIO_BYTES / 3) * 4;
 
 // Execution.resultTextは複数の実行系(プロンプト実行・AIレビュー・AI評価)で

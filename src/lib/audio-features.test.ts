@@ -42,4 +42,41 @@ describe("extractAudioFeatureSummary", () => {
       "音声ファイルの読み込みに失敗しました",
     );
   });
+
+  it("ステレオのWAVは例外を投げる(クライアントは必ずモノラルで送る前提)", () => {
+    const n = 44100 * 2;
+    const left = new Float32Array(n);
+    const right = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      left[i] = Math.sin((2 * Math.PI * 440 * i) / 44100) * 0.5;
+      right[i] = left[i];
+    }
+    const stereoBase64 = wav
+      .encode([left, right], { sampleRate: 44100, float: true, bitDepth: 32 })
+      .toString("base64");
+    expect(() => extractAudioFeatureSummary(stereoBase64)).toThrow(
+      "モノラルのWAVのみ対応しています",
+    );
+  });
+
+  it("高い周波数の音は低い周波数の音より明るさ(スペクトル重心)が高く判定される", () => {
+    // spectralCentroidはFFTのビン番号の加重平均であり周波数(Hz)ではないため、
+    // 正規化の分母を誤ると(sampleRate/2で割ると)常に小さい値になり、実際の
+    // 明るさの違いを区別できなくなる不具合があった。この回帰を検出するテスト。
+    const lowSummary = extractAudioFeatureSummary(sineWaveWavBase64(440, 2, 44100));
+    const highSummary = extractAudioFeatureSummary(sineWaveWavBase64(8000, 2, 44100));
+    expect(lowSummary).toMatch(/明るさ\(スペクトル重心\): 低い/);
+    expect(highSummary).toMatch(/明るさ\(スペクトル重心\): 高い/);
+  });
+
+  it("完全な無音でも例外を投げず、NaNに汚染されない(明るさ・ノイズ感を「高い」と誤判定しない)", () => {
+    const silence = new Float32Array(44100 * 2);
+    const silentBase64 = wav
+      .encode([silence], { sampleRate: 44100, float: true, bitDepth: 32 })
+      .toString("base64");
+    const summary = extractAudioFeatureSummary(silentBase64);
+    expect(summary).not.toContain("NaN");
+    expect(summary).toMatch(/明るさ\(スペクトル重心\): 低い/);
+    expect(summary).toMatch(/ノイズ感\(スペクトル平坦度\): 低い/);
+  });
 });

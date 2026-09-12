@@ -56,6 +56,14 @@ export function extractAudioFeatureSummary(wavBase64: string): string {
     throw new Error("音声ファイルの読み込みに失敗しました(WAV形式のみ対応しています)");
   }
 
+  // クライアント(audio-downsample.ts)は必ずモノラルにダウンサンプリングしてから
+  // 送信するが、このAPIを直接叩く呼び出し元がステレオWAVを送る可能性を排除できない
+  // ため、ここでも明示的に検証する(左チャンネルだけを無言で使うと分析結果が
+  // 不完全になるため)。
+  if (decoded.channelData.length !== 1) {
+    throw new Error("音声はモノラルのWAVのみ対応しています");
+  }
+
   const signal = decoded.channelData[0];
   const sampleRate = decoded.sampleRate;
   const durationSeconds = signal.length / sampleRate;
@@ -64,12 +72,18 @@ export function extractAudioFeatureSummary(wavBase64: string): string {
     throw new Error("音声が短すぎます(1秒以上にしてください)");
   }
 
+  // MeydaはbufferSize/sampleRateをモジュール共有の可変状態として持つ(呼び出し
+  // ごとの引数ではない)。この設定と下のフレーム抽出ループの間にawaitを挟むと、
+  // サンプルレートの異なる音声を並行処理した際に互いの設定を上書きしうるため、
+  // 挟まないこと。
   Meyda.bufferSize = BUFFER_SIZE;
   Meyda.sampleRate = sampleRate;
 
   let rmsSum = 0;
   let centroidSum = 0;
+  let centroidCount = 0;
   let flatnessSum = 0;
+  let flatnessCount = 0;
   let rolloffSum = 0;
   let zcrSum = 0;
   const chromaSum = new Array(12).fill(0);
@@ -81,8 +95,21 @@ export function extractAudioFeatureSummary(wavBase64: string): string {
     if (!features) continue;
 
     rmsSum += features.rms as number;
-    centroidSum += features.spectralCentroid as number;
-    flatnessSum += features.spectralFlatness as number;
+    // spectralCentroid/spectralFlatnessはどちらも無音フレーム(振幅スペクトルが
+    // 全帯域0)だと0/0のNaNを返しうる(meydaの実装に0除算ガードが無いため)。
+    // rms/spectralRolloff/zcr/chromaはmeyda側で0除算ガード済みか、そもそも
+    // 0除算が起きない計算式のため対象外。NaNのフレームは平均から除外し、
+    // 有効なフレーム数だけで割ることで無音区間に汚染されないようにする。
+    const centroid = features.spectralCentroid as number;
+    if (!Number.isNaN(centroid)) {
+      centroidSum += centroid;
+      centroidCount++;
+    }
+    const flatness = features.spectralFlatness as number;
+    if (!Number.isNaN(flatness)) {
+      flatnessSum += flatness;
+      flatnessCount++;
+    }
     rolloffSum += features.spectralRolloff as number;
     zcrSum += features.zcr as number;
     const chroma = features.chroma as number[];
@@ -95,10 +122,15 @@ export function extractAudioFeatureSummary(wavBase64: string): string {
   }
 
   const rms = rmsSum / frameCount;
-  // spectralCentroidはナイキスト周波数(sampleRate/2)を上限とする周波数値。
-  // 「明るさ」の目安として0〜1に正規化してから3段階の形容詞に変換する。
-  const centroidNormalized = centroidSum / frameCount / (sampleRate / 2);
-  const flatness = flatnessSum / frameCount;
+  // spectralCentroidはmeydaでは周波数(Hz)ではなく振幅スペクトルのビン番号の
+  // 加重平均で返ってくる(0〜ampSpectrum.length-1、ampSpectrum.length は
+  // 概ねBUFFER_SIZE/2+1)。「明るさ」の目安として0〜1に正規化するには
+  // ナイキスト周波数(sampleRate/2)ではなく最大ビン番号(BUFFER_SIZE/2)で
+  // 割る必要がある(spectralRolloffは既にHzで返ってくるため、そちらは
+  // sampleRate/2で正しい)。
+  const centroidNormalized =
+    centroidCount > 0 ? centroidSum / centroidCount / (BUFFER_SIZE / 2) : 0;
+  const flatness = flatnessCount > 0 ? flatnessSum / flatnessCount : 0;
   const rolloffNormalized = rolloffSum / frameCount / (sampleRate / 2);
   const zcr = zcrSum / frameCount / BUFFER_SIZE;
 
